@@ -16,17 +16,21 @@ type Props = {
 }
 
 export async function generateStaticParams() {
-  const products = await getProductsList({}).then(
-    ({ response }) => response.products
-  )
+  try {
+    const products = await getProductsList({}).then(
+      ({ response }) => response.products
+    )
 
-  if (!products) {
+    if (!products) {
+      return []
+    }
+
+    return products.map((product) => ({
+      handle: product.handle,
+    }))
+  } catch (error) {
     return []
   }
-
-  return products.map((product) => ({
-    handle: product.handle,
-  }))
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
