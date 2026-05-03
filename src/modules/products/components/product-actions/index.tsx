@@ -4,13 +4,16 @@ import { Region } from "@medusajs/medusa"
 import { PricedProduct } from "@medusajs/medusa/dist/types/pricing"
 import { Button } from "@medusajs/ui"
 import { isEqual } from "lodash"
-import { useParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { useIntersection } from "@lib/hooks/use-in-view"
 import { addToCart } from "@modules/cart/actions"
 import Divider from "@modules/common/components/divider"
 import OptionSelect from "@modules/products/components/option-select"
+import CakeCustomizer from "@modules/products/components/cake-customizer"
+import { isCake } from "@lib/util/product-guards"
+import { formatDate, getEarliestDeliveryDate } from "@lib/util/delivery-utils"
+import type { DeliveryTimeSlot } from "@lib/types/product-contract"
 
 import MobileActions from "../mobile-actions"
 import ProductPrice from "../product-price"
@@ -36,7 +39,15 @@ export default function ProductActions({
   const [options, setOptions] = useState<Record<string, string>>({})
   const [isAdding, setIsAdding] = useState(false)
 
-  const countryCode = useParams().countryCode as string
+  // Cake customization state
+  const isCakeProduct = isCake(product)
+  const [cakeMessage, setCakeMessage] = useState("")
+  const [deliveryDate, setDeliveryDate] = useState(() =>
+    formatDate(getEarliestDeliveryDate())
+  )
+  const [deliveryTimeSlot, setDeliveryTimeSlot] = useState<
+    DeliveryTimeSlot | ""
+  >("")
 
   const variants = product.variants
 
@@ -126,10 +137,21 @@ export default function ProductActions({
 
     setIsAdding(true)
 
+    // Build metadata for cake products
+    const metadata: Record<string, unknown> | undefined = isCakeProduct
+      ? {
+          ...(cakeMessage ? { message: cakeMessage } : {}),
+          ...(deliveryDate ? { delivery_date: deliveryDate } : {}),
+          ...(deliveryTimeSlot
+            ? { delivery_time_slot: deliveryTimeSlot }
+            : {}),
+        }
+      : undefined
+
     await addToCart({
       variantId: variant.id,
       quantity: 1,
-      countryCode,
+      metadata: metadata && Object.keys(metadata).length > 0 ? metadata : undefined,
     })
 
     setIsAdding(false)
@@ -162,6 +184,18 @@ export default function ProductActions({
 
         <ProductPrice product={product} variant={variant} region={region} />
 
+        {/* Cake customization: message + delivery date/time */}
+        {isCakeProduct && (
+          <CakeCustomizer
+            message={cakeMessage}
+            deliveryDate={deliveryDate}
+            deliveryTimeSlot={deliveryTimeSlot}
+            onMessageChange={setCakeMessage}
+            onDeliveryDateChange={setDeliveryDate}
+            onDeliveryTimeSlotChange={setDeliveryTimeSlot}
+          />
+        )}
+
         <Button
           onClick={handleAddToCart}
           disabled={!inStock || !variant || !!disabled || isAdding}
@@ -174,6 +208,8 @@ export default function ProductActions({
             ? "Select variant"
             : !inStock
             ? "Out of stock"
+            : isCakeProduct
+            ? "🎂 Add Cake to Cart"
             : "Add to cart"}
         </Button>
         <MobileActions

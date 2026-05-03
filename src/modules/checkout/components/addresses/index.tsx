@@ -4,7 +4,6 @@ import {
   useSearchParams,
   useRouter,
   usePathname,
-  useParams,
 } from "next/navigation"
 import { Cart, Customer } from "@medusajs/medusa"
 import { CheckCircleSolid } from "@medusajs/icons"
@@ -31,9 +30,9 @@ const Addresses = ({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const params = useParams()
 
-  const countryCode = params.countryCode as string
+  // India-only: fixed country code. Future: derive from [region] param.
+  const countryCode = "in"
 
   const isOpen = searchParams.get("step") === "address"
 

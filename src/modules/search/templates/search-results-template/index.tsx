@@ -11,7 +11,6 @@ type SearchResultsTemplateProps = {
   ids: string[]
   sortBy?: SortOptions
   page?: string
-  countryCode: string
 }
 
 const SearchResultsTemplate = ({
@@ -19,7 +18,6 @@ const SearchResultsTemplate = ({
   ids,
   sortBy,
   page,
-  countryCode,
 }: SearchResultsTemplateProps) => {
   const pageNumber = page ? parseInt(page) : 1
 
@@ -48,7 +46,6 @@ const SearchResultsTemplate = ({
                 productsIds={ids}
                 sortBy={sortBy}
                 page={pageNumber}
-                countryCode={countryCode}
               />
             </div>
           </>

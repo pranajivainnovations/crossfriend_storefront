@@ -34,6 +34,19 @@ module.exports = {
           80: "#1F2937",
           90: "#111827",
         },
+        // CrossFriend celebration palette
+        cf: {
+          orange: "#FF6B35",
+          "orange-dark": "#E55A25",
+          coral: "#FF4F6F",
+          pink: "#FF2D87",
+          yellow: "#FFD166",
+          "yellow-light": "#FFE49A",
+          purple: "#7B2FF7",
+          "purple-light": "#9B5FFF",
+          warm: "#FFF7F0",
+          "warm-dark": "#FFEEDD",
+        },
       },
       borderRadius: {
         none: "0px",
@@ -60,6 +73,7 @@ module.exports = {
       },
       fontFamily: {
         sans: [
+          "var(--font-inter)",
           "Inter",
           "-apple-system",
           "BlinkMacSystemFont",
@@ -67,6 +81,14 @@ module.exports = {
           "Roboto",
           "Helvetica Neue",
           "Ubuntu",
+          "sans-serif",
+        ],
+        heading: [
+          "var(--font-poppins)",
+          "Poppins",
+          "Inter",
+          "-apple-system",
+          "BlinkMacSystemFont",
           "sans-serif",
         ],
       },
@@ -140,6 +162,29 @@ module.exports = {
           "0%": { transform: "translateY(-100%)" },
           "100%": { transform: "translateY(0)" },
         },
+        // CrossFriend celebration keyframes
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        "bounce-in": {
+          "0%": { transform: "scale(0.3)", opacity: "0" },
+          "50%": { transform: "scale(1.05)", opacity: "1" },
+          "70%": { transform: "scale(0.9)" },
+          "100%": { transform: "scale(1)" },
+        },
+        "confetti-fall": {
+          "0%": { transform: "translateY(-10%) rotate(0deg)", opacity: "1" },
+          "100%": { transform: "translateY(100%) rotate(720deg)", opacity: "0" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-6px)" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
+        },
       },
       animation: {
         ring: "ring 2.2s cubic-bezier(0.5, 0, 0.5, 1) infinite",
@@ -155,6 +200,12 @@ module.exports = {
         enter: "enter 200ms ease-out",
         "slide-in": "slide-in 1.2s cubic-bezier(.41,.73,.51,1.02)",
         leave: "leave 150ms ease-in forwards",
+        // CrossFriend celebration animations
+        shimmer: "shimmer 2s linear infinite",
+        "bounce-in": "bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+        "confetti-fall": "confetti-fall 3s ease-in forwards",
+        float: "float 3s ease-in-out infinite",
+        "pulse-soft": "pulse-soft 2s ease-in-out infinite",
       },
     },
   },
