@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  crossfriend-storefront:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Build-time environment variables (NEXT_PUBLIC_* are baked into client JS)
+        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-http://localhost:9001}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8000}
+        NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
+    image: crossfriend-storefront:latest
+    container_name: crossfriend-storefront
+    ports:
+      - "8000:8000"
+    environment:
+      # Runtime environment variables
+      NODE_ENV: production
+      PORT: 8000
+      # Server-side URL (container → host) for SSR
+      MEDUSA_BACKEND_URL: http://host.docker.internal:9001
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-http://localhost:9001}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8000}
+      NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - crossfriend-network
+
+networks:
+  crossfriend-network:
+    driver: bridge

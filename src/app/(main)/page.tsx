@@ -24,10 +24,11 @@ export const metadata: Metadata = {
 
 const getCollectionsWithProducts = cache(
   async (): Promise<ProductCollectionWithPreviews[] | null> => {
-    const { collections } = await getCollectionsList(0, 3)
+    try {
+      const { collections } = await getCollectionsList(0, 3)
 
-    if (!collections) {
-      return null
+      if (!collections) {
+        return null
     }
 
     const collectionIds = collections.map((collection) => collection.id)
@@ -57,6 +58,9 @@ const getCollectionsWithProducts = cache(
     )
 
     return collections as unknown as ProductCollectionWithPreviews[]
+    } catch (error) {
+      return null
+    }
   }
 )
 
