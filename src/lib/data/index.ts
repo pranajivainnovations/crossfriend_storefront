@@ -1,6 +1,7 @@
 import {
   ProductCategory,
   ProductCollection,
+  ProductType,
   Region,
   StoreGetProductsParams,
   StorePostAuthReq,
@@ -17,6 +18,12 @@ import sortProducts from "@lib/util/sort-products"
 import transformProductPreview from "@lib/util/transform-product-preview"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import { ProductCategoryWithChildren, ProductPreviewType } from "types/global"
+import {
+  PRODUCT_TYPES as CF_PRODUCT_TYPES,
+  type ProductType as CfProductType,
+  type OccasionCollection,
+} from "@lib/types/product-contract"
+import { getProductType } from "@lib/util/product-guards"
 
 import { medusaClient } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
@@ -89,15 +96,17 @@ export async function addItem({
   cartId,
   variantId,
   quantity,
+  metadata,
 }: {
   cartId: string
   variantId: string
   quantity: number
+  metadata?: Record<string, unknown>
 }) {
   const headers = getMedusaHeaders(["cart"])
 
   return medusaClient.carts.lineItems
-    .create(cartId, { variant_id: variantId, quantity }, headers)
+    .create(cartId, { variant_id: variantId, quantity, metadata }, headers)
     .then(({ cart }) => cart)
     .catch((err) => {
       console.log(err)
@@ -359,12 +368,19 @@ export const retrieveRegion = cache(async function (id: string) {
     .catch((err) => medusaError(err))
 })
 
+/**
+ * India-only: Fixed country code.
+ * Future: accept region param for city/area-based routing.
+ */
+const COUNTRY_CODE = process.env.NEXT_PUBLIC_DEFAULT_REGION || "in"
+
 const regionMap = new Map<string, Region>()
 
-export const getRegion = cache(async function (countryCode: string) {
+export const getRegion = cache(async function (countryCode?: string) {
+  const code = countryCode || COUNTRY_CODE
   try {
-    if (regionMap.has(countryCode)) {
-      return regionMap.get(countryCode)
+    if (regionMap.has(code)) {
+      return regionMap.get(code)
     }
 
     const regions = await listRegions()
@@ -379,9 +395,7 @@ export const getRegion = cache(async function (countryCode: string) {
       })
     })
 
-    const region = countryCode
-      ? regionMap.get(countryCode)
-      : regionMap.get("us")
+    const region = regionMap.get(code) || regionMap.values().next().value
 
     return region
   } catch (e: any) {
@@ -449,7 +463,7 @@ export const getProductsList = cache(async function ({
 }: {
   pageParam?: number
   queryParams?: StoreGetProductsParams
-  countryCode: string
+  countryCode?: string
 }): Promise<{
   response: { products: ProductPreviewType[]; count: number }
   nextPage: number | null
@@ -501,7 +515,7 @@ export const getProductsListWithSort = cache(
     page?: number
     queryParams?: StoreGetProductsParams
     sortBy?: SortOptions
-    countryCode: string
+    countryCode?: string
   }): Promise<{
     response: { products: ProductPreviewType[]; count: number }
     nextPage: number | null
@@ -546,7 +560,7 @@ export const getHomepageProducts = cache(async function getHomepageProducts({
 }: {
   collectionHandles?: string[]
   currencyCode: string
-  countryCode: string
+  countryCode?: string
 }) {
   const collectionProductsMap = new Map<string, ProductPreviewType[]>()
 
@@ -625,7 +639,7 @@ export const getProductsByCollectionHandle = cache(
     pageParam?: number
     handle: string
     limit?: number
-    countryCode: string
+    countryCode?: string
     currencyCode?: string
   }): Promise<{
     response: { products: ProductPreviewType[]; count: number }
@@ -730,7 +744,7 @@ export const getProductsByCategoryHandle = cache(async function ({
 }: {
   pageParam?: number
   handle: string
-  countryCode: string
+  countryCode?: string
   currencyCode?: string
 }): Promise<{
   response: { products: ProductPreviewType[]; count: number }
@@ -754,4 +768,175 @@ export const getProductsByCategoryHandle = cache(async function ({
     response,
     nextPage,
   }
+})
+
+// ============================================
+// CrossFriend — Generic Data Layer
+// ============================================
+
+/**
+ * Cached product-type lookup.
+ * Resolves a type value string (e.g. "cake") to the Medusa type_id.
+ * The map is populated lazily on first call.
+ */
+const productTypeMap = new Map<string, string>() // value → id
+
+async function resolveProductTypeId(
+  typeValue: string
+): Promise<string | null> {
+  if (productTypeMap.size === 0) {
+    try {
+      const { product_types } = await medusaClient.productTypes.list(
+        { limit: 100 },
+        { next: { tags: ["product-types"] } }
+      )
+      for (const pt of product_types) {
+        productTypeMap.set(pt.value.toLowerCase(), pt.id)
+      }
+    } catch (err) {
+      console.warn("[CrossFriend] Failed to fetch product types:", err)
+      return null
+    }
+  }
+  return productTypeMap.get(typeValue.toLowerCase()) ?? null
+}
+
+/**
+ * Resolve an occasion slug (collection handle) to its Medusa collection.
+ * Returns null if the collection doesn't exist.
+ */
+export const getCollectionBySlug = cache(async function (
+  slug: string
+): Promise<ProductCollection | null> {
+  try {
+    const collection = await getCollectionByHandle(slug)
+    return collection ?? null
+  } catch {
+    return null
+  }
+})
+
+// --- Generic getProducts() ---
+
+export interface GetProductsOptions {
+  /** Filter by CrossFriend product type value (cake, decor, gift, costume, wellness) */
+  type?: CfProductType
+  /** Filter by occasion collection slug (birthday, anniversary, festival, kids, special) */
+  collection?: OccasionCollection | string
+  /** Filter by Medusa tag IDs */
+  tags?: string[]
+  /** Max products to return (default 12) */
+  limit?: number
+  /** Pagination offset (default 0) */
+  offset?: number
+  /** Optional: Medusa collection_id to use directly (skips slug resolution) */
+  collectionId?: string
+}
+
+export interface GetProductsResult {
+  products: PricedProduct[]
+  count: number
+  /** Products transformed to preview format (with prices) */
+  previews: ProductPreviewType[]
+}
+
+/**
+ * Generic product fetcher for the CrossFriend storefront.
+ *
+ * Resolves human-friendly filters (type value, occasion slug) to Medusa IDs,
+ * fetches products, and returns both raw PricedProduct[] and transformed previews.
+ *
+ * Runtime validation: logs warnings for products missing type or collection
+ * in development. Never crashes on bad data.
+ */
+export const getProducts = cache(async function (
+  options: GetProductsOptions = {}
+): Promise<GetProductsResult> {
+  const {
+    type,
+    collection,
+    tags,
+    limit = 12,
+    offset = 0,
+    collectionId,
+  } = options
+
+  const region = await getRegion()
+  if (!region) {
+    return { products: [], count: 0, previews: [] }
+  }
+
+  // Build query params
+  const queryParams: StoreGetProductsParams = {
+    limit,
+    offset,
+    region_id: region.id,
+  }
+
+  // Resolve type value → type_id
+  if (type) {
+    const typeId = await resolveProductTypeId(type)
+    if (typeId) {
+      queryParams.type_id = [typeId]
+    } else {
+      console.warn(
+        `[CrossFriend] Product type "${type}" not found in Medusa. Returning empty.`
+      )
+      return { products: [], count: 0, previews: [] }
+    }
+  }
+
+  // Resolve collection slug → collection_id
+  if (collectionId) {
+    queryParams.collection_id = [collectionId]
+  } else if (collection) {
+    const col = await getCollectionBySlug(collection)
+    if (col) {
+      queryParams.collection_id = [col.id]
+    } else {
+      console.warn(
+        `[CrossFriend] Collection "${collection}" not found in Medusa. Returning empty.`
+      )
+      return { products: [], count: 0, previews: [] }
+    }
+  }
+
+  // Tags
+  if (tags && tags.length > 0) {
+    queryParams.tags = tags
+  }
+
+  // Fetch
+  const headers = getMedusaHeaders(["products"])
+  let products: PricedProduct[] = []
+  let count = 0
+
+  try {
+    const res = await medusaClient.products.list(queryParams, headers)
+    products = res.products
+    count = res.count
+  } catch (err) {
+    console.error("[CrossFriend] getProducts() failed:", err)
+    return { products: [], count: 0, previews: [] }
+  }
+
+  // Runtime validation (dev only)
+  if (process.env.NODE_ENV === "development") {
+    for (const p of products) {
+      const pType = getProductType(p)
+      if (!pType) {
+        console.warn(
+          `[CrossFriend] Product "${p.title}" (${p.id}) has no valid type. ` +
+            `Expected one of: ${CF_PRODUCT_TYPES.join(", ")}`
+        )
+      }
+    }
+  }
+
+  // Transform to previews
+  const previews = products.map((product) =>
+    transformProductPreview(product, region!)
+  )
+
+  return { products, count, previews }
 })

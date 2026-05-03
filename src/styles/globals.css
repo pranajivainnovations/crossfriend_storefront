@@ -110,3 +110,108 @@
     @apply text-[32px] leading-[44px] font-semibold;
   }
 }
+
+/* ============================================
+   CrossFriend — Celebration Design Tokens
+   ============================================ */
+
+/* Gradient utilities */
+@layer utilities {
+  .gradient-cf {
+    background: linear-gradient(135deg, #FF6B35 0%, #FF4F6F 50%, #FF2D87 100%);
+  }
+
+  .gradient-cf-warm {
+    background: linear-gradient(135deg, #FFF7F0 0%, #FFEEDD 100%);
+  }
+
+  .gradient-cf-purple {
+    background: linear-gradient(135deg, #7B2FF7 0%, #9B5FFF 100%);
+  }
+
+  .gradient-cf-sunset {
+    background: linear-gradient(135deg, #FF6B35 0%, #FFD166 100%);
+  }
+
+  .gradient-cf-text {
+    background: linear-gradient(135deg, #FF6B35 0%, #FF2D87 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Hover scale for cards / interactive elements */
+  .hover-lift {
+    @apply transition-transform duration-200 ease-out;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-1;
+  }
+
+  /* Shimmer loading effect */
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      #f0f0f0 25%,
+      #e0e0e0 50%,
+      #f0f0f0 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Celebration section headings */
+  .cf-heading {
+    @apply font-heading font-semibold tracking-tight;
+  }
+
+  /* Urgency banner pulse */
+  .urgency-pulse {
+    @apply animate-pulse-soft;
+  }
+
+  /* Soft warm page background */
+  .bg-cf-page {
+    @apply bg-cf-warm;
+  }
+}
+
+@layer components {
+  /* Primary CTA button */
+  .btn-cf-primary {
+    @apply px-6 py-3 rounded-full font-heading font-semibold text-white
+           gradient-cf hover:opacity-90 transition-opacity duration-200
+           shadow-md hover:shadow-lg;
+  }
+
+  /* Secondary / outline CTA */
+  .btn-cf-secondary {
+    @apply px-6 py-3 rounded-full font-heading font-semibold
+           border-2 border-cf-orange text-cf-orange
+           hover:bg-cf-orange hover:text-white
+           transition-colors duration-200;
+  }
+
+  /* Category / occasion pill chip */
+  .chip-cf {
+    @apply inline-flex items-center gap-1.5 px-4 py-1.5
+           rounded-full text-sm font-medium
+           bg-cf-warm text-cf-orange
+           hover:bg-cf-orange hover:text-white
+           transition-colors duration-200 cursor-pointer;
+  }
+
+  /* Card with warm shadow */
+  .card-cf {
+    @apply bg-white rounded-2xl overflow-hidden
+           shadow-sm hover:shadow-md
+           transition-shadow duration-200;
+  }
+
+  /* Urgency / countdown banner */
+  .banner-urgency {
+    @apply flex items-center gap-2 px-4 py-2
+           bg-cf-coral text-white text-sm font-medium
+           rounded-lg urgency-pulse;
+  }
+}

@@ -262,11 +262,11 @@ export async function updateCustomerBillingAddress(
   }
 }
 
-export async function signOut(countryCode: string) {
+export async function signOut() {
   cookies().set("_medusa_jwt", "", {
     maxAge: -1,
   })
   revalidateTag("auth")
   revalidateTag("customer")
-  redirect(`/${countryCode}/account`)
+  redirect(`/account`)
 }

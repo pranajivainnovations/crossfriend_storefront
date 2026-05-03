@@ -3,17 +3,16 @@ import { Suspense } from "react"
 import SkeletonProductGrid from "@modules/skeletons/templates/skeleton-product-grid"
 import RefinementList from "@modules/store/components/refinement-list"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
+import StoreFilters from "@modules/store/components/store-filters"
 
 import PaginatedProducts from "./paginated-products"
 
 const StoreTemplate = ({
   sortBy,
   page,
-  countryCode,
 }: {
   sortBy?: SortOptions
   page?: string
-  countryCode: string
 }) => {
   const pageNumber = page ? parseInt(page) : 1
 
@@ -21,14 +20,23 @@ const StoreTemplate = ({
     <div className="flex flex-col small:flex-row small:items-start py-6 content-container" data-testid="category-container">
       <RefinementList sortBy={sortBy || "created_at"} />
       <div className="w-full">
-        <div className="mb-8 text-2xl-semi">
-          <h1 data-testid="store-page-title">All products</h1>
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="cf-heading text-2xl small:text-3xl" data-testid="store-page-title">
+            Shop <span className="gradient-cf-text">Everything</span>
+          </h1>
+          <p className="text-sm text-ui-fg-muted mt-1">
+            Browse all celebration products — filter by occasion or category
+          </p>
         </div>
+
+        {/* Occasion + Type filter chips */}
+        <StoreFilters />
+
         <Suspense fallback={<SkeletonProductGrid />}>
           <PaginatedProducts
             sortBy={sortBy || "created_at"}
             page={pageNumber}
-            countryCode={countryCode}
           />
         </Suspense>
       </div>

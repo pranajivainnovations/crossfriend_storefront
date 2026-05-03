@@ -7,14 +7,12 @@ import ProductPreview from "../product-preview"
 
 type RelatedProductsProps = {
   product: PricedProduct
-  countryCode: string
 }
 
 export default async function RelatedProducts({
   product,
-  countryCode,
 }: RelatedProductsProps) {
-  const region = await getRegion(countryCode)
+  const region = await getRegion()
 
   if (!region) {
     return null
@@ -49,7 +47,6 @@ export default async function RelatedProducts({
 
   const productPreviews = await getProductsList({
     queryParams,
-    countryCode,
   }).then(({ response }) =>
     response.products.filter(
       (productPreview) => productPreview.id !== product.id

@@ -1,12 +1,10 @@
-import { Container } from "@medusajs/ui"
-
 const SkeletonProductPreview = () => {
   return (
     <div className="animate-pulse">
-      <Container className="aspect-[9/16] w-full bg-gray-100 bg-ui-bg-subtle" />
-      <div className="flex justify-between text-base-regular mt-2">
-        <div className="w-2/5 h-6 bg-gray-100"></div>
-        <div className="w-1/5 h-6 bg-gray-100"></div>
+      <div className="aspect-square w-full rounded-xl bg-ui-bg-subtle" />
+      <div className="mt-3 px-1 space-y-2">
+        <div className="h-4 w-3/4 rounded bg-ui-bg-subtle" />
+        <div className="h-3 w-1/3 rounded bg-ui-bg-subtle" />
       </div>
     </div>
   )

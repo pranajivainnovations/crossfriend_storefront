@@ -17,13 +17,10 @@ import {
 } from "@lib/data"
 
 /**
- * Retrieves the cart based on the cartId cookie
- *
- * @returns {Promise<Cart>} The cart
- * @example
- * const cart = await getOrSetCart()
+ * Retrieves the cart based on the cartId cookie.
+ * India-only: uses fixed region, no countryCode param needed.
  */
-export async function getOrSetCart(countryCode: string) {
+export async function getOrSetCart() {
   const cartId = cookies().get("_medusa_cart_id")?.value
   let cart
 
@@ -31,7 +28,7 @@ export async function getOrSetCart(countryCode: string) {
     cart = await getCart(cartId).then((cart) => cart)
   }
 
-  const region = await getRegion(countryCode)
+  const region = await getRegion()
 
   if (!region) {
     return null
@@ -78,13 +75,13 @@ export async function retrieveCart() {
 export async function addToCart({
   variantId,
   quantity,
-  countryCode,
+  metadata,
 }: {
   variantId: string
   quantity: number
-  countryCode: string
+  metadata?: Record<string, unknown>
 }) {
-  const cart = await getOrSetCart(countryCode).then((cart) => cart)
+  const cart = await getOrSetCart().then((cart) => cart)
 
   if (!cart) {
     return "Missing cart ID"
@@ -95,7 +92,7 @@ export async function addToCart({
   }
 
   try {
-    await addItem({ cartId: cart.id, variantId, quantity })
+    await addItem({ cartId: cart.id, variantId, quantity, metadata })
     revalidateTag("cart")
   } catch (e) {
     return "Error adding item to cart"

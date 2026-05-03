@@ -8,6 +8,9 @@ import { Fragment } from "react"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import CountrySelect from "../country-select"
+import { OCCASIONS, PRODUCT_TYPE_LABELS } from "@lib/constants"
+import type { ProductType } from "@lib/types/product-contract"
+import { usePlanning } from "@modules/planning/context/planning-context"
 
 const SideMenuItems = {
   Home: "/",
@@ -19,6 +22,7 @@ const SideMenuItems = {
 
 const SideMenu = ({ regions }: { regions: Region[] | null }) => {
   const toggleState = useToggleState()
+  const planning = usePlanning()
 
   return (
     <div className="h-full">
@@ -43,28 +47,87 @@ const SideMenu = ({ regions }: { regions: Region[] | null }) => {
                 leaveTo="opacity-0"
               >
                 <Popover.Panel className="flex flex-col absolute w-full pr-4 sm:pr-0 sm:w-1/3 2xl:w-1/4 sm:min-w-min h-[calc(100vh-1rem)] z-30 inset-x-0 text-sm text-ui-fg-on-color m-2 backdrop-blur-2xl">
-                  <div data-testid="nav-menu-popup" className="flex flex-col h-full bg-[rgba(3,7,18,0.5)] rounded-rounded justify-between p-6">
+                  <div data-testid="nav-menu-popup" className="flex flex-col h-full bg-[rgba(3,7,18,0.5)] rounded-rounded justify-between p-6 overflow-y-auto">
                     <div className="flex justify-end" id="xmark">
                       <button data-testid="close-menu-button" onClick={close}>
                         <XMark />
                       </button>
                     </div>
-                    <ul className="flex flex-col gap-6 items-start justify-start">
-                      {Object.entries(SideMenuItems).map(([name, href]) => {
-                        return (
-                          <li key={name}>
+
+                    {/* Start Planning CTA */}
+                    <button
+                      className="mb-6 py-3 px-5 rounded-full text-center font-heading font-semibold text-white bg-gradient-to-r from-cf-orange to-cf-pink hover:opacity-90 transition-opacity"
+                      onClick={() => {
+                        close()
+                        planning.open()
+                      }}
+                    >
+                      🎉 Start Planning
+                    </button>
+
+                    {/* Occasions */}
+                    <div className="mb-6">
+                      <span className="text-xs uppercase tracking-wider text-ui-fg-muted mb-3 block">
+                        Occasions
+                      </span>
+                      <ul className="flex flex-col gap-3">
+                        {OCCASIONS.map((occasion) => (
+                          <li key={occasion.slug}>
                             <LocalizedClientLink
-                              href={href}
-                              className="text-3xl leading-10 hover:text-ui-fg-disabled"
+                              href={`/occasions/${occasion.slug}`}
+                              className="text-xl leading-8 hover:text-ui-fg-disabled flex items-center gap-3"
                               onClick={close}
-                              data-testid={`${name.toLowerCase()}-link`}
                             >
-                              {name}
+                              <span>{occasion.emoji}</span>
+                              {occasion.label}
                             </LocalizedClientLink>
                           </li>
-                        )
-                      })}
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Categories */}
+                    <div className="mb-6">
+                      <span className="text-xs uppercase tracking-wider text-ui-fg-muted mb-3 block">
+                        Categories
+                      </span>
+                      <ul className="flex flex-col gap-3">
+                        {(Object.keys(PRODUCT_TYPE_LABELS) as ProductType[]).map(
+                          (type) => {
+                            const item = PRODUCT_TYPE_LABELS[type]
+                            return (
+                              <li key={type}>
+                                <LocalizedClientLink
+                                  href={item.href}
+                                  className="text-xl leading-8 hover:text-ui-fg-disabled flex items-center gap-3"
+                                  onClick={close}
+                                >
+                                  <span>{item.emoji}</span>
+                                  {item.label}
+                                </LocalizedClientLink>
+                              </li>
+                            )
+                          }
+                        )}
+                      </ul>
+                    </div>
+
+                    {/* Standard links */}
+                    <ul className="flex flex-col gap-4 items-start justify-start mb-auto">
+                      {Object.entries(SideMenuItems).map(([name, href]) => (
+                        <li key={name}>
+                          <LocalizedClientLink
+                            href={href}
+                            className="text-2xl leading-10 hover:text-ui-fg-disabled"
+                            onClick={close}
+                            data-testid={`${name.toLowerCase()}-link`}
+                          >
+                            {name}
+                          </LocalizedClientLink>
+                        </li>
+                      ))}
                     </ul>
+
                     <div className="flex flex-col gap-y-6">
                       <div
                         className="flex justify-between"
@@ -85,7 +148,7 @@ const SideMenu = ({ regions }: { regions: Region[] | null }) => {
                         />
                       </div>
                       <Text className="flex justify-between txt-compact-small">
-                        © {new Date().getFullYear()} Medusa Store. All rights
+                        © {new Date().getFullYear()} CrossFriend. All rights
                         reserved.
                       </Text>
                     </div>

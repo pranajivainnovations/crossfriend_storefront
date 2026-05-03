@@ -10,12 +10,10 @@ export default function CollectionTemplate({
   sortBy,
   collection,
   page,
-  countryCode,
 }: {
   sortBy?: SortOptions
   collection: ProductCollection
   page?: string
-  countryCode: string
 }) {
   const pageNumber = page ? parseInt(page) : 1
 
@@ -31,7 +29,6 @@ export default function CollectionTemplate({
             sortBy={sortBy || "created_at"}
             page={pageNumber}
             collectionId={collection.id}
-            countryCode={countryCode}
           />
         </Suspense>
       </div>
