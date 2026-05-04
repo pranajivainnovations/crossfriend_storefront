@@ -25,13 +25,11 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build arguments for environment variables
-ARG NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9001
+# Build arguments for environment variables (non-backend, safe to bake)
 ARG NEXT_PUBLIC_BASE_URL=http://localhost:8000
 ARG NEXT_PUBLIC_DEFAULT_REGION=in
 
 # Set environment variables for build
-ENV NEXT_PUBLIC_MEDUSA_BACKEND_URL=$NEXT_PUBLIC_MEDUSA_BACKEND_URL
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 ENV NEXT_PUBLIC_DEFAULT_REGION=$NEXT_PUBLIC_DEFAULT_REGION
 ENV NEXT_TELEMETRY_DISABLED=1

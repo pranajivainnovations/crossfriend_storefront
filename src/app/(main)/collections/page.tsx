@@ -7,7 +7,7 @@ import {
   StaggerItem,
 } from "@modules/common/components/motion"
 
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "All Collections",
@@ -53,11 +53,11 @@ export default async function CollectionsPage() {
                     <h2 className="cf-heading text-lg small:text-xl mb-2 group-hover:text-cf-orange transition-colors">
                       {collection.title}
                     </h2>
-                    {collection.metadata?.description && (
+                    {collection.metadata?.description ? (
                       <p className="text-sm text-ui-fg-subtle line-clamp-2">
-                        {collection.metadata.description as string}
+                        {String(collection.metadata.description)}
                       </p>
-                    )}
+                    ) : null}
                     <span className="inline-block mt-3 text-sm font-medium text-cf-orange group-hover:translate-x-1 transition-transform">
                       Explore →
                     </span>

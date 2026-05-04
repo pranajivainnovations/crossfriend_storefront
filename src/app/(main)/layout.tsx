@@ -9,6 +9,9 @@ import { ReviewsProvider } from "@lib/context/reviews-context"
 import PlanningWizard from "@modules/planning/components/planning-wizard"
 import WhatsAppWidget from "@modules/common/components/whatsapp-widget"
 
+// Force ALL pages under (main) to render at request time — no build-time Medusa calls
+export const dynamic = "force-dynamic"
+
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://localhost:8000"
 
 export const metadata: Metadata = {

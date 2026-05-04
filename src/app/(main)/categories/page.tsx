@@ -7,7 +7,7 @@ import {
   StaggerItem,
 } from "@modules/common/components/motion"
 
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "All Categories",

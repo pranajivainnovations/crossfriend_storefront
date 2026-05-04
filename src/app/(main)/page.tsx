@@ -13,8 +13,8 @@ import CtaBanner from "@modules/home/components/cta-banner"
 import { ProductCollectionWithPreviews } from "types/global"
 import { cache } from "react"
 
-// Revalidate homepage every 5 minutes for fresh products without being slow
-export const revalidate = 300
+// Never prerender — always fetch fresh from Medusa at request time
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "CrossFriend — Make Every Celebration Unforgettable",

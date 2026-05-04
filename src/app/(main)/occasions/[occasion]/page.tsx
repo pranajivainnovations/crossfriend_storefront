@@ -3,15 +3,10 @@ import { notFound } from "next/navigation"
 import { getOccasions, getOccasionBySlug } from "@lib/data/dynamic"
 import OccasionTemplate from "@modules/occasions/templates/occasion-template"
 
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 type Props = {
   params: { occasion: string }
-}
-
-export async function generateStaticParams() {
-  const occasions = await getOccasions()
-  return occasions.map((o) => ({ occasion: o.slug }))
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

@@ -2,6 +2,9 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import ChevronDown from "@modules/common/icons/chevron-down"
 import MedusaCTA from "@modules/layout/components/medusa-cta"
 
+// Force dynamic — no prerender attempts that call Medusa at build time
+export const dynamic = "force-dynamic"
+
 export default function CheckoutLayout({
   children,
 }: {

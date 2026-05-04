@@ -45,11 +45,11 @@ export default function CollectionTemplate({
           <h1 className="cf-heading text-2xl small:text-3xl">
             {collection.title}
           </h1>
-          {collection.metadata?.description && (
+          {collection.metadata?.description ? (
             <p className="text-sm text-ui-fg-subtle mt-2 max-w-2xl">
-              {collection.metadata.description as string}
+              {String(collection.metadata.description)}
             </p>
-          )}
+          ) : null}
         </div>
         <Suspense fallback={<SkeletonProductGrid />}>
           <PaginatedProducts

@@ -6,8 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Build-time environment variables (NEXT_PUBLIC_* are baked into client JS)
-        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-http://localhost:9001}
         NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8000}
         NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
     image: crossfriend-storefront:latest
@@ -15,12 +13,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Runtime environment variables
+      # Runtime environment variables — Medusa URL is ONLY set here (or .env)
       NODE_ENV: production
       PORT: 8000
-      # Server-side URL (container → host) for SSR
-      MEDUSA_BACKEND_URL: http://host.docker.internal:9001
-      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-http://localhost:9001}
+      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9001}
       NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8000}
       NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
     extra_hosts:
