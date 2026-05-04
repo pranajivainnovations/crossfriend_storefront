@@ -1,15 +1,17 @@
 import { Text, clx } from "@medusajs/ui"
 
 import { getCategoriesList, getCollectionsList } from "@lib/data"
-import { OCCASIONS, PRODUCT_TYPE_LABELS } from "@lib/constants"
-import type { ProductType } from "@lib/types/product-contract"
+import { getOccasions, getProductTypes } from "@lib/data/dynamic"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import MedusaCTA from "@modules/layout/components/medusa-cta"
 
 export default async function Footer() {
-  const { collections } = await getCollectionsList(0, 6)
-  const { product_categories } = await getCategoriesList(0, 6)
+  const [{ collections }, occasions, productTypes] = await Promise.all([
+    getCollectionsList(0, 6),
+    getOccasions(),
+    getProductTypes(),
+  ])
 
   return (
     <footer className="border-t border-ui-border-base w-full bg-grey-90 text-white">
@@ -32,48 +34,47 @@ export default async function Footer() {
 
           {/* Links grid */}
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-4">
-            {/* Occasions */}
-            <div className="flex flex-col gap-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-grey-40 mb-1">
-                Occasions
-              </span>
-              <ul className="grid grid-cols-1 gap-2">
-                {OCCASIONS.map((o) => (
-                  <li key={o.slug}>
-                    <LocalizedClientLink
-                      href={`/occasions/${o.slug}`}
-                      className="text-sm text-grey-30 hover:text-white transition-colors"
-                    >
-                      {o.emoji} {o.label}
-                    </LocalizedClientLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Occasions (dynamic) */}
+            {occasions.length > 0 && (
+              <div className="flex flex-col gap-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-grey-40 mb-1">
+                  Occasions
+                </span>
+                <ul className="grid grid-cols-1 gap-2">
+                  {occasions.map((o) => (
+                    <li key={o.slug}>
+                      <LocalizedClientLink
+                        href={`/occasions/${o.slug}`}
+                        className="text-sm text-grey-30 hover:text-white transition-colors"
+                      >
+                        {o.emoji} {o.label}
+                      </LocalizedClientLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-            {/* Categories */}
-            <div className="flex flex-col gap-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-grey-40 mb-1">
-                Categories
-              </span>
-              <ul className="grid grid-cols-1 gap-2">
-                {(Object.keys(PRODUCT_TYPE_LABELS) as ProductType[]).map(
-                  (type) => {
-                    const item = PRODUCT_TYPE_LABELS[type]
-                    return (
-                      <li key={type}>
-                        <LocalizedClientLink
-                          href={item.href}
-                          className="text-sm text-grey-30 hover:text-white transition-colors"
-                        >
-                          {item.label}
-                        </LocalizedClientLink>
-                      </li>
-                    )
-                  }
-                )}
-              </ul>
-            </div>
+            {/* Categories (dynamic from product types) */}
+            {productTypes.length > 0 && (
+              <div className="flex flex-col gap-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-grey-40 mb-1">
+                  Categories
+                </span>
+                <ul className="grid grid-cols-1 gap-2">
+                  {productTypes.map((item) => (
+                    <li key={item.value}>
+                      <LocalizedClientLink
+                        href={item.href}
+                        className="text-sm text-grey-30 hover:text-white transition-colors"
+                      >
+                        {item.label}
+                      </LocalizedClientLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Collections (from Medusa) */}
             {collections && collections.length > 0 && (

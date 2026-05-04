@@ -8,7 +8,7 @@
 
 // --- Product Types ---
 
-export const PRODUCT_TYPES = ["cake", "decor", "costume", "gift", "wellness"] as const
+export const PRODUCT_TYPES = ["cake", "decor", "costume", "gift", "wellness", "toys"] as const
 export type ProductType = (typeof PRODUCT_TYPES)[number]
 
 // --- Occasion Collections ---

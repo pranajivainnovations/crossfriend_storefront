@@ -4,17 +4,27 @@ import SkeletonProductGrid from "@modules/skeletons/templates/skeleton-product-g
 import RefinementList from "@modules/store/components/refinement-list"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import StoreFilters from "@modules/store/components/store-filters"
+import { getOccasions, getProductTypes } from "@lib/data/dynamic"
 
 import PaginatedProducts from "./paginated-products"
 
-const StoreTemplate = ({
+const StoreTemplate = async ({
   sortBy,
   page,
+  collectionHandle,
+  typeFilter,
 }: {
   sortBy?: SortOptions
   page?: string
+  collectionHandle?: string
+  typeFilter?: string
 }) => {
   const pageNumber = page ? parseInt(page) : 1
+
+  const [occasions, productTypes] = await Promise.all([
+    getOccasions(),
+    getProductTypes(),
+  ])
 
   return (
     <div className="flex flex-col small:flex-row small:items-start py-6 content-container" data-testid="category-container">
@@ -30,13 +40,15 @@ const StoreTemplate = ({
           </p>
         </div>
 
-        {/* Occasion + Type filter chips */}
-        <StoreFilters />
+        {/* Occasion + Type filter chips (dynamic) */}
+        <StoreFilters occasions={occasions} productTypes={productTypes} />
 
-        <Suspense fallback={<SkeletonProductGrid />}>
+        <Suspense key={`${sortBy}-${pageNumber}-${typeFilter}-${collectionHandle}`} fallback={<SkeletonProductGrid />}>
           <PaginatedProducts
             sortBy={sortBy || "created_at"}
             page={pageNumber}
+            typeFilter={typeFilter}
+            collectionHandle={collectionHandle}
           />
         </Suspense>
       </div>

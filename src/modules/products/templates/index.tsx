@@ -9,6 +9,7 @@ import ProductTabs from "@modules/products/components/product-tabs"
 import RelatedProducts from "@modules/products/components/related-products"
 import CelebrationRelated from "@modules/products/components/celebration-related"
 import AddOnSelector from "@modules/products/components/add-on-selector"
+import ReviewsSection from "@modules/products/components/reviews-section"
 import ProductInfo from "@modules/products/templates/product-info"
 import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-related-products"
 import { notFound } from "next/navigation"
@@ -58,6 +59,11 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
             <AddOnSelector product={product} />
           </Suspense>
         </div>
+      </div>
+
+      {/* Reviews section */}
+      <div className="content-container">
+        <ReviewsSection productId={product.id!} />
       </div>
 
       {/* Celebration-related: same occasion, different types */}

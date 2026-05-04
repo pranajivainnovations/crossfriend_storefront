@@ -134,6 +134,7 @@ export const PRODUCT_TYPE_LABELS: Record<ProductType, { label: string; href: str
   gift: { label: "Gifts", href: "/store?type=gift", emoji: "🎁" },
   costume: { label: "Costumes", href: "/store?type=costume", emoji: "🎭" },
   wellness: { label: "Premium / Wellness", href: "/store?type=wellness", emoji: "🌿" },
+  toys: { label: "Toys", href: "/store?type=toys", emoji: "🧸" },
 }
 
 // ============================================

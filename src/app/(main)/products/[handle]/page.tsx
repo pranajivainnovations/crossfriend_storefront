@@ -11,6 +11,9 @@ import {
 import { Region } from "@medusajs/medusa"
 import ProductTemplate from "@modules/products/templates"
 
+// Revalidate product pages every 2 minutes for stock/pricing freshness
+export const revalidate = 120
+
 type Props = {
   params: { handle: string }
 }
@@ -44,13 +47,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     notFound()
   }
 
+  const description = product.description
+    ? product.description.slice(0, 160)
+    : `Buy ${product.title} online at CrossFriend. Same-day delivery available.`
+
   return {
-    title: `${product.title} | CrossFriend`,
-    description: `${product.title}`,
+    title: product.title,
+    description,
     openGraph: {
       title: `${product.title} | CrossFriend`,
-      description: `${product.title}`,
+      description,
       images: product.thumbnail ? [product.thumbnail] : [],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.title,
+      description,
+      images: product.thumbnail ? [product.thumbnail] : [],
+    },
+    alternates: {
+      canonical: `/products/${handle}`,
     },
   }
 }

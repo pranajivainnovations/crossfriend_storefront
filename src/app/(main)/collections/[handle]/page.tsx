@@ -8,6 +8,9 @@ import {
 import CollectionTemplate from "@modules/collections/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 
+// Revalidate collection pages every 5 minutes
+export const revalidate = 300
+
 type Props = {
   params: { handle: string }
   searchParams: {

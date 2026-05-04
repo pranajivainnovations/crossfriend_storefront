@@ -5,11 +5,16 @@ import { getCategoryByHandle, listCategories } from "@lib/data"
 import CategoryTemplate from "@modules/categories/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 
+// Revalidate category pages every 5 minutes
+export const revalidate = 300
+
 type Props = {
   params: { category: string[] }
   searchParams: {
     sortBy?: SortOptions
     page?: string
+    type?: string
+    tags?: string
   }
 }
 
@@ -21,9 +26,23 @@ export async function generateStaticParams() {
       return []
     }
 
-    return product_categories.map((category) => ({
-      category: [category.handle],
-    }))
+    const params: { category: string[] }[] = []
+
+    product_categories.forEach((category) => {
+      // Add parent category
+      if (!category.parent_category_id) {
+        params.push({ category: [category.handle] })
+
+        // Add child categories with parent/child path
+        if (category.category_children) {
+          category.category_children.forEach((child: any) => {
+            params.push({ category: [category.handle, child.handle] })
+          })
+        }
+      }
+    })
+
+    return params
   } catch (error) {
     return []
   }
@@ -56,7 +75,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CategoryPage({ params, searchParams }: Props) {
-  const { sortBy, page } = searchParams
+  const { sortBy, page, type, tags } = searchParams
 
   const { product_categories } = await getCategoryByHandle(
     params.category
@@ -71,6 +90,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       categories={product_categories}
       sortBy={sortBy}
       page={page}
+      type={type}
+      tags={tags}
     />
   )
 }

@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 
 import { listRegions } from "@lib/data"
+import { getOccasions, getProductTypes } from "@lib/data/dynamic"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import CartButton from "@modules/layout/components/cart-button"
 import SideMenu from "@modules/layout/components/side-menu"
@@ -8,7 +9,11 @@ import MegaMenu from "@modules/layout/components/mega-menu"
 import PlanningTrigger from "@modules/planning/components/planning-trigger"
 
 export default async function Nav() {
-  const regions = await listRegions().then((regions) => regions)
+  const [regions, occasions, productTypes] = await Promise.all([
+    listRegions().then((regions) => regions),
+    getOccasions(),
+    getProductTypes(),
+  ])
 
   return (
     <div className="sticky top-0 inset-x-0 z-50 group">
@@ -18,7 +23,7 @@ export default async function Nav() {
           <div className="flex items-center gap-x-4 h-full flex-1 basis-0">
             {/* Mobile hamburger */}
             <div className="h-full small:hidden">
-              <SideMenu regions={regions} />
+              <SideMenu regions={regions} occasions={occasions} productTypes={productTypes} />
             </div>
 
             {/* Logo */}
@@ -30,27 +35,18 @@ export default async function Nav() {
               CrossFriend
             </LocalizedClientLink>
 
-            {/* Desktop mega-menu + top links */}
+            {/* Desktop mega-menu + top links (dynamic from product types) */}
             <div className="hidden small:flex items-center gap-x-5 h-full ml-4">
-              <MegaMenu />
-              <LocalizedClientLink
-                href="/store?type=cake"
-                className="text-sm text-ui-fg-subtle hover:text-cf-orange transition-colors"
-              >
-                Cakes
-              </LocalizedClientLink>
-              <LocalizedClientLink
-                href="/store?type=decor"
-                className="text-sm text-ui-fg-subtle hover:text-cf-orange transition-colors"
-              >
-                Decor
-              </LocalizedClientLink>
-              <LocalizedClientLink
-                href="/store?type=gift"
-                className="text-sm text-ui-fg-subtle hover:text-cf-orange transition-colors"
-              >
-                Gifts
-              </LocalizedClientLink>
+              <MegaMenu occasions={occasions} productTypes={productTypes} />
+              {productTypes.slice(0, 3).map((pt) => (
+                <LocalizedClientLink
+                  key={pt.value}
+                  href={pt.href}
+                  className="text-sm text-ui-fg-subtle hover:text-cf-orange transition-colors"
+                >
+                  {pt.label}
+                </LocalizedClientLink>
+              ))}
             </div>
           </div>
 

@@ -11,6 +11,7 @@ import { addToCart } from "@modules/cart/actions"
 import Divider from "@modules/common/components/divider"
 import OptionSelect from "@modules/products/components/option-select"
 import CakeCustomizer from "@modules/products/components/cake-customizer"
+import PincodeChecker from "@modules/common/components/pincode-checker"
 import { isCake } from "@lib/util/product-guards"
 import { formatDate, getEarliestDeliveryDate } from "@lib/util/delivery-utils"
 import type { DeliveryTimeSlot } from "@lib/types/product-contract"
@@ -195,6 +196,9 @@ export default function ProductActions({
             onDeliveryTimeSlotChange={setDeliveryTimeSlot}
           />
         )}
+
+        {/* Delivery availability check */}
+        <PincodeChecker variant="full" className="my-2" />
 
         <Button
           onClick={handleAddToCart}

@@ -8,16 +8,21 @@ import RefinementList from "@modules/store/components/refinement-list"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import PaginatedProducts from "@modules/store/templates/paginated-products"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { OCCASIONS } from "@lib/constants"
+import CategoryFilters from "@modules/categories/components/category-filters"
+import { getOccasions } from "@lib/data/dynamic"
 
-export default function CategoryTemplate({
+export default async function CategoryTemplate({
   categories,
   sortBy,
   page,
+  type,
+  tags,
 }: {
   categories: ProductCategoryWithChildren[]
   sortBy?: SortOptions
   page?: string
+  type?: string
+  tags?: string
 }) {
   const pageNumber = page ? parseInt(page) : 1
 
@@ -25,6 +30,9 @@ export default function CategoryTemplate({
   const parents = categories.slice(0, categories.length - 1)
 
   if (!category) notFound()
+
+  // Fetch occasions dynamically for the quick-links
+  const occasions = await getOccasions()
 
   return (
     <div className="flex flex-col small:flex-row small:items-start py-6 content-container" data-testid="category-container">
@@ -78,7 +86,7 @@ export default function CategoryTemplate({
 
         {/* Occasion quick-links */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {OCCASIONS.map((o) => (
+          {occasions.map((o) => (
             <LocalizedClientLink
               key={o.slug}
               href={`/occasions/${o.slug}`}
@@ -96,7 +104,7 @@ export default function CategoryTemplate({
               <ul className="flex flex-wrap gap-2">
                 {category.category_children.map((c) => (
                   <li key={c.id}>
-                    <InteractiveLink href={`/categories/${c.handle}`}>
+                    <InteractiveLink href={`/categories/${category.handle}/${c.handle}`}>
                       {c.name}
                     </InteractiveLink>
                   </li>
@@ -105,11 +113,16 @@ export default function CategoryTemplate({
             </div>
           )}
 
-        <Suspense fallback={<SkeletonProductGrid />}>
+        {/* Type/Tag Filters */}
+        <CategoryFilters activeType={type} activeTags={tags} />
+
+        <Suspense key={`${sortBy}-${pageNumber}-${type}-${tags}`} fallback={<SkeletonProductGrid />}>
           <PaginatedProducts
             sortBy={sortBy || "created_at"}
             page={pageNumber}
             categoryId={category.id}
+            typeFilter={type}
+            tagsFilter={tags}
           />
         </Suspense>
       </div>

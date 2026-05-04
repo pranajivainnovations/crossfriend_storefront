@@ -1,8 +1,7 @@
 import { PricedProduct } from "@medusajs/medusa/dist/types/pricing"
 import { getProducts, getRegion } from "@lib/data"
 import { getProductType } from "@lib/util/product-guards"
-import { PRODUCT_TYPE_LABELS, OCCASION_MAP } from "@lib/constants"
-import type { OccasionCollection, ProductType } from "@lib/types/product-contract"
+import { getOccasionBySlug, getProductTypes } from "@lib/data/dynamic"
 import ProductPreview from "../product-preview"
 
 type Props = {
@@ -14,23 +13,24 @@ export default async function CelebrationRelated({ product }: Props) {
   if (!region) return null
 
   const currentType = getProductType(product)
-  const occasionSlug = product.collection?.handle as OccasionCollection | undefined
-  const occasionConfig = occasionSlug ? OCCASION_MAP[occasionSlug] : undefined
+  const occasionSlug = product.collection?.handle
+  const occasion = occasionSlug ? await getOccasionBySlug(occasionSlug) : null
 
-  if (!occasionConfig || !currentType) return null
+  if (!occasion || !currentType) return null
 
-  // Get other product types for this occasion (exclude current type)
-  const otherTypes = occasionConfig.sectionOrder.filter((t) => t !== currentType)
+  // Get all product types dynamically, exclude current
+  const allTypes = await getProductTypes()
+  const otherTypes = allTypes.filter((t) => t.value !== currentType)
 
   // Fetch 2 products per other type
   const sections = await Promise.all(
-    otherTypes.slice(0, 3).map(async (type) => {
+    otherTypes.slice(0, 3).map(async (pt) => {
       const { previews } = await getProducts({
-        type,
+        type: pt.value as any,
         collection: occasionSlug!,
         limit: 2,
       })
-      return { type, previews }
+      return { type: pt.value, label: pt.label, emoji: pt.emoji, previews }
     })
   )
 
@@ -41,11 +41,11 @@ export default async function CelebrationRelated({ product }: Props) {
     <div className="bg-cf-warm py-12">
       <div className="content-container">
         <div className="text-center mb-8">
-          <span className="text-base">{occasionConfig.emoji}</span>
+          <span className="text-base">{occasion.emoji}</span>
           <h3 className="cf-heading text-2xl mt-1">
             Complete Your{" "}
             <span className="gradient-cf-text">
-              {occasionConfig.label}
+              {occasion.label}
             </span>{" "}
             Celebration
           </h3>
@@ -55,27 +55,24 @@ export default async function CelebrationRelated({ product }: Props) {
         </div>
 
         <div className="space-y-8">
-          {populated.map(({ type, previews }) => {
-            const typeInfo = PRODUCT_TYPE_LABELS[type]
-            return (
-              <div key={type}>
-                <h4 className="text-sm font-semibold text-ui-fg-muted uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                  <span>{typeInfo.emoji}</span>
-                  {typeInfo.label}
-                </h4>
-                <ul className="grid grid-cols-2 small:grid-cols-4 gap-4">
-                  {previews.map((preview) => (
-                    <li key={preview.id}>
-                      <ProductPreview
-                        productPreview={preview}
-                        region={region}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
+          {populated.map(({ type, label, emoji, previews }) => (
+            <div key={type}>
+              <h4 className="text-sm font-semibold text-ui-fg-muted uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                <span>{emoji}</span>
+                {label}
+              </h4>
+              <ul className="grid grid-cols-2 small:grid-cols-4 gap-4">
+                {previews.map((preview) => (
+                  <li key={preview.id}>
+                    <ProductPreview
+                      productPreview={preview}
+                      region={region}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
     </div>

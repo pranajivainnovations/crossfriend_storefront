@@ -1,10 +1,15 @@
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { OCCASIONS, PRODUCT_TYPE_LABELS } from "@lib/constants"
-import { PRODUCT_TYPES } from "@lib/types/product-contract"
+import type { DynamicOccasion, DynamicProductType } from "@lib/data/dynamic"
 
-export default function StoreFilters() {
+export default function StoreFilters({
+  occasions,
+  productTypes,
+}: {
+  occasions: DynamicOccasion[]
+  productTypes: DynamicProductType[]
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -27,75 +32,76 @@ export default function StoreFilters() {
   return (
     <div className="flex flex-col gap-5 mb-6">
       {/* Occasion filter chips */}
-      <div>
-        <span className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted mb-2 block">
-          Occasion
-        </span>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setFilter("collection", "")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              !activeOccasion
-                ? "bg-cf-orange text-white border-cf-orange"
-                : "bg-white text-grey-80 border-ui-border-base hover:border-cf-orange"
-            }`}
-          >
-            All
-          </button>
-          {OCCASIONS.map((o) => (
+      {occasions.length > 0 && (
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted mb-2 block">
+            Occasion
+          </span>
+          <div className="flex flex-wrap gap-2">
             <button
-              key={o.slug}
-              onClick={() =>
-                setFilter("collection", activeOccasion === o.slug ? "" : o.slug)
-              }
+              onClick={() => setFilter("collection", "")}
               className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                activeOccasion === o.slug
+                !activeOccasion
                   ? "bg-cf-orange text-white border-cf-orange"
                   : "bg-white text-grey-80 border-ui-border-base hover:border-cf-orange"
               }`}
             >
-              {o.emoji} {o.label}
+              All
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Type filter chips */}
-      <div>
-        <span className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted mb-2 block">
-          Category
-        </span>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setFilter("type", "")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              !activeType
-                ? "bg-cf-orange text-white border-cf-orange"
-                : "bg-white text-grey-80 border-ui-border-base hover:border-cf-orange"
-            }`}
-          >
-            All
-          </button>
-          {PRODUCT_TYPES.map((t) => {
-            const info = PRODUCT_TYPE_LABELS[t]
-            return (
+            {occasions.map((o) => (
               <button
-                key={t}
+                key={o.slug}
                 onClick={() =>
-                  setFilter("type", activeType === t ? "" : t)
+                  setFilter("collection", activeOccasion === o.slug ? "" : o.slug)
                 }
                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  activeType === t
+                  activeOccasion === o.slug
                     ? "bg-cf-orange text-white border-cf-orange"
                     : "bg-white text-grey-80 border-ui-border-base hover:border-cf-orange"
                 }`}
               >
-                {info.emoji} {info.label}
+                {o.emoji} {o.label}
               </button>
-            )
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Type filter chips */}
+      {productTypes.length > 0 && (
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted mb-2 block">
+            Category
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilter("type", "")}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                !activeType
+                  ? "bg-cf-orange text-white border-cf-orange"
+                  : "bg-white text-grey-80 border-ui-border-base hover:border-cf-orange"
+              }`}
+            >
+              All
+            </button>
+            {productTypes.map((pt) => (
+              <button
+                key={pt.value}
+                onClick={() =>
+                  setFilter("type", activeType === pt.value ? "" : pt.value)
+                }
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  activeType === pt.value
+                    ? "bg-cf-orange text-white border-cf-orange"
+                    : "bg-white text-grey-80 border-ui-border-base hover:border-cf-orange"
+                }`}
+              >
+                {pt.emoji} {pt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

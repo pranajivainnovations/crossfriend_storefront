@@ -1,9 +1,10 @@
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { PRODUCT_TYPE_LABELS } from "@lib/constants"
-import type { ProductType } from "@lib/types/product-contract"
+import { getProductTypes } from "@lib/data/dynamic"
 
-export default function CategoryStrip() {
-  const types = Object.keys(PRODUCT_TYPE_LABELS) as ProductType[]
+export default async function CategoryStrip() {
+  const types = await getProductTypes()
+
+  if (types.length === 0) return null
 
   return (
     <section className="content-container py-8">
@@ -11,19 +12,16 @@ export default function CategoryStrip() {
         <span className="text-sm font-medium text-ui-fg-muted whitespace-nowrap shrink-0">
           Quick shop:
         </span>
-        {types.map((type) => {
-          const item = PRODUCT_TYPE_LABELS[type]
-          return (
-            <LocalizedClientLink
-              key={type}
-              href={item.href}
-              className="chip-cf whitespace-nowrap shrink-0"
-            >
-              <span>{item.emoji}</span>
-              {item.label}
-            </LocalizedClientLink>
-          )
-        })}
+        {types.map((item) => (
+          <LocalizedClientLink
+            key={item.value}
+            href={item.href}
+            className="chip-cf whitespace-nowrap shrink-0"
+          >
+            <span>{item.emoji}</span>
+            {item.label}
+          </LocalizedClientLink>
+        ))}
         <LocalizedClientLink
           href="/store"
           className="chip-cf whitespace-nowrap shrink-0 !bg-cf-orange !text-white"

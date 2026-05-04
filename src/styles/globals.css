@@ -214,4 +214,79 @@
            bg-cf-coral text-white text-sm font-medium
            rounded-lg urgency-pulse;
   }
+
+  /* ============================================
+     Futuristic UI — Glass Morphism & Neon
+     ============================================ */
+
+  /* Glass card effect */
+  .glass-cf {
+    @apply bg-white/70 backdrop-blur-md border border-white/30
+           rounded-2xl shadow-lg;
+  }
+
+  .glass-cf-dark {
+    @apply bg-grey-90/60 backdrop-blur-md border border-white/10
+           rounded-2xl shadow-lg;
+  }
+
+  /* Neon glow effects */
+  .glow-cf-orange {
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.3), 0 0 40px rgba(255, 107, 53, 0.1);
+  }
+
+  .glow-cf-purple {
+    box-shadow: 0 0 20px rgba(123, 47, 247, 0.3), 0 0 40px rgba(123, 47, 247, 0.1);
+  }
+
+  .glow-cf-pink {
+    box-shadow: 0 0 20px rgba(255, 45, 135, 0.3), 0 0 40px rgba(255, 45, 135, 0.1);
+  }
+
+  /* Animated gradient border */
+  .border-gradient-cf {
+    position: relative;
+    border-radius: 1rem;
+  }
+  .border-gradient-cf::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, #FF6B35, #FF2D87, #7B2FF7, #FF6B35);
+    background-size: 300% 300%;
+    animation: gradient-shift 4s ease infinite;
+    z-index: -1;
+  }
+
+  /* Futuristic card with subtle depth */
+  .card-futuristic {
+    @apply bg-white rounded-2xl overflow-hidden
+           border border-grey-10
+           shadow-[0_4px_20px_rgba(0,0,0,0.04)]
+           hover:shadow-[0_8px_40px_rgba(255,107,53,0.1)]
+           transition-all duration-300;
+  }
+
+  .card-futuristic:hover {
+    @apply -translate-y-1 border-cf-orange/20;
+  }
+
+  /* Smooth page section transitions */
+  .section-fade {
+    @apply opacity-0 translate-y-6;
+    animation: section-appear 0.6s ease-out forwards;
+  }
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes section-appear {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

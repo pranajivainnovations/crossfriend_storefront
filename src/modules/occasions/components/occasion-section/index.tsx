@@ -1,29 +1,30 @@
 import { getProducts, getRegion } from "@lib/data"
-import { PRODUCT_TYPE_LABELS, type OccasionConfig } from "@lib/constants"
-import type { ProductType, OccasionCollection } from "@lib/types/product-contract"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ProductPreview from "@modules/products/components/product-preview"
 
 export default async function OccasionSection({
   type,
-  occasion,
+  typeLabel,
+  typeEmoji,
+  occasionSlug,
 }: {
-  type: ProductType
-  occasion: OccasionConfig
+  type: string
+  typeLabel: string
+  typeEmoji: string
+  occasionSlug: string
 }) {
-  const typeInfo = PRODUCT_TYPE_LABELS[type]
   const region = await getRegion()
 
   const { previews } = await getProducts({
-    type,
-    collection: occasion.slug,
+    type: type as any,
+    collection: occasionSlug as any,
     limit: 8,
   })
 
   // If no products for this type + occasion combo, try type-only
   let products = previews
   if (products.length === 0) {
-    const fallback = await getProducts({ type, limit: 8 })
+    const fallback = await getProducts({ type: type as any, limit: 8 })
     products = fallback.previews
   }
 
@@ -36,13 +37,13 @@ export default async function OccasionSection({
         {/* Section header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{typeInfo.emoji}</span>
+            <span className="text-2xl">{typeEmoji}</span>
             <h2 className="cf-heading text-xl small:text-2xl">
-              {typeInfo.label}
+              {typeLabel}
             </h2>
           </div>
           <LocalizedClientLink
-            href={`/store?type=${type}&collection=${occasion.slug}`}
+            href={`/store?type=${type}&collection=${occasionSlug}`}
             className="text-sm font-medium text-cf-orange hover:text-cf-orange-dark transition-colors"
           >
             View All →
