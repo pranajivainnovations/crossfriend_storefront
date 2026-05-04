@@ -185,6 +185,19 @@ module.exports = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.7" },
         },
+        // Futuristic animations
+        "glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 20px rgba(255, 107, 53, 0.2)" },
+          "50%": { boxShadow: "0 0 40px rgba(255, 107, 53, 0.4)" },
+        },
+        "slide-up-fade": {
+          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "scale-in": {
+          "0%": { opacity: "0", transform: "scale(0.95)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
       },
       animation: {
         ring: "ring 2.2s cubic-bezier(0.5, 0, 0.5, 1) infinite",
@@ -206,6 +219,10 @@ module.exports = {
         "confetti-fall": "confetti-fall 3s ease-in forwards",
         float: "float 3s ease-in-out infinite",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        // Futuristic animations
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        "slide-up-fade": "slide-up-fade 0.4s ease-out forwards",
+        "scale-in": "scale-in 0.3s ease-out forwards",
       },
     },
   },

@@ -477,11 +477,11 @@ export const getProductsList = cache(async function ({
     return emptyResponse
   }
 
-  const { products, count } = await medusaClient.products
+  const { products: allProducts } = await medusaClient.products
     .list(
       {
-        limit,
-        offset: pageParam,
+        limit: 100,
+        offset: 0,
         region_id: region.id,
         ...queryParams,
       },
@@ -492,11 +492,19 @@ export const getProductsList = cache(async function ({
       throw err
     })
 
-  const transformedProducts = products.map((product) => {
+  // Filter by brand = crossfriend
+  const brandFiltered = allProducts.filter(
+    (p) => String(p.metadata?.brand || "").toLowerCase() === "crossfriend"
+  )
+
+  const count = brandFiltered.length
+  const paginatedSlice = brandFiltered.slice(pageParam, pageParam + limit)
+
+  const transformedProducts = paginatedSlice.map((product) => {
     return transformProductPreview(product, region!)
   })
 
-  const nextPage = count > pageParam + 1 ? pageParam + 1 : null
+  const nextPage = count > pageParam + limit ? pageParam + limit : null
 
   return {
     response: { products: transformedProducts, count },
@@ -511,11 +519,15 @@ export const getProductsListWithSort = cache(
     queryParams,
     sortBy = "created_at",
     countryCode,
+    typeFilter,
+    tagsFilter,
   }: {
     page?: number
     queryParams?: StoreGetProductsParams
     sortBy?: SortOptions
     countryCode?: string
+    typeFilter?: string
+    tagsFilter?: string
   }): Promise<{
     response: { products: ProductPreviewType[]; count: number }
     nextPage: number | null
@@ -523,18 +535,59 @@ export const getProductsListWithSort = cache(
   }> {
     const limit = queryParams?.limit || 12
 
-    const {
-      response: { products, count },
-    } = await getProductsList({
-      pageParam: 0,
-      queryParams: {
-        ...queryParams,
-        limit: 100,
-      },
-      countryCode,
-    })
+    const region = await getRegion(countryCode)
 
-    const sortedProducts = sortProducts(products, sortBy)
+    if (!region) {
+      return {
+        response: { products: [], count: 0 },
+        nextPage: null,
+        queryParams,
+      }
+    }
+
+    // Fetch raw products for filtering
+    const { products: rawProducts } = await medusaClient.products
+      .list(
+        {
+          limit: 100,
+          offset: 0,
+          region_id: region.id,
+          ...queryParams,
+        },
+        { next: { tags: ["products"] } }
+      )
+      .then((res) => res)
+      .catch((err) => {
+        throw err
+      })
+
+    // Filter by brand = crossfriend
+    let filteredProducts = rawProducts.filter(
+      (p) => String(p.metadata?.brand || "").toLowerCase() === "crossfriend"
+    )
+    if (typeFilter) {
+      filteredProducts = filteredProducts.filter(
+        (p) => p.type?.value?.toLowerCase() === typeFilter.toLowerCase()
+      )
+    }
+
+    // Apply tags filter
+    if (tagsFilter) {
+      const filterTags = tagsFilter.split(",").map((t) => t.trim().toLowerCase())
+      filteredProducts = filteredProducts.filter((p) =>
+        filterTags.some((ft) =>
+          p.tags?.some((t) => t.value.toLowerCase() === ft)
+        )
+      )
+    }
+
+    // Transform to preview type
+    const transformedProducts = filteredProducts.map((product) =>
+      transformProductPreview(product, region!)
+    )
+
+    const count = transformedProducts.length
+    const sortedProducts = sortProducts(transformedProducts, sortBy)
 
     const pageParam = (page - 1) * limit
 
@@ -603,7 +656,12 @@ export const getCollectionsList = cache(async function (
 ): Promise<{ collections: ProductCollection[]; count: number }> {
   const collections = await medusaClient.collections
     .list({ limit, offset }, { next: { tags: ["collections"] } })
-    .then(({ collections }) => collections)
+    .then(({ collections }) =>
+      collections.filter(
+        (col) =>
+          String(col.metadata?.brand || "").toLowerCase() === "crossfriend"
+      )
+    )
     .catch((err) => {
       throw err
     })
@@ -675,8 +733,13 @@ export const listCategories = cache(async function () {
   } as Record<string, any>
 
   return medusaClient.productCategories
-    .list({ expand: "category_children" }, headers)
-    .then(({ product_categories }) => product_categories)
+    .list({ expand: "category_children", limit: 100 }, headers)
+    .then(({ product_categories }) =>
+      product_categories.filter(
+        (cat) =>
+          String(cat.metadata?.brand || "").toLowerCase() === "crossfriend"
+      )
+    )
     .catch((err) => {
       throw err
     })
@@ -689,15 +752,20 @@ export const getCategoriesList = cache(async function (
   product_categories: ProductCategoryWithChildren[]
   count: number
 }> {
-  const { product_categories, count } = await medusaClient.productCategories
+  const { product_categories } = await medusaClient.productCategories
     .list({ limit, offset }, { next: { tags: ["categories"] } })
     .catch((err) => {
       throw err
     })
 
+  const filtered = product_categories.filter(
+    (cat) =>
+      String(cat.metadata?.brand || "").toLowerCase() === "crossfriend"
+  )
+
   return {
-    product_categories,
-    count,
+    product_categories: filtered,
+    count: filtered.length,
   }
 })
 
@@ -706,17 +774,14 @@ export const getCategoryByHandle = cache(async function (
 ): Promise<{
   product_categories: ProductCategoryWithChildren[]
 }> {
-  const handles = categoryHandle.map((handle: string, index: number) =>
-    categoryHandle.slice(0, index + 1).join("/")
-  )
-
   const product_categories = [] as ProductCategoryWithChildren[]
 
-  for (const handle of handles) {
+  for (const handle of categoryHandle) {
     const category = await medusaClient.productCategories
       .list(
         {
           handle: handle,
+          expand: "category_children",
         },
         {
           next: {

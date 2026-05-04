@@ -1,10 +1,10 @@
 import { Suspense } from "react"
-import type { OccasionConfig } from "@lib/constants"
+import type { DynamicOccasion } from "@lib/data/dynamic"
+import { getProductTypes } from "@lib/data/dynamic"
 import OccasionHero from "@modules/occasions/components/occasion-hero"
 import OccasionSection from "@modules/occasions/components/occasion-section"
 import QuickAddKit from "@modules/occasions/components/quick-add-kit"
 import SuggestedBundle from "@modules/products/components/suggested-bundle"
-import PremiumRecommendations from "@modules/products/components/premium-recommendations"
 
 function SectionSkeleton() {
   return (
@@ -19,15 +19,13 @@ function SectionSkeleton() {
   )
 }
 
-export default function OccasionTemplate({
+export default async function OccasionTemplate({
   occasion,
 }: {
-  occasion: OccasionConfig
+  occasion: DynamicOccasion
 }) {
-  // Filter section order based on showPremium setting
-  const sections = occasion.showPremium
-    ? occasion.sectionOrder
-    : occasion.sectionOrder.filter((t) => t !== "wellness")
+  // Fetch all product types dynamically — show sections for each type
+  const productTypes = await getProductTypes()
 
   return (
     <div>
@@ -37,19 +35,17 @@ export default function OccasionTemplate({
       {/* Quick-Add Kit */}
       <QuickAddKit occasion={occasion.slug} />
 
-      {/* Product sections in priority order */}
-      {sections.map((type) => (
-        <Suspense key={type} fallback={<SectionSkeleton />}>
-          <OccasionSection type={type} occasion={occasion} />
+      {/* Product sections — one per product type (dynamically fetched) */}
+      {productTypes.map((pt) => (
+        <Suspense key={pt.value} fallback={<SectionSkeleton />}>
+          <OccasionSection
+            type={pt.value}
+            typeLabel={pt.label}
+            typeEmoji={pt.emoji}
+            occasionSlug={occasion.slug}
+          />
         </Suspense>
       ))}
-
-      {/* PranaJiva premium section — only for eligible occasions */}
-      {occasion.showPremium && (
-        <Suspense fallback={null}>
-          <PremiumRecommendations occasion={occasion} />
-        </Suspense>
-      )}
 
       {/* Suggested bundle */}
       <Suspense fallback={null}>

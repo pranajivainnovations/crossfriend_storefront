@@ -5,10 +5,15 @@ import { ChevronDownMini } from "@medusajs/icons"
 import { Fragment } from "react"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { OCCASIONS, PRODUCT_TYPE_LABELS } from "@lib/constants"
-import type { ProductType } from "@lib/types/product-contract"
+import type { DynamicOccasion, DynamicProductType } from "@lib/data/dynamic"
 
-export default function MegaMenu() {
+export default function MegaMenu({
+  occasions,
+  productTypes,
+}: {
+  occasions: DynamicOccasion[]
+  productTypes: DynamicProductType[]
+}) {
   return (
     <Popover className="relative h-full flex items-center">
       {({ open, close }) => (
@@ -40,7 +45,7 @@ export default function MegaMenu() {
                       Shop by Occasion
                     </h3>
                     <ul className="space-y-1">
-                      {OCCASIONS.map((occasion) => (
+                      {occasions.map((occasion) => (
                         <li key={occasion.slug}>
                           <LocalizedClientLink
                             href={`/occasions/${occasion.slug}`}
@@ -61,6 +66,15 @@ export default function MegaMenu() {
                           </LocalizedClientLink>
                         </li>
                       ))}
+                      <li>
+                        <LocalizedClientLink
+                          href="/occasions"
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-cf-warm transition-colors text-sm font-medium text-cf-orange"
+                          onClick={close}
+                        >
+                          View All Occasions →
+                        </LocalizedClientLink>
+                      </li>
                     </ul>
                   </div>
 
@@ -70,27 +84,22 @@ export default function MegaMenu() {
                       Shop by Category
                     </h3>
                     <ul className="space-y-1">
-                      {(Object.keys(PRODUCT_TYPE_LABELS) as ProductType[]).map(
-                        (type) => {
-                          const item = PRODUCT_TYPE_LABELS[type]
-                          return (
-                            <li key={type}>
-                              <LocalizedClientLink
-                                href={item.href}
-                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-cf-warm transition-colors group"
-                                onClick={close}
-                              >
-                                <span className="text-xl" role="img" aria-label={item.label}>
-                                  {item.emoji}
-                                </span>
-                                <span className="text-sm font-medium text-ui-fg-base group-hover:text-cf-orange transition-colors">
-                                  {item.label}
-                                </span>
-                              </LocalizedClientLink>
-                            </li>
-                          )
-                        }
-                      )}
+                      {productTypes.map((item) => (
+                        <li key={item.value}>
+                          <LocalizedClientLink
+                            href={item.href}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-cf-warm transition-colors group"
+                            onClick={close}
+                          >
+                            <span className="text-xl" role="img" aria-label={item.label}>
+                              {item.emoji}
+                            </span>
+                            <span className="text-sm font-medium text-ui-fg-base group-hover:text-cf-orange transition-colors">
+                              {item.label}
+                            </span>
+                          </LocalizedClientLink>
+                        </li>
+                      ))}
                     </ul>
 
                     {/* Start Planning CTA inside mega-menu */}

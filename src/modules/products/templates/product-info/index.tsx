@@ -2,8 +2,6 @@ import { PricedProduct } from "@medusajs/medusa/dist/types/pricing"
 import { Heading, Text } from "@medusajs/ui"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { getProductType, isCake, getMetadata } from "@lib/util/product-guards"
-import { PRODUCT_TYPE_LABELS, OCCASION_MAP } from "@lib/constants"
-import type { OccasionCollection } from "@lib/types/product-contract"
 import CakeUrgencyBadge from "@modules/products/components/cake-urgency-badge"
 
 type ProductInfoProps = {
@@ -15,10 +13,10 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
   const meta = getMetadata(product)
   const isCakeProduct = isCake(product)
 
-  // Determine occasion from collection
-  const occasionSlug = product.collection?.handle as OccasionCollection | undefined
-  const occasionConfig = occasionSlug ? OCCASION_MAP[occasionSlug] : undefined
-  const typeLabel = productType ? PRODUCT_TYPE_LABELS[productType] : undefined
+  // Derive type label from product type value
+  const typeLabel = productType
+    ? productType.charAt(0).toUpperCase() + productType.slice(1)
+    : undefined
 
   return (
     <div id="product-info">
@@ -32,13 +30,13 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
             Home
           </LocalizedClientLink>
           <span>/</span>
-          {occasionConfig && (
+          {product.collection && (
             <>
               <LocalizedClientLink
-                href={`/occasions/${occasionSlug}`}
+                href={`/collections/${product.collection.handle}`}
                 className="hover:text-cf-orange transition-colors"
               >
-                {occasionConfig.emoji} {occasionConfig.label}
+                {product.collection.title}
               </LocalizedClientLink>
               <span>/</span>
             </>
@@ -46,10 +44,10 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
           {typeLabel && (
             <>
               <LocalizedClientLink
-                href={typeLabel.href}
+                href={`/store?type=${productType}`}
                 className="hover:text-cf-orange transition-colors"
               >
-                {typeLabel.label}
+                {typeLabel}
               </LocalizedClientLink>
               <span>/</span>
             </>

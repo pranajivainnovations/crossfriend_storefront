@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react"
 import { usePlanning } from "@modules/planning/context/planning-context"
 import { fetchWizardResults, type WizardResultsPayload } from "@modules/planning/actions"
-import { OCCASION_MAP } from "@lib/constants"
+import type { DynamicOccasion } from "@lib/data/dynamic"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import type { ProductPreviewType } from "types/global"
 
@@ -62,11 +62,21 @@ export default function StepResults() {
   const { occasion, budget, goBack, close } = usePlanning()
   const [data, setData] = useState<WizardResultsPayload | null>(null)
   const [isPending, startTransition] = useTransition()
-
-  const occasionConfig = occasion ? OCCASION_MAP[occasion] : null
+  const [occasionConfig, setOccasionConfig] = useState<DynamicOccasion | null>(null)
 
   useEffect(() => {
     if (!occasion) return
+
+    // Fetch occasion config dynamically
+    fetch("/api/occasions")
+      .then((res) => res.json())
+      .then((d) => {
+        const found = (d.occasions as DynamicOccasion[])?.find(
+          (o) => o.slug === occasion
+        )
+        if (found) setOccasionConfig(found)
+      })
+      .catch(() => {})
 
     startTransition(async () => {
       const results = await fetchWizardResults(

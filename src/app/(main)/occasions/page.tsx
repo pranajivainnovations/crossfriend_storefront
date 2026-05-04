@@ -1,11 +1,13 @@
 import { Metadata } from "next"
-import { OCCASIONS } from "@lib/constants"
+import { getOccasions } from "@lib/data/dynamic"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import {
   FadeInSection,
   StaggerGrid,
   StaggerItem,
 } from "@modules/common/components/motion"
+
+export const revalidate = 300
 
 export const metadata: Metadata = {
   title: "All Occasions | CrossFriend",
@@ -18,7 +20,9 @@ export const metadata: Metadata = {
   },
 }
 
-export default function OccasionsPage() {
+export default async function OccasionsPage() {
+  const occasions = await getOccasions()
+
   return (
     <div className="bg-cf-warm min-h-screen">
       <div className="content-container py-12 small:py-20">
@@ -35,7 +39,7 @@ export default function OccasionsPage() {
 
         {/* Occasion cards grid */}
         <StaggerGrid className="grid grid-cols-1 small:grid-cols-2 medium:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {OCCASIONS.map((occasion) => (
+          {occasions.map((occasion) => (
             <StaggerItem key={occasion.slug}>
               <LocalizedClientLink
                 href={`/occasions/${occasion.slug}`}
@@ -64,6 +68,13 @@ export default function OccasionsPage() {
             </StaggerItem>
           ))}
         </StaggerGrid>
+
+        {occasions.length === 0 && (
+          <div className="text-center py-20 text-ui-fg-muted">
+            <p className="text-lg">No occasions available yet.</p>
+            <p className="text-sm mt-2">Check back soon — new occasions are coming!</p>
+          </div>
+        )}
       </div>
     </div>
   )

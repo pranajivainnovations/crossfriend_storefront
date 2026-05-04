@@ -1,11 +1,11 @@
-import type { OccasionConfig } from "@lib/constants"
+import type { DynamicOccasion } from "@lib/data/dynamic"
 import ConfettiBg from "@modules/common/components/confetti-bg"
 import UrgencyBanner from "@modules/common/components/urgency-banner"
 
 export default function OccasionHero({
   occasion,
 }: {
-  occasion: OccasionConfig
+  occasion: DynamicOccasion
 }) {
   return (
     <div
@@ -32,12 +32,10 @@ export default function OccasionHero({
           {occasion.tagline}
         </p>
 
-        {/* Urgency for cakes */}
-        {occasion.sectionOrder[0] === "cake" && (
-          <div className="mt-2">
-            <UrgencyBanner />
-          </div>
-        )}
+        {/* Urgency banner */}
+        <div className="mt-2">
+          <UrgencyBanner />
+        </div>
       </div>
     </div>
   )

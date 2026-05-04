@@ -8,8 +8,7 @@ import { Fragment } from "react"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import CountrySelect from "../country-select"
-import { OCCASIONS, PRODUCT_TYPE_LABELS } from "@lib/constants"
-import type { ProductType } from "@lib/types/product-contract"
+import type { DynamicOccasion, DynamicProductType } from "@lib/data/dynamic"
 import { usePlanning } from "@modules/planning/context/planning-context"
 
 const SideMenuItems = {
@@ -20,7 +19,15 @@ const SideMenuItems = {
   Cart: "/cart",
 }
 
-const SideMenu = ({ regions }: { regions: Region[] | null }) => {
+const SideMenu = ({
+  regions,
+  occasions,
+  productTypes,
+}: {
+  regions: Region[] | null
+  occasions: DynamicOccasion[]
+  productTypes: DynamicProductType[]
+}) => {
   const toggleState = useToggleState()
   const planning = usePlanning()
 
@@ -65,52 +72,51 @@ const SideMenu = ({ regions }: { regions: Region[] | null }) => {
                       🎉 Start Planning
                     </button>
 
-                    {/* Occasions */}
-                    <div className="mb-6">
-                      <span className="text-xs uppercase tracking-wider text-ui-fg-muted mb-3 block">
-                        Occasions
-                      </span>
-                      <ul className="flex flex-col gap-3">
-                        {OCCASIONS.map((occasion) => (
-                          <li key={occasion.slug}>
-                            <LocalizedClientLink
-                              href={`/occasions/${occasion.slug}`}
-                              className="text-xl leading-8 hover:text-ui-fg-disabled flex items-center gap-3"
-                              onClick={close}
-                            >
-                              <span>{occasion.emoji}</span>
-                              {occasion.label}
-                            </LocalizedClientLink>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {/* Occasions (dynamic) */}
+                    {occasions.length > 0 && (
+                      <div className="mb-6">
+                        <span className="text-xs uppercase tracking-wider text-ui-fg-muted mb-3 block">
+                          Occasions
+                        </span>
+                        <ul className="flex flex-col gap-3">
+                          {occasions.map((occasion) => (
+                            <li key={occasion.slug}>
+                              <LocalizedClientLink
+                                href={`/occasions/${occasion.slug}`}
+                                className="text-xl leading-8 hover:text-ui-fg-disabled flex items-center gap-3"
+                                onClick={close}
+                              >
+                                <span>{occasion.emoji}</span>
+                                {occasion.label}
+                              </LocalizedClientLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
-                    {/* Categories */}
-                    <div className="mb-6">
-                      <span className="text-xs uppercase tracking-wider text-ui-fg-muted mb-3 block">
-                        Categories
-                      </span>
-                      <ul className="flex flex-col gap-3">
-                        {(Object.keys(PRODUCT_TYPE_LABELS) as ProductType[]).map(
-                          (type) => {
-                            const item = PRODUCT_TYPE_LABELS[type]
-                            return (
-                              <li key={type}>
-                                <LocalizedClientLink
-                                  href={item.href}
-                                  className="text-xl leading-8 hover:text-ui-fg-disabled flex items-center gap-3"
-                                  onClick={close}
-                                >
-                                  <span>{item.emoji}</span>
-                                  {item.label}
-                                </LocalizedClientLink>
-                              </li>
-                            )
-                          }
-                        )}
-                      </ul>
-                    </div>
+                    {/* Categories (dynamic) */}
+                    {productTypes.length > 0 && (
+                      <div className="mb-6">
+                        <span className="text-xs uppercase tracking-wider text-ui-fg-muted mb-3 block">
+                          Categories
+                        </span>
+                        <ul className="flex flex-col gap-3">
+                          {productTypes.map((item) => (
+                            <li key={item.value}>
+                              <LocalizedClientLink
+                                href={item.href}
+                                className="text-xl leading-8 hover:text-ui-fg-disabled flex items-center gap-3"
+                                onClick={close}
+                              >
+                                <span>{item.emoji}</span>
+                                {item.label}
+                              </LocalizedClientLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Standard links */}
                     <ul className="flex flex-col gap-4 items-start justify-start mb-auto">

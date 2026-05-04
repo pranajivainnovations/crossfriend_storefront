@@ -1,4 +1,4 @@
-import { getProductsListWithSort, getRegion } from "@lib/data"
+import { getProductsListWithSort, getRegion, getCollectionByHandle } from "@lib/data"
 import ProductPreview from "@modules/products/components/product-preview"
 import { Pagination } from "@modules/store/components/pagination"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
@@ -16,14 +16,20 @@ export default async function PaginatedProducts({
   sortBy,
   page,
   collectionId,
+  collectionHandle,
   categoryId,
   productsIds,
+  typeFilter,
+  tagsFilter,
 }: {
   sortBy?: SortOptions
   page: number
   collectionId?: string
+  collectionHandle?: string
   categoryId?: string
   productsIds?: string[]
+  typeFilter?: string
+  tagsFilter?: string
 }) {
   const region = await getRegion()
 
@@ -35,8 +41,19 @@ export default async function PaginatedProducts({
     limit: PRODUCT_LIMIT,
   }
 
-  if (collectionId) {
-    queryParams["collection_id"] = [collectionId]
+  // Resolve collection handle to ID if needed
+  let resolvedCollectionId = collectionId
+  if (!resolvedCollectionId && collectionHandle) {
+    try {
+      const collection = await getCollectionByHandle(collectionHandle)
+      resolvedCollectionId = collection?.id
+    } catch {
+      // Collection not found, skip filter
+    }
+  }
+
+  if (resolvedCollectionId) {
+    queryParams["collection_id"] = [resolvedCollectionId]
   }
 
   if (categoryId) {
@@ -53,6 +70,8 @@ export default async function PaginatedProducts({
     page,
     queryParams,
     sortBy,
+    typeFilter,
+    tagsFilter,
   })
 
   const totalPages = Math.ceil(count / PRODUCT_LIMIT)

@@ -1,12 +1,26 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { BUDGET_RANGES, usePlanning } from "@modules/planning/context/planning-context"
-import { OCCASION_MAP } from "@lib/constants"
+import type { DynamicOccasion } from "@lib/data/dynamic"
 
 export default function StepBudget() {
   const { occasion, selectBudget, skipBudget, goBack } = usePlanning()
+  const [occasionLabel, setOccasionLabel] = useState("")
 
-  const occasionLabel = occasion ? OCCASION_MAP[occasion]?.label : ""
+  useEffect(() => {
+    if (occasion) {
+      fetch("/api/occasions")
+        .then((res) => res.json())
+        .then((data) => {
+          const found = (data.occasions as DynamicOccasion[])?.find(
+            (o) => o.slug === occasion
+          )
+          if (found) setOccasionLabel(found.label)
+        })
+        .catch(() => {})
+    }
+  }, [occasion])
 
   return (
     <div className="flex flex-col items-center">
