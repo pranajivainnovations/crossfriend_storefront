@@ -11,29 +11,10 @@ import {
 import { Region } from "@medusajs/medusa"
 import ProductTemplate from "@modules/products/templates"
 
-// Revalidate product pages every 2 minutes for stock/pricing freshness
-export const revalidate = 120
+export const dynamic = "force-dynamic"
 
 type Props = {
   params: { handle: string }
-}
-
-export async function generateStaticParams() {
-  try {
-    const products = await getProductsList({}).then(
-      ({ response }) => response.products
-    )
-
-    if (!products) {
-      return []
-    }
-
-    return products.map((product) => ({
-      handle: product.handle,
-    }))
-  } catch (error) {
-    return []
-  }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

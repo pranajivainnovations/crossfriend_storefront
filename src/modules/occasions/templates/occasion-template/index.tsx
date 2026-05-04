@@ -33,7 +33,7 @@ export default async function OccasionTemplate({
       <OccasionHero occasion={occasion} />
 
       {/* Quick-Add Kit */}
-      <QuickAddKit occasion={occasion.slug} />
+      <QuickAddKit occasion={occasion.slug as any} />
 
       {/* Product sections — one per product type (dynamically fetched) */}
       {productTypes.map((pt) => (

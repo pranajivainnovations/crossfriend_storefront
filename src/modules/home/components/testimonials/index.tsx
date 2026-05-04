@@ -62,7 +62,7 @@ export default function Testimonials() {
             >
               {/* Quote mark */}
               <div className="absolute -top-3 left-6 w-8 h-8 rounded-full bg-cf-orange flex items-center justify-center text-white text-sm font-bold shadow-md">
-                "
+                &ldquo;
               </div>
 
               {/* Stars */}

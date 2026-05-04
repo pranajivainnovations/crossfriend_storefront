@@ -39,7 +39,7 @@ export default function StepOccasion() {
           {occasions.map((occasion) => (
             <button
               key={occasion.slug}
-              onClick={() => selectOccasion(occasion.slug)}
+              onClick={() => selectOccasion(occasion.slug as any)}
               className="group relative flex flex-col items-center gap-2 p-5 rounded-xl bg-white border-2 border-transparent hover:border-cf-orange hover:shadow-md transition-all duration-200 hover-lift"
             >
               <span className="text-3xl group-hover:animate-bounce-in">

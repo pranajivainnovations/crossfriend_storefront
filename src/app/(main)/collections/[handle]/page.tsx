@@ -8,8 +8,7 @@ import {
 import CollectionTemplate from "@modules/collections/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 
-// Revalidate collection pages every 5 minutes
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 type Props = {
   params: { handle: string }
@@ -20,22 +19,6 @@ type Props = {
 }
 
 export const PRODUCT_LIMIT = 12
-
-export async function generateStaticParams() {
-  try {
-    const { collections } = await getCollectionsList()
-
-    if (!collections) {
-      return []
-    }
-
-    return collections.map((collection) => ({
-      handle: collection.handle,
-    }))
-  } catch (error) {
-    return []
-  }
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const collection = await getCollectionByHandle(params.handle)

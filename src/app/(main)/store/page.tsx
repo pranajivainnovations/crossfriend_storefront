@@ -3,8 +3,8 @@ import { Metadata } from "next"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import StoreTemplate from "@modules/store/templates"
 
-// Revalidate store page every 5 minutes
-export const revalidate = 300
+// Never prerender — always fetch fresh from Medusa at request time
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "Shop All Products",
