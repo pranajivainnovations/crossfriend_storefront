@@ -1,0 +1,13 @@
+{
+  "_comment": "Controls which product types appear on each occasion page.",
+  "_usage": "Edit this file on the server and call POST /api/revalidate to apply without redeployment.",
+  "_occasions": ["birthday", "anniversary", "festival", "kids", "special"],
+  "_types": ["cake", "decor", "costume", "gift", "wellness", "toys"],
+
+  "cake":     ["birthday", "anniversary", "kids", "special", "festival"],
+  "decor":    ["birthday", "anniversary", "kids", "special", "festival"],
+  "costume":  ["kids", "festival", "special"],
+  "gift":     ["birthday", "anniversary", "festival", "special"],
+  "wellness": ["anniversary", "festival", "special"],
+  "toys":     ["kids", "special"]
+}

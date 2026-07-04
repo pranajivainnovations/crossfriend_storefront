@@ -50,7 +50,15 @@ const ImageOrPlaceholder = ({
   image,
   size,
 }: Pick<ThumbnailProps, "size"> & { image?: string }) => {
-  return image ? (
+  // Accept only absolute URLs or root-relative paths (starting with /).
+  // Plain filenames like "cake.png" from Medusa are invalid for next/image — treat as missing.
+  const isValidSrc =
+    image &&
+    (image.startsWith("http://") ||
+      image.startsWith("https://") ||
+      image.startsWith("/"))
+
+  return isValidSrc ? (
     <Image
       src={image}
       alt="Thumbnail"

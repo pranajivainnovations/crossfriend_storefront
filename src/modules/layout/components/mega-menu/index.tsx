@@ -5,14 +5,16 @@ import { ChevronDownMini } from "@medusajs/icons"
 import { Fragment } from "react"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import type { DynamicOccasion, DynamicProductType } from "@lib/data/dynamic"
+import type { DynamicOccasion, DynamicProductType, DynamicCategory } from "@lib/data/dynamic"
 
 export default function MegaMenu({
   occasions,
   productTypes,
+  categories,
 }: {
   occasions: DynamicOccasion[]
   productTypes: DynamicProductType[]
+  categories: DynamicCategory[]
 }) {
   return (
     <Popover className="relative h-full flex items-center">
@@ -36,10 +38,11 @@ export default function MegaMenu({
             leaveFrom="opacity-100 translate-y-0"
             leaveTo="opacity-0 -translate-y-1"
           >
-            <Popover.Panel className="absolute left-1/2 -translate-x-1/2 top-full mt-0 w-[640px] z-50">
+            <Popover.Panel className="absolute left-0 top-full mt-0 w-[900px] z-50">
               <div className="bg-white rounded-b-2xl shadow-lg border border-ui-border-base overflow-hidden">
-                <div className="grid grid-cols-2 gap-0">
-                  {/* Left column — Occasions */}
+                <div className="grid grid-cols-3 gap-0">
+
+                  {/* Column 1 — Occasions */}
                   <div className="p-6 border-r border-ui-border-base">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted mb-4">
                       Shop by Occasion
@@ -78,13 +81,13 @@ export default function MegaMenu({
                     </ul>
                   </div>
 
-                  {/* Right column — Product types */}
-                  <div className="p-6">
+                  {/* Column 2 — Product Types */}
+                  <div className="p-6 border-r border-ui-border-base">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted mb-4">
-                      Shop by Category
+                      Shop by Type
                     </h3>
                     <ul className="space-y-1">
-                      {productTypes.map((item) => (
+                      {productTypes.length > 0 ? productTypes.map((item) => (
                         <li key={item.value}>
                           <LocalizedClientLink
                             href={item.href}
@@ -99,10 +102,45 @@ export default function MegaMenu({
                             </span>
                           </LocalizedClientLink>
                         </li>
-                      ))}
+                      )) : (
+                        <li className="px-3 py-2 text-sm text-ui-fg-muted">Coming soon</li>
+                      )}
+                    </ul>
+                    <div className="mt-4">
+                      <LocalizedClientLink
+                        href="/store"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-cf-warm transition-colors text-sm font-medium text-cf-orange"
+                        onClick={close}
+                      >
+                        View All Products →
+                      </LocalizedClientLink>
+                    </div>
+                  </div>
+
+                  {/* Column 3 — Categories + Planning CTA */}
+                  <div className="p-6">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted mb-4">
+                      Shop by Category
+                    </h3>
+                    <ul className="space-y-1">
+                      {categories.length > 0 ? categories.map((cat) => (
+                        <li key={cat.id}>
+                          <LocalizedClientLink
+                            href={`/categories/${cat.handle}`}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-cf-warm transition-colors group"
+                            onClick={close}
+                          >
+                            <span className="text-sm font-medium text-ui-fg-base group-hover:text-cf-orange transition-colors">
+                              {cat.name}
+                            </span>
+                          </LocalizedClientLink>
+                        </li>
+                      )) : (
+                        <li className="px-3 py-2 text-sm text-ui-fg-muted">Coming soon</li>
+                      )}
                     </ul>
 
-                    {/* Start Planning CTA inside mega-menu */}
+                    {/* Start Planning CTA */}
                     <div className="mt-6 pt-4 border-t border-ui-border-base">
                       <LocalizedClientLink
                         href="/?planning=true"
@@ -113,6 +151,7 @@ export default function MegaMenu({
                       </LocalizedClientLink>
                     </div>
                   </div>
+
                 </div>
               </div>
             </Popover.Panel>

@@ -22,6 +22,41 @@ export const OCCASION_COLLECTIONS = [
 ] as const
 export type OccasionCollection = (typeof OCCASION_COLLECTIONS)[number]
 
+// --- Type → Occasion Map ---
+
+/**
+ * Defines which occasions each product type appears on by default.
+ *
+ * HOW TO USE:
+ *   - Add a new product type → add a row here listing its occasions.
+ *   - Add a new occasion     → add it to the relevant type rows here.
+ *   - Individual products can override this via metadata.occasions (Step 2).
+ *
+ * This is the ONLY place you need to change when the taxonomy grows.
+ */
+export const TYPE_OCCASION_MAP: Record<ProductType, OccasionCollection[]> = {
+  cake:        ["birthday", "anniversary", "kids", "special", "festival"],
+  decor:       ["birthday", "anniversary", "kids", "special", "festival"],
+  costume:     ["kids", "festival", "special"],
+  gift:        ["birthday", "anniversary", "festival", "special"],
+  wellness:    ["anniversary", "festival", "special"],
+  toys:        ["kids", "special"],
+}
+
+/**
+ * Reverse lookup — given an occasion, which product types appear on it?
+ * Derived automatically from TYPE_OCCASION_MAP. Never edit this directly.
+ */
+export const OCCASION_TYPE_MAP: Record<OccasionCollection, ProductType[]> = (() => {
+  const map = {} as Record<OccasionCollection, ProductType[]>
+  for (const occasion of OCCASION_COLLECTIONS) {
+    map[occasion] = (Object.entries(TYPE_OCCASION_MAP) as [ProductType, OccasionCollection[]][])
+      .filter(([, occasions]) => occasions.includes(occasion))
+      .map(([type]) => type)
+  }
+  return map
+})()
+
 // --- Product Metadata ---
 
 /**
@@ -35,6 +70,16 @@ export interface ProductMetadata {
   brand?: string
   /** Whether this product can be included in quick-add celebration kits */
   kit_eligible?: boolean
+  /**
+   * Optional per-product occasion override.
+   * Comma-separated occasion slugs. When set, REPLACES the type-level default.
+   * Set in Medusa Admin → Product → Metadata → occasions
+   *
+   * Example:  "special,anniversary"
+   * Effect:   This product only appears on special and anniversary pages,
+   *           regardless of what TYPE_OCCASION_MAP says for its type.
+   */
+  occasions?: string
 }
 
 // --- Delivery Configuration ---

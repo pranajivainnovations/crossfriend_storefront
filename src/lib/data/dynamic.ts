@@ -19,6 +19,7 @@ import { cache } from "react"
 import { ProductCollection } from "@medusajs/medusa"
 import { medusaClient } from "@lib/config"
 import { getCollectionsList, listCategories, getCategoriesList } from "@lib/data"
+import { loadConfiguredOccasions, loadConfiguredTypes } from "@lib/config/occasion-map.server"
 
 // ============================================
 // Types
@@ -118,41 +119,40 @@ function getDefaultGradient(index: number): string {
 }
 
 // ============================================
-// Dynamic Occasions (from Medusa collections with metadata.is_occasion=true)
+// Dynamic Occasions — JSON config is source of truth
 // ============================================
 
 /**
- * Fetches all collections marked as occasions from Medusa.
+ * Returns occasions in the order defined by `_occasions` in type-occasion-map.json.
+ * Medusa collections are fetched to enrich with title/emoji/tagline metadata.
+ * If a slug has no matching Medusa collection, sensible defaults are used.
  *
- * In Medusa admin, set collection metadata:
- * - is_occasion: true (required to show as occasion)
- * - emoji: "🎂" (optional, auto-detected from handle if missing)
- * - tagline: "Make their day unforgettable" (optional)
- * - gradient: "from-cf-orange to-cf-coral" (optional)
- * - priority: 1 (optional, for ordering)
+ * No metadata required in Medusa Admin — just create the collection with the
+ * correct handle (e.g. "birthday") and it will be picked up automatically.
  */
 export const getOccasions = cache(async function (): Promise<DynamicOccasion[]> {
   try {
+    const configuredSlugs = loadConfiguredOccasions()
+
     const { collections } = await getCollectionsList(0, 100)
-
-    if (!collections) return []
-
-    // Filter collections that have metadata.is_occasion = true
-    const occasionCollections = collections.filter(
-      (col) => col.metadata?.is_occasion === true || col.metadata?.is_occasion === "true"
+    const collectionByHandle = new Map(
+      (collections ?? []).map((col) => [col.handle.toLowerCase(), col])
     )
 
-    return occasionCollections
-      .map((col, index) => ({
-        id: col.id,
-        slug: col.handle,
-        label: col.title,
-        tagline: (col.metadata?.tagline as string) || `Shop for your ${col.title.toLowerCase()} celebration`,
-        emoji: (col.metadata?.emoji as string) || getDefaultEmoji(col.handle),
-        gradient: (col.metadata?.gradient as string) || getDefaultGradient(index),
-        priority: Number(col.metadata?.priority) || 0,
-      }))
-      .sort((a, b) => a.priority - b.priority)
+    return configuredSlugs.map((slug, index) => {
+      const col = collectionByHandle.get(slug.toLowerCase())
+      return {
+        id: col?.id ?? slug,
+        slug,
+        label: col?.title ?? capitalizeFirst(slug),
+        tagline:
+          (col?.metadata?.tagline as string) ??
+          `Shop for your ${(col?.title ?? slug).toLowerCase()} celebration`,
+        emoji: (col?.metadata?.emoji as string) ?? getDefaultEmoji(slug),
+        gradient: (col?.metadata?.gradient as string) ?? getDefaultGradient(index),
+        priority: Number(col?.metadata?.priority) || index,
+      }
+    })
   } catch (error) {
     console.error("[CrossFriend] Failed to fetch occasions:", error)
     return []
@@ -170,34 +170,41 @@ export const getOccasionBySlug = cache(async function (
 })
 
 // ============================================
-// Dynamic Product Types (from Medusa product_types)
+// Dynamic Product Types — JSON config is source of truth
 // ============================================
 
 /**
- * Fetches all product types from Medusa.
+ * Returns product types in the order defined by `_types` in type-occasion-map.json.
+ * Medusa product_types are fetched to enrich with emoji/label metadata.
+ * If a value has no matching Medusa product type, sensible defaults are used.
  *
- * In Medusa admin, product types can have metadata:
- * - emoji: "🎂" (optional)
- * - label: "Birthday Cakes" (optional, defaults to value with capital first letter)
- * - priority: 1 (optional, for ordering)
+ * No metadata required in Medusa Admin — just create a product type whose
+ * value matches a key in type-occasion-map.json (e.g. "cake").
  */
 export const getProductTypes = cache(async function (): Promise<DynamicProductType[]> {
   try {
+    const configuredValues = loadConfiguredTypes()
+
     const { product_types } = await medusaClient.productTypes.list(
       { limit: 100 },
       { next: { tags: ["product-types"] } }
     )
 
-    return product_types
-      .map((pt: any) => ({
-        id: pt.id,
-        value: pt.value.toLowerCase(),
-        label: (pt.metadata?.label as string) || capitalizeFirst(pt.value),
-        emoji: (pt.metadata?.emoji as string) || getDefaultEmoji(pt.value),
-        href: `/store?type=${pt.value.toLowerCase()}`,
-        priority: Number(pt.metadata?.priority) || 0,
-      }))
-      .sort((a: DynamicProductType, b: DynamicProductType) => a.priority - b.priority)
+    const typeByValue = new Map(
+      (product_types ?? []).map((pt: any) => [pt.value.toLowerCase(), pt])
+    )
+
+    return configuredValues.map((value, index) => {
+      const pt = typeByValue.get(value.toLowerCase())
+      return {
+        id: pt?.id ?? value,
+        value: value.toLowerCase(),
+        label: (pt?.metadata?.label as string) ?? capitalizeFirst(value),
+        emoji: (pt?.metadata?.emoji as string) ?? getDefaultEmoji(value),
+        href: `/store?type=${value.toLowerCase()}`,
+        priority: Number(pt?.metadata?.priority) || index,
+      }
+    })
   } catch (error) {
     console.error("[CrossFriend] Failed to fetch product types:", error)
     return []

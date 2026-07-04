@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 
 import { listRegions } from "@lib/data"
-import { getOccasions, getProductTypes } from "@lib/data/dynamic"
+import { getOccasions, getProductTypes, getParentCategories } from "@lib/data/dynamic"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import CartButton from "@modules/layout/components/cart-button"
 import SideMenu from "@modules/layout/components/side-menu"
@@ -9,10 +9,11 @@ import MegaMenu from "@modules/layout/components/mega-menu"
 import PlanningTrigger from "@modules/planning/components/planning-trigger"
 
 export default async function Nav() {
-  const [regions, occasions, productTypes] = await Promise.all([
+  const [regions, occasions, productTypes, categories] = await Promise.all([
     listRegions().then((regions) => regions),
     getOccasions(),
     getProductTypes(),
+    getParentCategories(),
   ])
 
   return (
@@ -35,18 +36,9 @@ export default async function Nav() {
               CrossFriend
             </LocalizedClientLink>
 
-            {/* Desktop mega-menu + top links (dynamic from product types) */}
-            <div className="hidden small:flex items-center gap-x-5 h-full ml-4">
-              <MegaMenu occasions={occasions} productTypes={productTypes} />
-              {productTypes.slice(0, 3).map((pt) => (
-                <LocalizedClientLink
-                  key={pt.value}
-                  href={pt.href}
-                  className="text-sm text-ui-fg-subtle hover:text-cf-orange transition-colors"
-                >
-                  {pt.label}
-                </LocalizedClientLink>
-              ))}
+            {/* Desktop mega-menu */}
+            <div className="hidden small:flex items-center h-full ml-4">
+              <MegaMenu occasions={occasions} productTypes={productTypes} categories={categories} />
             </div>
           </div>
 
@@ -92,6 +84,26 @@ export default async function Nav() {
           </div>
         </nav>
       </header>
+
+      {/* Product type ribbon — desktop only, shown below main header */}
+      {productTypes.length > 0 && (
+        <div className="hidden small:block bg-white border-b border-ui-border-base">
+          <div className="content-container">
+            <div className="flex items-center gap-x-1 h-9 overflow-x-auto">
+              {productTypes.map((pt) => (
+                <LocalizedClientLink
+                  key={pt.value}
+                  href={pt.href}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-ui-fg-subtle hover:text-cf-orange hover:bg-cf-warm transition-colors whitespace-nowrap"
+                >
+                  <span>{pt.emoji}</span>
+                  <span>{pt.label}</span>
+                </LocalizedClientLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

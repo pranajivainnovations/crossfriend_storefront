@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import type { DynamicOccasion } from "@lib/data/dynamic"
 import { getProductTypes } from "@lib/data/dynamic"
+import { getOccasionTypes } from "@lib/config/occasion-map.server"
 import OccasionHero from "@modules/occasions/components/occasion-hero"
 import OccasionSection from "@modules/occasions/components/occasion-section"
 import QuickAddKit from "@modules/occasions/components/quick-add-kit"
@@ -24,8 +25,14 @@ export default async function OccasionTemplate({
 }: {
   occasion: DynamicOccasion
 }) {
-  // Fetch all product types dynamically — show sections for each type
-  const productTypes = await getProductTypes()
+  // Fetch all crossfriend product types, then keep only those
+  // that type-occasion-map.json says belong on this occasion page.
+  // Edit src/lib/config/type-occasion-map.json + call /api/revalidate to update without redeployment.
+  const allTypes = await getProductTypes()
+  const mappedTypeValues = getOccasionTypes(occasion.slug)
+  const productTypes = allTypes.filter((pt) =>
+    mappedTypeValues.includes(pt.value as any)
+  )
 
   return (
     <div>
@@ -35,7 +42,7 @@ export default async function OccasionTemplate({
       {/* Quick-Add Kit */}
       <QuickAddKit occasion={occasion.slug as any} />
 
-      {/* Product sections — one per product type (dynamically fetched) */}
+      {/* Product sections — only types mapped to this occasion */}
       {productTypes.map((pt) => (
         <Suspense key={pt.value} fallback={<SectionSkeleton />}>
           <OccasionSection

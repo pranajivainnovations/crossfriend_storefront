@@ -14,6 +14,7 @@ import {
   ProductMetadata,
   OCCASION_COLLECTIONS,
   OccasionCollection,
+  TYPE_OCCASION_MAP,
 } from "@lib/types/product-contract"
 
 // --- Type Guards ---
@@ -58,6 +59,7 @@ export function getMetadata(product: PricedProduct): ProductMetadata {
     is_addon: raw.is_addon === true || raw.is_addon === "true",
     brand: typeof raw.brand === "string" ? raw.brand : undefined,
     kit_eligible: raw.kit_eligible === true || raw.kit_eligible === "true",
+    occasions: typeof raw.occasions === "string" ? raw.occasions : undefined,
   }
 }
 
@@ -75,7 +77,7 @@ export function isKitEligible(product: PricedProduct): boolean {
 
 // --- Collection Guards ---
 
-/** Get the occasion collection handles this product belongs to. */
+/** Get the occasion collection handle this product is assigned to in Medusa. */
 export function getOccasions(product: PricedProduct): OccasionCollection[] {
   if (!product.collection) return []
 
@@ -86,10 +88,86 @@ export function getOccasions(product: PricedProduct): OccasionCollection[] {
   return []
 }
 
-/** Check if a product belongs to a specific occasion collection. */
+/**
+ * Resolve the full list of occasions this product should appear on.
+ *
+ * Priority order:
+ *   1. metadata.occasions  — per-product override set in Medusa Admin
+ *                            (comma-separated, e.g. "special,anniversary")
+ *   2. TYPE_OCCASION_MAP   — default rule for the product's type
+ *   3. collection handle   — fallback: just the assigned collection
+ */
+export function getProductOccasions(product: PricedProduct): OccasionCollection[] {
+  // 1. Per-product metadata override
+  const metaOccasions = getMetadata(product).occasions
+  if (metaOccasions) {
+    return metaOccasions
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s): s is OccasionCollection =>
+        (OCCASION_COLLECTIONS as readonly string[]).includes(s)
+      )
+  }
+
+  // 2. Type-level default from TYPE_OCCASION_MAP
+  const type = getProductType(product)
+  if (type && TYPE_OCCASION_MAP[type]) {
+    return TYPE_OCCASION_MAP[type]
+  }
+
+  // 3. Fallback: just the assigned collection
+  return getOccasions(product)
+}
+
+/** Check if a product should appear on a specific occasion page. */
 export function isForOccasion(
   product: PricedProduct,
   occasion: OccasionCollection
 ): boolean {
-  return getOccasions(product).includes(occasion)
+  return getProductOccasions(product).includes(occasion)
+}
+
+// --- Tag Guards ---
+
+/**
+ * Get all tag values on a product as a lowercase string array.
+ * Always use this instead of raw product.tags access.
+ */
+export function getTags(product: PricedProduct): string[] {
+  if (!product.tags || product.tags.length === 0) return []
+  return product.tags.map((t) => t.value.toLowerCase())
+}
+
+/**
+ * Check if a product has a specific tag (case-insensitive).
+ *
+ * Usage:
+ *   hasTag(product, "rakhi")
+ *   hasTag(product, "dance")
+ *   hasTag(product, "independence-day")
+ */
+export function hasTag(product: PricedProduct, tag: string): boolean {
+  return getTags(product).includes(tag.toLowerCase())
+}
+
+/**
+ * Check if a product has ANY of the given tags.
+ *
+ * Usage:
+ *   hasAnyTag(product, ["rakhi", "diwali", "holi"])
+ */
+export function hasAnyTag(product: PricedProduct, tags: string[]): boolean {
+  const productTags = getTags(product)
+  return tags.some((t) => productTags.includes(t.toLowerCase()))
+}
+
+/**
+ * Check if a product has ALL of the given tags.
+ *
+ * Usage:
+ *   hasAllTags(product, ["dance", "kids"])
+ */
+export function hasAllTags(product: PricedProduct, tags: string[]): boolean {
+  const productTags = getTags(product)
+  return tags.every((t) => productTags.includes(t.toLowerCase()))
 }

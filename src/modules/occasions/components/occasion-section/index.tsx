@@ -15,20 +15,23 @@ export default async function OccasionSection({
 }) {
   const region = await getRegion()
 
-  const { previews } = await getProducts({
-    type: type as any,
-    collection: occasionSlug as any,
-    limit: 8,
-  })
+  // Call 1 — curated: products explicitly in this occasion's collection
+  //           (these are handpicked by the admin for this occasion)
+  // Call 2 — by type: all crossfriend products of this type
+  //           (TYPE_OCCASION_MAP already guarantees this type belongs here)
+  // Run both in parallel, then merge — curated first, no duplicates.
+  const [{ previews: curated }, { previews: byType }] = await Promise.all([
+    getProducts({ type: type as any, collection: occasionSlug as any, limit: 8 }),
+    getProducts({ type: type as any, limit: 8 }),
+  ])
 
-  // If no products for this type + occasion combo, try type-only
-  let products = previews
-  if (products.length === 0) {
-    const fallback = await getProducts({ type: type as any, limit: 8 })
-    products = fallback.previews
-  }
+  const curatedIds = new Set(curated.map((p) => p.id))
+  const products = [
+    ...curated,
+    ...byType.filter((p) => !curatedIds.has(p.id)),
+  ].slice(0, 8)
 
-  // Still nothing — don't render the section
+  // Nothing for this type at all — don't render the section
   if (products.length === 0 || !region) return null
 
   return (
