@@ -10,10 +10,10 @@ import PlanningTrigger from "@modules/planning/components/planning-trigger"
 
 export default async function Nav() {
   const [regions, occasions, productTypes, categories] = await Promise.all([
-    listRegions().then((regions) => regions),
-    getOccasions(),
-    getProductTypes(),
-    getParentCategories(),
+    listRegions().then((data) => data).catch(() => []),
+    getOccasions().catch(() => []),
+    getProductTypes().catch(() => []),
+    getParentCategories().catch(() => []),
   ])
 
   return (

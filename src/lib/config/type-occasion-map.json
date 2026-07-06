@@ -6,7 +6,7 @@
 
   "cake":     ["birthday", "anniversary", "kids", "special", "festival"],
   "decor":    ["birthday", "anniversary", "kids", "special", "festival"],
-  "costume":  ["kids", "festival", "special"],
+  "Fancy-Dress":  ["kids", "festival", "special"],
   "gift":     ["birthday", "anniversary", "festival", "special"],
   "wellness": ["anniversary", "festival", "special"],
   "toys":     ["kids", "special"]

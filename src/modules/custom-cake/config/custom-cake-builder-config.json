@@ -1,0 +1,86 @@
+{
+  "defaultValues": {
+    "occasion": "Birthday",
+    "age": "",
+    "birthDate": "",
+    "guestCount": "20",
+    "tiers": "2",
+    "weight": "2.5",
+    "shape": "Round",
+    "flavor": "Chocolate",
+    "theme": "Floral",
+    "decoration": "Fresh flowers and gold dust",
+    "cakeText": "Happy Birthday",
+    "nameOnCake": "",
+    "notes": "Add a clean, modern design with soft pastel highlights.",
+    "reference": "Pastel garden, luxe shimmer, and subtle frosting textures."
+  },
+  "options": {
+    "occasions": [
+      { "value": "Birthday", "label": "Birthday" },
+      { "value": "Anniversary", "label": "Anniversary" },
+      { "value": "Festival", "label": "Festival" },
+      { "value": "Kids", "label": "Kids" },
+      { "value": "Special", "label": "Special" }
+    ],
+    "shapes": [
+      { "value": "Round", "label": "Round" },
+      { "value": "Square", "label": "Square" },
+      { "value": "Heart", "label": "Heart" },
+      { "value": "Oval", "label": "Oval" }
+    ],
+    "flavors": [
+      { "value": "Chocolate", "label": "Chocolate" },
+      { "value": "Vanilla", "label": "Vanilla" },
+      { "value": "Red Velvet", "label": "Red Velvet" },
+      { "value": "Strawberry", "label": "Strawberry" },
+      { "value": "Butterscotch", "label": "Butterscotch" },
+      { "value": "Salted Caramel", "label": "Salted Caramel" }
+    ],
+    "themes": [
+      { "value": "Floral", "label": "Floral" },
+      { "value": "Superhero", "label": "Superhero" },
+      { "value": "Princess", "label": "Princess" },
+      { "value": "Minimal", "label": "Minimal" },
+      { "value": "Rustic", "label": "Rustic" },
+      { "value": "Modern Luxe", "label": "Modern Luxe" },
+      { "value": "Botanical", "label": "Botanical" }
+    ],
+    "tiers": [
+      { "value": "1", "label": "Single tier" },
+      { "value": "2", "label": "Two tiers" },
+      { "value": "3", "label": "Three tiers" },
+      { "value": "4", "label": "Four tiers" }
+    ],
+    "weights": [
+      { "value": "1", "label": "1 kg" },
+      { "value": "1.5", "label": "1.5 kg" },
+      { "value": "2", "label": "2 kg" },
+      { "value": "2.5", "label": "2.5 kg" },
+      { "value": "3", "label": "3 kg" }
+    ]
+  },
+  "savedDesigns": [
+    {
+      "id": "signature-1",
+      "title": "Celestial Bloom",
+      "subtitle": "A futuristic pastel cake with gold dust and floral geometry",
+      "accent": "from-cf-pink to-cf-purple",
+      "tags": ["Birthday", "Premium", "Modern"]
+    },
+    {
+      "id": "signature-2",
+      "title": "Velvet Midnight",
+      "subtitle": "Deep tones with jewel accents and elegant script text",
+      "accent": "from-cf-purple to-cf-coral",
+      "tags": ["Anniversary", "Luxury", "Minimal"]
+    },
+    {
+      "id": "signature-3",
+      "title": "Dreamscape Play",
+      "subtitle": "A celebratory cake with playful colors and bold details",
+      "accent": "from-cf-orange to-cf-yellow",
+      "tags": ["Kids", "Fun", "Vibrant"]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-import { Text, clx } from "@medusajs/ui"
+import { Text } from "@medusajs/ui"
 
-import { getCategoriesList, getCollectionsList } from "@lib/data"
+import { getCollectionsList } from "@lib/data"
 import { getOccasions, getProductTypes } from "@lib/data/dynamic"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
@@ -8,9 +8,9 @@ import MedusaCTA from "@modules/layout/components/medusa-cta"
 
 export default async function Footer() {
   const [{ collections }, occasions, productTypes] = await Promise.all([
-    getCollectionsList(0, 6),
-    getOccasions(),
-    getProductTypes(),
+    getCollectionsList(0, 6).catch(() => ({ collections: [] })),
+    getOccasions().catch(() => []),
+    getProductTypes().catch(() => []),
   ])
 
   return (
