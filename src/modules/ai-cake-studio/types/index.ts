@@ -89,3 +89,68 @@ export interface StudioState {
   generated: boolean
   selectedDesignId: string | null
 }
+
+// ─── Price Estimator ────────────────────────────────────────────────────────
+
+export interface EstimatorSelections {
+  weight: string
+  tiers: string
+  shape: string
+  flavor: string
+  eggless: boolean
+  expressDelivery: boolean
+  midnightDelivery: boolean
+}
+
+export interface Addon {
+  id: string
+  label: string
+  description: string
+  price: number
+  emoji: string
+  suggestFor: string[]
+  /** Medusa product ID — present when the add-on comes from the database */
+  productId?: string
+  /** Medusa variant ID — used to add the add-on to the cart as a line item */
+  variantId?: string
+  /** Product thumbnail URL from Medusa */
+  thumbnail?: string | null
+}
+
+export interface PricingFactors {
+  basePrice: number
+  currency: string
+  factors: {
+    weight: Record<string, number>
+    tiers: Record<string, number>
+    shape: Record<string, number>
+    style: Record<string, number>
+    flavor: Record<string, number>
+    eggless: number
+    expressDelivery: number
+    midnightDelivery: number
+    messageOnCake: number
+    photoOnCake: number
+  }
+}
+
+export interface StudioConfigSelector {
+  value: string
+  label: string
+  serves?: string
+  emoji?: string
+}
+
+export interface StudioConfig {
+  pricing: PricingFactors
+  selectors: {
+    weights: StudioConfigSelector[]
+    tiers: StudioConfigSelector[]
+    shapes: StudioConfigSelector[]
+    flavors: StudioConfigSelector[]
+    styles: StudioConfigSelector[]
+    occasions: StudioConfigSelector[]
+  }
+  addons: Addon[]
+}
+

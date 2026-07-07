@@ -1,0 +1,113 @@
+{
+  "_comment": "AI Cake Studio configuration. Edit here and call POST /api/revalidate to apply without redeployment.",
+
+  "pricing": {
+    "basePrice": 800,
+    "currency": "₹",
+    "factors": {
+      "weight": {
+        "0.5": 0,
+        "1":   0,
+        "1.5": 200,
+        "2":   400,
+        "2.5": 650,
+        "3":   900,
+        "4":   1400,
+        "5":   2000
+      },
+      "tiers": {
+        "1": 0,
+        "2": 600,
+        "3": 1400,
+        "4": 2400
+      },
+      "shape": {
+        "Round":  0,
+        "Square": 150,
+        "Heart":  250,
+        "Oval":   200,
+        "Custom": 500
+      },
+      "style": {
+        "Realistic":    0,
+        "Cartoon":      200,
+        "Luxury":       800,
+        "Minimal":      0,
+        "3D Sculpted":  1200,
+        "Wedding":      600,
+        "Kids":         300
+      },
+      "flavor": {
+        "Vanilla":        0,
+        "Chocolate":      0,
+        "Red Velvet":     100,
+        "Strawberry":     100,
+        "Butterscotch":   150,
+        "Salted Caramel": 200,
+        "Mango":          150,
+        "Blueberry":      200,
+        "Lemon":          100
+      },
+      "eggless": 150,
+      "expressDelivery": 300,
+      "midnightDelivery": 200,
+      "messageOnCake": 0,
+      "photoOnCake": 250
+    }
+  },
+
+  "selectors": {
+    "weights": [
+      { "value": "0.5", "label": "0.5 kg",  "serves": "4–6" },
+      { "value": "1",   "label": "1 kg",    "serves": "8–10" },
+      { "value": "1.5", "label": "1.5 kg",  "serves": "12–15" },
+      { "value": "2",   "label": "2 kg",    "serves": "16–20" },
+      { "value": "2.5", "label": "2.5 kg",  "serves": "20–25" },
+      { "value": "3",   "label": "3 kg",    "serves": "25–30" },
+      { "value": "4",   "label": "4 kg",    "serves": "30–40" },
+      { "value": "5",   "label": "5 kg",    "serves": "40–50" }
+    ],
+    "tiers": [
+      { "value": "1", "label": "Single tier" },
+      { "value": "2", "label": "Two tiers" },
+      { "value": "3", "label": "Three tiers" },
+      { "value": "4", "label": "Four tiers" }
+    ],
+    "shapes": [
+      { "value": "Round",  "label": "Round" },
+      { "value": "Square", "label": "Square" },
+      { "value": "Heart",  "label": "Heart" },
+      { "value": "Oval",   "label": "Oval" }
+    ],
+    "flavors": [
+      { "value": "Chocolate",      "label": "Chocolate" },
+      { "value": "Vanilla",        "label": "Vanilla" },
+      { "value": "Red Velvet",     "label": "Red Velvet" },
+      { "value": "Strawberry",     "label": "Strawberry" },
+      { "value": "Butterscotch",   "label": "Butterscotch" },
+      { "value": "Salted Caramel", "label": "Salted Caramel" },
+      { "value": "Mango",          "label": "Mango" },
+      { "value": "Blueberry",      "label": "Blueberry" },
+      { "value": "Lemon",          "label": "Lemon" }
+    ],
+    "styles": [
+      { "value": "Realistic",   "label": "Realistic",   "emoji": "🎂" },
+      { "value": "Cartoon",     "label": "Cartoon",     "emoji": "🎨" },
+      { "value": "Luxury",      "label": "Luxury",      "emoji": "✨" },
+      { "value": "Minimal",     "label": "Minimal",     "emoji": "🤍" },
+      { "value": "3D Sculpted", "label": "3D Sculpted", "emoji": "🏆" },
+      { "value": "Wedding",     "label": "Wedding",     "emoji": "💍" },
+      { "value": "Kids",        "label": "Kids",        "emoji": "🎠" }
+    ],
+    "occasions": [
+      { "value": "Birthday",    "label": "Birthday" },
+      { "value": "Anniversary", "label": "Anniversary" },
+      { "value": "Wedding",     "label": "Wedding" },
+      { "value": "Festival",    "label": "Festival" },
+      { "value": "Kids",        "label": "Kids Party" },
+      { "value": "Special",     "label": "Special" }
+    ]
+  },
+
+  "_addons_note": "Add-ons are managed as Medusa products under the 'cake-addons' product category. Create products there with metadata: { emoji, suggestFor (comma-separated), price (optional ₹ override) }. They will be fetched live by /api/cake-addons and suggested automatically based on occasion and style."
+}

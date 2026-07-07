@@ -270,3 +270,79 @@ export const HERO_PROMPT_EXAMPLES = [
   "Minecraft birthday cake for a 10-year-old boy",
   "Minimalist 3-tier cake with dried flowers",
 ]
+
+// ─── Prompt templates shown as quick-start chips in the AI studio ──────────
+
+export interface PromptTemplate {
+  label: string
+  prompt: string
+  occasion: string
+}
+
+export const PROMPT_TEMPLATES: PromptTemplate[] = [
+  {
+    label: "🎂 Birthday Surprise",
+    prompt:
+      "A 2-tier birthday cake with bright sprinkles, edible gold stars, and a bold Happy Birthday message in pastel colours",
+    occasion: "Birthday",
+  },
+  {
+    label: "💍 Wedding Elegance",
+    prompt:
+      "A 3-tier white wedding cake with hand-sculpted sugar roses, gold leaf accents, and delicate lace fondant details",
+    occasion: "Wedding",
+  },
+  {
+    label: "🦄 Kids Fantasy",
+    prompt:
+      "A unicorn themed cake with rainbow layers, pastel buttercream swirls, edible glitter and a fondant unicorn topper",
+    occasion: "Kids",
+  },
+  {
+    label: "✨ Luxe Dark Floral",
+    prompt:
+      "A single-tier dark chocolate cake with deep burgundy sugar flowers, gold drip and moody romantic vibes",
+    occasion: "Anniversary",
+  },
+  {
+    label: "🌸 Pastel Garden",
+    prompt:
+      "A 2-tier spring garden cake with watercolour floral painting, fresh pastel blooms and soft sage green fondant",
+    occasion: "Special",
+  },
+  {
+    label: "🌌 Galaxy Dream",
+    prompt:
+      "A galaxy-themed cake with swirling nebula colours in deep purple and blue, edible stars, silver shimmer and a cosmos effect",
+    occasion: "Birthday",
+  },
+  {
+    label: "🎊 Diwali Special",
+    prompt:
+      "A festive Diwali cake with deep jewel tones, diya motifs, rangoli patterns in edible colours and golden shimmering finish",
+    occasion: "Festival",
+  },
+  {
+    label: "🤍 Minimalist Cake",
+    prompt:
+      "A clean single-tier minimalist white cake with naked frosting, fresh berries on top and a simple handwritten script message",
+    occasion: "Special",
+  },
+]
+
+// ─── Curated messages from CrossFriend for each occasion ─────────────────────
+
+export const CF_OCCASION_MESSAGES: Record<string, string> = {
+  Birthday:
+    "Every birthday deserves a cake as unique as the person it celebrates. From all of us at CrossFriend — may your day be as sweet, vibrant, and full of joy as the design you're about to create.",
+  Anniversary:
+    "You've written so many beautiful chapters together. Let this cake be a delicious page in your story — made with the same love and intention you give each other every single day.",
+  Wedding:
+    "A wedding cake is more than sweetness — it's the first chapter of your forever. CrossFriend is honoured to be part of your story and hopes every tier reflects a year of happiness ahead.",
+  Festival:
+    "Festivals are best celebrated with people who matter most, and with a cake that captures the spirit of the season. Wishing you colours, sweetness, and togetherness.",
+  Kids:
+    "There is nothing more magical than seeing a child's eyes light up at their birthday cake. We hope this design brings that priceless moment to life — pure joy, made edible.",
+  Special:
+    "Some moments call for something truly extraordinary. Whatever you are celebrating today, you deserve a cake made with intention, love, and a little bit of magic.",
+}

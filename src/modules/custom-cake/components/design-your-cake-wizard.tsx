@@ -641,7 +641,7 @@ export default function DesignYourCakeWizard() {
             These premium visuals are curated for fast inspiration and easier selection.
           </p>
           <div className="mt-6 space-y-4">
-            {SAMPLE_DESIGNS.map((design) => (
+            {savedDesigns.map((design) => (
               <div key={design.id} className="rounded-[28px] border border-ui-border-base bg-slate-950/80 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>

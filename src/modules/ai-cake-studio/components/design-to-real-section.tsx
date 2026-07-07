@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import Image from "next/image"
 
 export default function DesignToRealSection() {
   return (
@@ -37,12 +38,18 @@ export default function DesignToRealSection() {
 
             <div className="relative">
               <div className="relative overflow-hidden rounded-[28px] border border-violet-100 bg-gradient-to-br from-violet-100 via-purple-100 to-fuchsia-100 p-6">
-                <div className="h-[220px] overflow-hidden rounded-2xl border border-white/70 bg-white/45">
-                  <img
+                <div className="relative h-[220px] overflow-hidden rounded-2xl border border-white/70 bg-gradient-to-br from-violet-100 via-purple-50 to-fuchsia-100">
+                  {/* Fallback shown until baker image is uploaded */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <span className="text-4xl">👨‍🍳</span>
+                    <span className="text-xs font-semibold text-violet-400">Verified Baker</span>
+                  </div>
+                  <Image
                     src="/ai-cake-studio/baker/verified-baker.jpg"
                     alt="Verified baker"
-                    className="h-full w-full object-cover"
-                    loading="lazy"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                   />
                 </div>
               </div>

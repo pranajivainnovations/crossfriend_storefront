@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { addToCart } from "@modules/cart/actions"
 
 type AddOnItem = {
@@ -96,9 +97,11 @@ export default function AddOnSelectorClient({ addOns }: Props) {
               {/* Thumbnail */}
               <div className="w-10 h-10 rounded-lg bg-grey-10 overflow-hidden shrink-0">
                 {item.thumbnail && (
-                  <img
+                  <Image
                     src={item.thumbnail}
                     alt={item.title}
+                    width={40}
+                    height={40}
                     className="w-full h-full object-cover"
                   />
                 )}

@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, cubicBezier } from "framer-motion"
 import type { Baker } from "../types"
 
 interface RecommendedBakersProps {
@@ -29,7 +29,7 @@ function BakerCard({ baker, index }: { baker: Baker; index: number }) {
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.5, delay: index * 0.1, ease: cubicBezier(0.22, 1, 0.36, 1) }}
       whileHover={{ y: -5 }}
       className="group overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-100/60 transition-shadow duration-300 hover:shadow-2xl hover:shadow-violet-100/40"
     >

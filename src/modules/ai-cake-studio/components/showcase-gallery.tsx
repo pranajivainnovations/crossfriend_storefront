@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import Image from "next/image"
 import { SHOWCASE_CREATIONS } from "../data/mock-data"
 
 export default function ShowcaseGallery() {
@@ -31,12 +32,18 @@ export default function ShowcaseGallery() {
               whileHover={{ y: -4 }}
               className="overflow-hidden rounded-2xl border border-violet-100 bg-white p-2 shadow-sm"
             >
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-violet-50">
-                <img
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-violet-100 via-purple-50 to-fuchsia-100">
+                {/* Gradient + subtle label fallback when image isn't uploaded yet */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-semibold text-violet-400">{item.title}</span>
+                </div>
+                {/* Image loads on top once uploaded */}
+                <Image
                   src={item.imagePath}
                   alt={item.imageAlt}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                 />
                 <div className="absolute inset-0 rounded-xl border border-white/50" />
               </div>

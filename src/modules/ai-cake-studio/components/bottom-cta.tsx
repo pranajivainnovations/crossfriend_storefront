@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import Image from "next/image"
 
 export default function BottomCta() {
   return (
@@ -18,12 +19,16 @@ export default function BottomCta() {
           <div className="pointer-events-none absolute right-6 top-8 text-2xl text-white/50">✦</div>
           <div className="pointer-events-none absolute right-16 bottom-8 text-xl text-white/45">✧</div>
 
-          <div className="pointer-events-none mx-auto mb-4 h-24 w-24 overflow-hidden rounded-full border border-white/40 shadow-lg shadow-violet-900/20 sm:h-28 sm:w-28">
-            <img
+          <div className="pointer-events-none relative mx-auto mb-4 h-24 w-24 overflow-hidden rounded-full border border-white/40 bg-white/20 shadow-lg shadow-violet-900/20 sm:h-28 sm:w-28">
+            {/* Fallback ring visible until banner-cake.png is uploaded */}
+            <div className="absolute inset-0 flex items-center justify-center text-3xl">🎂</div>
+            <Image
               src="/ai-cake-studio/banner/banner-cake.png"
               alt="Banner cake"
-              className="h-full w-full object-cover"
-              loading="lazy"
+              fill
+              className="object-cover"
+              sizes="112px"
+              priority
             />
           </div>
 

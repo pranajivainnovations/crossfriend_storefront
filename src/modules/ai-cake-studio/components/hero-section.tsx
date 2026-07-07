@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { motion } from "framer-motion"
+import { motion, cubicBezier } from "framer-motion"
+import Image from "next/image"
 import { HERO_PROMPT_EXAMPLES } from "../data/mock-data"
 
 const fadeUp = {
@@ -9,7 +10,7 @@ const fadeUp = {
   visible: (delay = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1], delay },
+    transition: { duration: 0.65, ease: cubicBezier(0.22, 1, 0.36, 1), delay },
   }),
 }
 
@@ -27,11 +28,12 @@ function CakeHeroVisual() {
         className="relative overflow-hidden rounded-[36px] border border-violet-100 bg-gradient-to-br from-[#f3ebff] via-white to-[#f9f3ff] p-5 shadow-[0_24px_70px_rgba(124,58,237,0.2)]"
       >
         <div className="relative aspect-[4/3] overflow-hidden rounded-[28px] border border-violet-100 bg-gradient-to-br from-violet-100 via-purple-100 to-fuchsia-100">
-          <img
+          <Image
             src="/ai-cake-studio/hero/hero-cake.jpg"
             alt="AI cake studio hero cake"
-            className="h-full w-full object-cover"
-            loading="lazy"
+            fill
+            className="object-cover"
+            priority
           />
           <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-violet-700">
             AI Cake Preview
@@ -98,7 +100,7 @@ export default function HeroSection() {
           </motion.div>
 
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0.1}>
-            <h1 className="font-heading text-4xl font-semibold leading-[1.03] tracking-[-0.045em] text-slate-900 sm:text-5xl lg:text-[60px]">
+            <h1 className="font-heading text-4xl font-semibold leading-[1.03] tracking-[-0.045em] text-slate-900 sm:text-5xl lg:text-[40px]">
               <span className="bg-gradient-to-r from-violet-700 via-purple-600 to-fuchsia-500 bg-clip-text text-transparent">
                 Design Your Dream Cake
               </span>
@@ -156,53 +158,9 @@ export default function HeroSection() {
             custom={0.35}
             className="overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-[0_14px_35px_rgba(109,40,217,0.12)]"
           >
-            <div className="p-4">
-              <p className="mb-2 text-sm font-semibold text-slate-700">Describe your cake idea...</p>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value.slice(0, 200))}
-                placeholder="Describe your dream cake..."
-                rows={3}
-                className="w-full resize-none rounded-2xl border border-violet-100 bg-violet-50/35 p-4 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
-              />
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={handleExampleClick}
-                  className="rounded-full border border-dashed border-slate-300 px-4 py-2 text-xs font-medium text-slate-500 transition hover:border-violet-300 hover:text-violet-600"
-                >
-                  💡 Try an example
-                </button>
-                <span className="text-xs text-slate-400">{prompt.length} / 200</span>
-              </div>
-            </div>
+            
 
-            <div className="px-4 pb-4 pt-1">
-              <motion.button
-                type="button"
-                onClick={handleGenerate}
-                disabled={!hasPrompt}
-                whileHover={hasPrompt ? { scale: 1.015 } : {}}
-                whileTap={hasPrompt ? { scale: 0.98 } : {}}
-                className={`w-full rounded-xl px-6 py-3.5 text-sm font-bold text-white shadow-lg transition ${
-                  hasPrompt
-                    ? "bg-gradient-to-r from-violet-600 to-purple-600 shadow-violet-200 hover:from-violet-700 hover:to-purple-700"
-                    : "cursor-not-allowed bg-slate-300 shadow-slate-200"
-                }`}
-              >
-                ✨ Generate Cake Designs
-              </motion.button>
-              <p className="pt-3 text-center text-xs text-slate-500">
-                Or{" "}
-                <button
-                  type="button"
-                  onClick={() => document.getElementById("inspiration-templates")?.scrollIntoView({ behavior: "smooth" })}
-                  className="font-semibold text-violet-600 hover:text-violet-700"
-                >
-                  browse beautiful templates
-                </button>
-              </p>
-            </div>
+            
           </motion.div>
         </div>
 

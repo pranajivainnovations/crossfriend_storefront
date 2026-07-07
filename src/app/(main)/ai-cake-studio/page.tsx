@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { getCustomer } from "@lib/data"
 import HeroSection from "@modules/ai-cake-studio/components/hero-section"
 import InspirationCards from "@modules/ai-cake-studio/components/inspiration-cards"
 import HowItWorks from "@modules/ai-cake-studio/components/how-it-works"
@@ -26,14 +27,16 @@ export const metadata: Metadata = {
   },
 }
 
-export default function AiCakeStudioPage() {
+export default async function AiCakeStudioPage() {
+  const customer = await getCustomer().catch(() => null)
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#f9f6ff] via-white to-[#fcfaff]">
       <HeroSection />
       <InspirationCards />
       <HowItWorks />
       <ShowcaseGallery />
-      <AiStudioSection />
+      <AiStudioSection customer={customer} />
       <DesignToRealSection />
       <BottomCta />
     </main>

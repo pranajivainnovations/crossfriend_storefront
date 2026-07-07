@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import Image from "next/image"
 import { INSPIRATION_CARDS } from "../data/mock-data"
 
 export default function InspirationCards() {
@@ -42,11 +43,17 @@ export default function InspirationCards() {
             >
               <div className="relative overflow-hidden rounded-2xl border border-violet-100 bg-white p-2.5 shadow-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-violet-100/60">
                 <div className={`relative h-32 overflow-hidden rounded-xl bg-gradient-to-br ${card.gradient}`}>
-                  <img
+                  {/* Emoji fallback — visible when image hasn't been uploaded yet */}
+                  <div className="absolute inset-0 flex items-center justify-center text-4xl">
+                    {card.emoji}
+                  </div>
+                  {/* Image loads on top of fallback once uploaded */}
+                  <Image
                     src={card.imagePath}
                     alt={card.imageAlt}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                   />
                   <div className="absolute inset-0 border border-white/50" />
                 </div>

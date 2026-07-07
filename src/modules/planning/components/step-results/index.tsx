@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
+import Image from "next/image"
 import { usePlanning } from "@modules/planning/context/planning-context"
 import { fetchWizardResults, type WizardResultsPayload } from "@modules/planning/actions"
 import type { DynamicOccasion } from "@lib/data/dynamic"
@@ -25,9 +26,11 @@ function ProductCard({
       {/* Thumbnail */}
       <div className="w-16 h-16 rounded-lg bg-grey-10 overflow-hidden shrink-0">
         {product.thumbnail && (
-          <img
+          <Image
             src={product.thumbnail}
             alt={product.title}
+            width={64}
+            height={64}
             className="w-full h-full object-cover"
           />
         )}
