@@ -13,7 +13,7 @@ import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 
-const FREE_ATTEMPTS_LIMIT = 3
+const FREE_ATTEMPTS_LIMIT = 3 // fallback; overridden by ai-cake-studio-config.json → freeAttemptsLimit
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -189,7 +189,10 @@ export default function AiStudioSection({ customer }: Props) {
   useEffect(() => {
     fetch("/api/ai-cake-studio-config")
       .then((r) => r.json())
-      .then((data: { selectors?: StudioSelectors }) => {
+      .then((data: { selectors?: StudioSelectors; freeAttemptsLimit?: number }) => {
+        if (data.freeAttemptsLimit != null) {
+          setAttemptsLeft(isLoggedIn ? data.freeAttemptsLimit : 0)
+        }
         if (!data.selectors) return
         setSelectors(data.selectors)
         setSel({
