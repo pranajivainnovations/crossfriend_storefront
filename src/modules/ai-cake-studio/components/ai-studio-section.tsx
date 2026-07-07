@@ -202,7 +202,7 @@ export default function AiStudioSection({ customer }: Props) {
         })
       })
       .catch(() => {}) // keep fallback silently
-  }, [])
+  }, [isLoggedIn])
 
   const handleGenerate = async () => {
     if (!canGenerate) return
