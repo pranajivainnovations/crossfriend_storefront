@@ -64,6 +64,21 @@ export interface Baker {
   badge: string
 }
 
+export interface BakerProfile {
+  id: string
+  name: string
+  avatar: string
+  rating: number
+  reviewCount: number
+  specialty: string
+  minPrice: number
+  deliveryRadius: string
+  distance: string
+  turnaround: string
+  verified: boolean
+  whatsapp?: string
+}
+
 export interface HowItWorksStep {
   step: number
   title: string

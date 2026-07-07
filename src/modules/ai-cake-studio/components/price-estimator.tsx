@@ -351,6 +351,48 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
           >
             <div className="border-t border-violet-100 px-5 pb-5 pt-4 space-y-5">
 
+              {/* ── Live Cake Price Banner (top, updates as options change) ── */}
+              <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 p-4 text-white">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-200">
+                      Cake Price
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] text-violet-200">
+                      {sel.weight} kg · {sel.tiers}-tier · {sel.shape} · {cakeStyle} · {sel.flavor}
+                    </p>
+                  </div>
+                  <motion.p
+                    key={baseTotal}
+                    initial={{ scale: 1.18, opacity: 0.6 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 24 }}
+                    className="shrink-0 text-3xl font-black"
+                  >
+                    ₹{baseTotal.toLocaleString("en-IN")}
+                  </motion.p>
+                </div>
+                {(sel.eggless || sel.expressDelivery || sel.midnightDelivery) && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-white/20 pt-2.5">
+                    {sel.eggless && (
+                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold">
+                        🥚 Eggless +₹{pricing.factors.eggless}
+                      </span>
+                    )}
+                    {sel.expressDelivery && (
+                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold">
+                        ⚡ Express +₹{pricing.factors.expressDelivery}
+                      </span>
+                    )}
+                    {sel.midnightDelivery && (
+                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold">
+                        🌙 Midnight +₹{pricing.factors.midnightDelivery}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Weight */}
               <div>
                 <SectionLabel>
@@ -462,39 +504,43 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
                 </details>
               )}
 
-              {/* ── Price Breakdown ── */}
-              <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4 space-y-2">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 mb-3">
-                  Price breakdown
+              {/* ── Grand Total ── */}
+              <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Summary
                 </p>
-                <PriceRow label="Base price"                        amount={pricing.basePrice}  />
-                <PriceRow label={`Weight (${sel.weight} kg)`}       amount={pick(pricing.factors.weight, sel.weight)}  />
-                <PriceRow label={`${sel.tiers}-tier`}               amount={pick(pricing.factors.tiers, sel.tiers)}   />
-                <PriceRow label={`${sel.shape} shape`}              amount={pick(pricing.factors.shape, sel.shape)}   />
-                <PriceRow label={`${cakeStyle} style`}              amount={pick(pricing.factors.style, cakeStyle)}   />
-                <PriceRow label={`${sel.flavor} flavour`}           amount={pick(pricing.factors.flavor, sel.flavor)} />
-                <PriceRow label="Eggless"                           amount={sel.eggless ? pricing.factors.eggless : 0} />
-                <PriceRow label="Express delivery"                  amount={sel.expressDelivery ? pricing.factors.expressDelivery : 0} />
-                <PriceRow label="Midnight delivery"                 amount={sel.midnightDelivery ? pricing.factors.midnightDelivery : 0} />
-
-                {selectedAddons.size > 0 && (
-                  <div className="border-t border-violet-100 pt-2 space-y-1">
-                    {activeAddons
-                      .filter((a) => selectedAddons.has(a.id))
-                      .map((a) => (
-                        <PriceRow key={a.id} label={`${a.emoji} ${a.label}`} amount={a.price} />
-                      ))}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600">Cake</span>
+                    <span className="font-semibold text-slate-800">₹{baseTotal.toLocaleString("en-IN")}</span>
                   </div>
-                )}
-
-                <div className="border-t border-violet-200 pt-3 flex items-center justify-between">
-                  <p className="text-sm font-bold text-slate-900">Estimated total</p>
-                  <p className="text-xl font-bold text-violet-700">
-                    ₹{grandTotal.toLocaleString("en-IN")}
-                  </p>
+                  {selectedAddons.size > 0 && (
+                    <>
+                      {activeAddons
+                        .filter((a) => selectedAddons.has(a.id))
+                        .map((a) => (
+                          <div key={a.id} className="flex items-center justify-between text-xs text-slate-500">
+                            <span>{a.emoji} {a.label}</span>
+                            <span>+₹{a.price}</span>
+                          </div>
+                        ))}
+                    </>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  * Final price is confirmed by the baker. This is an indicative estimate.
+                <div className="mt-3 flex items-center justify-between border-t border-violet-200 pt-3">
+                  <p className="text-sm font-bold text-slate-900">Grand Total</p>
+                  <motion.p
+                    key={grandTotal}
+                    initial={{ scale: 1.12, opacity: 0.7 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 24 }}
+                    className="text-2xl font-black text-violet-700"
+                  >
+                    ₹{grandTotal.toLocaleString("en-IN")}
+                  </motion.p>
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-400">
+                  * Indicative estimate. Final price confirmed by your baker.
                 </p>
               </div>
 

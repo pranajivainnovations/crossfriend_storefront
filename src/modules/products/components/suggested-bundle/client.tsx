@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { addToCart } from "@modules/cart/actions"
 
 export type BundleItem = {
@@ -61,9 +62,11 @@ export default function SuggestedBundleClient({
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-ui-border-base">
                 <div className="w-10 h-10 rounded-lg bg-grey-10 overflow-hidden shrink-0">
                   {item.thumbnail && (
-                    <img
+                    <Image
                       src={item.thumbnail}
                       alt={item.title}
+                      width={40}
+                      height={40}
                       className="w-full h-full object-cover"
                     />
                   )}
