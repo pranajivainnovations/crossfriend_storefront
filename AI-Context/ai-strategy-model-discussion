@@ -1,0 +1,120 @@
+# AI Image Generation Provider Comparison — For Cake Images
+
+---
+
+## The Contenders
+
+| Provider | Model | Cost Per Image | Quality for Cakes | Initial Investment | API Complexity |
+|----------|-------|---------------|-------------------|-------------------|----------------|
+| **OpenAI DALL-E 3** | dall-e-3 | $0.04 (1024×1024) / $0.08 (1792×1024) | ⭐⭐⭐⭐⭐ Excellent | $5 min top-up | Very simple |
+| **OpenAI DALL-E 2** | dall-e-2 | $0.02 (1024×1024) | ⭐⭐⭐ Decent | $5 min top-up | Very simple |
+| **Stability AI (SDXL)** | stable-diffusion-xl | $0.002–$0.006 | ⭐⭐⭐⭐ Good | $10 credits | Moderate |
+| **Replicate (FLUX.1)** | flux-1.1-pro | $0.003–$0.01 | ⭐⭐⭐⭐⭐ Excellent | Pay-as-you-go ($0) | Moderate |
+| **Replicate (SDXL)** | sdxl | $0.002–$0.005 | ⭐⭐⭐⭐ Good | Pay-as-you-go ($0) | Moderate |
+| **Google Imagen 3** | imagen-3 | $0.03–$0.04 | ⭐⭐⭐⭐⭐ Excellent | GCP account needed | Moderate |
+| **Leonardo AI** | leonardo-phoenix | $0.01–$0.02 | ⭐⭐⭐⭐ Good (for product images) | Free tier (150 tokens/day) | Simple |
+
+---
+
+## Cost Breakdown — Your Scale
+
+Assuming **3 images per generation**, **3 free generations per user**:
+
+| Scenario | DALL-E 3 | FLUX.1 (Replicate) | Stability SDXL |
+|----------|----------|-------------------|----------------|
+| 1 generation (3 images) | ₹10–12 | ₹2–3 | ₹1–2 |
+| 1 user's free quota (9 images) | ₹30–36 | ₹6–9 | ₹3–6 |
+| 100 users (MVP month) | ₹3,000–3,600 | ₹600–900 | ₹300–600 |
+| 1,000 users (growth) | ₹30,000–36,000 | ₹6,000–9,000 | ₹3,000–6,000 |
+
+---
+
+## Quality Comparison for Cake Images Specifically
+
+| Criteria | DALL-E 3 | FLUX.1 (Replicate) | Stability SDXL |
+|----------|----------|-------------------|----------------|
+| Photorealistic cakes | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| Text on cakes (e.g., "Happy Birthday") | ⭐⭐⭐⭐⭐ (best at text) | ⭐⭐⭐⭐ | ⭐⭐⭐ (struggles) |
+| Fondant/decoration detail | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| Multi-tier accuracy | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| Consistent style control | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Speed | 8–15 sec | 5–10 sec | 3–8 sec |
+| Prompt following accuracy | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+
+---
+
+## My Recommendation
+
+### 🏆 **Best Value: Replicate FLUX.1**
+
+| Factor | Why |
+|--------|-----|
+| **Cost** | ~₹2–3 per generation (3 images) — **10x cheaper than DALL-E 3** |
+| **Quality** | Matches DALL-E 3 for photorealistic cakes. Excellent at details. |
+| **Initial investment** | **₹0** — pure pay-as-you-go, no minimum top-up |
+| **API** | Simple REST API, webhook support for async generation |
+| **Speed** | 5–10 seconds per image |
+| **Scaling** | No rate limits at low volume. Scales automatically. |
+| **Flexibility** | Can switch models instantly (FLUX, SDXL, etc.) without code changes |
+
+### Why Not DALL-E 3?
+
+- 10x more expensive for similar quality on cakes
+- $5 minimum top-up (small, but still a commitment before testing)
+- Better at text rendering (but you won't put much text on cake images)
+- Slightly slower
+
+### Why Not Stability AI Directly?
+
+- Cheapest option BUT requires managing their specific API
+- Image quality slightly below FLUX.1 for photorealism
+- Replicate hosts SDXL anyway — so you get it through Replicate if needed
+
+---
+
+## Recommended Strategy: Start with Replicate
+
+```
+Phase 1 (Now):     Replicate FLUX.1-pro     → ₹2-3 per generation
+Phase 2 (If needed): Add DALL-E 3 as fallback → for complex prompts that FLUX struggles with
+Phase 3 (Scale):   Self-host SDXL on GPU     → ₹0.5 per generation (if volume justifies)
+```
+
+### Replicate Pricing (FLUX.1)
+
+| Model | Cost | Speed | Quality |
+|-------|------|-------|---------|
+| `black-forest-labs/flux-1.1-pro` | ~$0.003/image | ~5 sec | Best |
+| `black-forest-labs/flux-schnell` | ~$0.001/image | ~2 sec | Good (faster, slightly lower quality) |
+| `stability-ai/sdxl` | ~$0.002/image | ~4 sec | Good |
+
+**For MVP:** Use `flux-1.1-pro` — best quality-to-cost ratio.
+
+---
+
+## What You Need to Start
+
+| Step | Action | Time |
+|------|--------|------|
+| 1 | Create Replicate account → [replicate.com](https://replicate.com) | 2 min |
+| 2 | Get API token from dashboard | 1 min |
+| 3 | Add `REPLICATE_API_TOKEN=<token>` to backend `.env` | 1 min |
+| 4 | No credit card needed initially (free tier gives some predictions) | — |
+| 5 | Add card when ready for production (pay-as-you-go, no minimum) | 2 min |
+
+---
+
+## Final Answer
+
+| Choice | Value |
+|--------|-------|
+| **Provider** | Replicate |
+| **Model** | `black-forest-labs/flux-1.1-pro` |
+| **Cost per generation (3 images)** | ~₹2–3 (~$0.009–$0.012) |
+| **Initial investment** | ₹0 |
+| **Monthly cost at 100 users** | ~₹600–900 |
+| **Fallback (optional later)** | OpenAI DALL-E 3 for edge cases |
+
+---
+
+Want me to proceed with building **Step 1: AI Generation + S3 Upload** using Replicate FLUX.1? I'll deliver the complete backend code (service + API route + S3 upload logic).

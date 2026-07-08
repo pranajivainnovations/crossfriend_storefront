@@ -1,0 +1,361 @@
+# Backend Requirements for AI Cake Studio — Complete Breakdown
+
+Based on your current state (UI done, mock data powering everything), here's everything that needs to be built on the backend to make this production-ready:
+
+---
+
+## 1. 🔐 OTP Authentication (Replace Mock)
+
+**Current state:** Any 6-digit code is accepted. OTP is logged to console.
+
+**What to build:**
+
+| Component | Details |
+|-----------|---------|
+| OTP Provider Integration | MSG91 / Twilio / Gupshup — send real SMS |
+| OTP Storage | Redis/KV store: key = `otp:{mobile}`, value = hashed OTP, TTL = 5 min |
+| OTP Verification | Compare submitted OTP against stored hash |
+| Rate limiting on send | Max 3 OTP requests per mobile per 10 min |
+| Rate limiting on verify | Max 5 attempts per OTP session, then block |
+| OTP expiry | Auto-expire after 5 minutes |
+| Resend logic | Allow resend only after 30s cooldown (already in UI) |
+
+**Env vars needed:**
+```
+OTP_PROVIDER=msg91
+MSG91_AUTH_KEY=<key>
+MSG91_TEMPLATE_ID=<template_id>
+MSG91_SENDER_ID=<sender>
+REDIS_URL=<redis-connection-string>
+```
+
+---
+
+## 2. 🎨 AI Image Generation Service
+
+**Current state:** Mock 1.8s delay, returns hardcoded designs.
+
+**What to build:**
+
+| Component | Details |
+|-----------|---------|
+| Generation API route | `POST /api/ai-cake-studio/generate` |
+| Prompt engineering | Combine user prompt + style + occasion + flavor + zodiac into optimized provider prompt |
+| Provider integration | OpenAI DALL-E 3 / Stability AI / Midjourney API / Replicate |
+| Image storage | Upload generated images to S3/Cloudflare R2/Supabase Storage |
+| Response shape | Return array of 2–3 image URLs + metadata |
+| Timeout handling | 30–60s max wait, graceful timeout error |
+| Retry logic | 1 automatic retry on provider failure |
+| Fallback | If provider is down, return error state (don't deduct credits) |
+
+**API contract:**
+
+```ts
+// POST /api/ai-cake-studio/generate
+// Request
+{
+  prompt: string
+  style: string
+  occasion: string
+  flavor: string
+  zodiacInfluence?: { sign: string; suggestion: string }
+  imageCount?: number // default 3
+}
+
+// Response (success)
+{
+  success: true
+  generationId: string
+  designs: [
+    {
+      id: string
+      imageUrl: string
+      title: string       // AI-generated or derived
+      description: string // AI-generated
+      style: string
+    }
+  ]
+  creditsRemaining: number
+}
+
+// Response (failure)
+{
+  success: false
+  error: string
+  code: "QUOTA_EXHAUSTED" | "RATE_LIMITED" | "PROVIDER_ERROR" | "AUTH_REQUIRED"
+  creditsRemaining?: number
+}
+```
+
+**Env vars needed:**
+```
+AI_PROVIDER=openai          # or "stability" or "replicate"
+OPENAI_API_KEY=<key>
+AI_IMAGE_STORAGE=r2         # or "s3" or "supabase"
+R2_ACCOUNT_ID=<id>
+R2_ACCESS_KEY=<key>
+R2_SECRET_KEY=<secret>
+R2_BUCKET_NAME=cake-designs
+R2_PUBLIC_URL=https://cdn.crossfriend.in
+```
+
+---
+
+## 3. 📊 Quota & Credit Tracking System
+
+**Current state:** Client-side counter only (resets on refresh).
+
+**What to build:**
+
+| Component | Details |
+|-----------|---------|
+| Storage | Medusa customer metadata OR dedicated table |
+| Credit fields per customer | `free_generation_limit`, `free_generations_used`, `bonus_generation_balance`, `last_generation_at`, `generation_locked` |
+| Credit check API | `GET /api/ai-cake-studio/credits` — returns remaining attempts |
+| Credit deduction | Deduct ONLY after successful generation |
+| Credit restoration | If provider fails after deduction, restore credit |
+| Admin grant | Endpoint or Medusa admin plugin to manually add credits |
+
+**Customer metadata structure (Medusa):**
+```json
+{
+  "ai_studio": {
+    "free_limit": 3,
+    "free_used": 1,
+    "bonus_balance": 0,
+    "last_generation_at": "2026-07-08T12:00:00Z",
+    "generation_locked": false
+  }
+}
+```
+
+**API contract:**
+```ts
+// GET /api/ai-cake-studio/credits
+// Response
+{
+  freeRemaining: number
+  bonusRemaining: number
+  totalRemaining: number
+  isLocked: boolean
+  nextAvailableAt?: string // ISO date if cooldown active
+}
+```
+
+---
+
+## 4. 🛡️ Rate Limiting & Abuse Protection
+
+**Current state:** None.
+
+**What to build:**
+
+| Layer | Rule |
+|-------|------|
+| Per-user cooldown | 1 generation every 20–30 seconds |
+| Per-user daily cap | Max 5 generations/day (free tier) |
+| Per-IP rate limit | Max 10 requests/minute to generation endpoint |
+| In-flight lock | `generation_locked = true` while request is processing; reject duplicates |
+| Device fingerprint (optional) | Prevent multi-account abuse from same device |
+| Honeypot (optional) | Detect bot patterns |
+
+**Implementation options:**
+- Redis-based rate limiter (recommended)
+- Vercel Edge middleware rate limiting
+- Upstash Redis (serverless-friendly)
+
+---
+
+## 5. 📒 Generation Ledger / History
+
+**Current state:** No persistence. Generated designs disappear on refresh.
+
+**What to build:**
+
+| Component | Details |
+|-----------|---------|
+| Storage | PostgreSQL table or Medusa custom entity |
+| Record per generation | `id`, `customer_id`, `prompt`, `occasion`, `style`, `flavor`, `zodiac_sign`, `provider`, `model`, `status`, `image_urls[]`, `image_count`, `credit_cost`, `created_at`, `completed_at`, `failed_reason` |
+| User history API | `GET /api/ai-cake-studio/history` — paginated list of past generations |
+| Design detail API | `GET /api/ai-cake-studio/designs/{id}` — single design with images |
+| Saved/favorited designs | Allow user to "save" a design for later |
+| Admin view | List all generations with filters (for cost monitoring) |
+
+**Schema:**
+```sql
+CREATE TABLE ai_generations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id VARCHAR NOT NULL,
+  prompt TEXT NOT NULL,
+  occasion VARCHAR(50),
+  style VARCHAR(50),
+  flavor VARCHAR(50),
+  zodiac_sign VARCHAR(20),
+  provider VARCHAR(30) NOT NULL,         -- 'openai', 'stability'
+  provider_model VARCHAR(50),            -- 'dall-e-3', 'sdxl'
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending, completed, failed
+  image_urls JSONB DEFAULT '[]',
+  image_count INT DEFAULT 0,
+  credit_cost INT DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  failed_reason TEXT,
+  metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX idx_generations_customer ON ai_generations(customer_id);
+CREATE INDEX idx_generations_status ON ai_generations(status);
+CREATE INDEX idx_generations_created ON ai_generations(created_at DESC);
+```
+
+---
+
+## 6. 🏪 Baker System (Replace Mock)
+
+**Current state:** Returns hardcoded sample bakers.
+
+**What to build:**
+
+| Component | Details |
+|-----------|---------|
+| Baker profiles in Medusa | Custom entity or product type with: name, specialty, rating, reviews, service pincodes, min price, turnaround, whatsapp, verified status |
+| Pincode-to-baker mapping | Baker serves multiple pincodes/areas |
+| Baker search API | `GET /api/bakers?pincode=XXXXXX` — query real data |
+| Baker onboarding | Admin flow to add/verify bakers |
+| Baker inquiry/lead | When user clicks "Request Quote" → create a lead record |
+| WhatsApp deep link | Pre-filled message with design details |
+| Distance calculation (future) | Pincode → lat/lng → distance from baker |
+
+**Options for storage:**
+- Medusa custom entity (recommended for V1)
+- Separate PostgreSQL table
+- Medusa products with type = "baker" (hacky but works)
+
+---
+
+## 7. 🛒 Order Handoff Flow
+
+**Current state:** User selects a design → sees action panel → no real next step.
+
+**What to build (decide one or more):**
+
+| Option | Flow |
+|--------|------|
+| **A. Baker Inquiry (Lead)** | Save design + customer + baker preference → notify baker via WhatsApp/email → baker responds with quote |
+| **B. Custom Cake Cart Item** | Create a "Custom AI Cake" product in Medusa → add to cart with metadata (design image, prompt, style, weight, add-ons) → standard checkout |
+| **C. Saved Design Library** | Save to user's account → revisit anytime → order when ready |
+| **D. Consultation Request** | Form submission → admin reviews → connects customer with baker |
+
+**Recommended MVP:** Option A (Lead) + Option C (Saved designs)
+
+**Lead table:**
+```sql
+CREATE TABLE cake_leads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id VARCHAR NOT NULL,
+  generation_id UUID REFERENCES ai_generations(id),
+  design_image_url TEXT,
+  baker_id VARCHAR,
+  pincode VARCHAR(6),
+  weight VARCHAR(10),
+  tiers VARCHAR(5),
+  flavor VARCHAR(50),
+  addons JSONB DEFAULT '[]',
+  estimated_price INT,
+  message TEXT,
+  status VARCHAR(20) DEFAULT 'new',  -- new, contacted, quoted, accepted, rejected
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+## 8. 🖼️ Image Storage & CDN
+
+**Current state:** No generated images stored.
+
+**What to build:**
+
+| Component | Details |
+|-----------|---------|
+| Object storage | Cloudflare R2 / AWS S3 / Supabase Storage |
+| Upload flow | After AI generates image → download from provider → upload to storage → save public URL |
+| CDN | Serve images via CDN (R2 has built-in, or use CloudFront) |
+| Cleanup policy | Delete unclaimed designs after 30 days |
+| Image optimization | Serve via Next.js Image (already using `next/image`) with remote patterns configured |
+
+**next.config.js addition:**
+```js
+images: {
+  remotePatterns: [
+    { protocol: 'https', hostname: 'cdn.crossfriend.in' },
+    { protocol: 'https', hostname: '*.r2.cloudflarestorage.com' },
+  ]
+}
+```
+
+---
+
+## 9. 📱 Real-time Notifications (Optional, Post-MVP)
+
+| Component | Details |
+|-----------|---------|
+| Baker notification | WhatsApp Business API or email when new lead arrives |
+| Customer notification | SMS/WhatsApp when baker responds with quote |
+| Generation complete | Push notification if generation takes >10s |
+
+---
+
+## 10. 📈 Admin Dashboard / Monitoring
+
+**What to build:**
+
+| Component | Details |
+|-----------|---------|
+| Generation stats | Total generations, success/fail rate, avg cost per generation |
+| Credit consumption | How many free vs bonus vs paid credits used |
+| Popular prompts | Most common styles, occasions, flavors |
+| Cost tracking | Total spend on AI provider per day/week/month |
+| User abuse flags | Users hitting rate limits frequently |
+| Baker performance | Response time, quote conversion rate |
+
+**Options:**
+- Medusa Admin plugin (custom widget)
+- Separate admin dashboard
+- Simple API endpoints + existing analytics tool (Mixpanel, PostHog)
+
+---
+
+## Summary: Priority Order for Implementation
+
+| Phase | What | Effort |
+|-------|------|--------|
+| **Phase 1** | Real OTP (MSG91) + Redis | 1–2 days |
+| **Phase 2** | AI Generation API + Image Storage | 2–3 days |
+| **Phase 3** | Quota/Credit system (customer metadata) | 1–2 days |
+| **Phase 4** | Rate limiting (Redis-based) | 1 day |
+| **Phase 5** | Generation ledger + user history | 1–2 days |
+| **Phase 6** | Order handoff (leads + saved designs) | 2–3 days |
+| **Phase 7** | Real baker data + search | 2–3 days |
+| **Phase 8** | Admin monitoring | 2–3 days |
+| **Phase 9** | Notifications | 1–2 days |
+
+**Total estimated effort: 13–21 days**
+
+---
+
+## Open Decisions You Need to Make
+
+1. **AI Provider:** OpenAI DALL-E 3? Stability AI? Replicate (multiple models)?
+2. **Image Storage:** Cloudflare R2? AWS S3? Supabase Storage?
+3. **Redis Provider:** Upstash (serverless)? Self-hosted? Vercel KV?
+4. **OTP Provider:** MSG91? Twilio? Gupshup?
+5. **Baker data:** Medusa custom entity? Separate DB table? Third-party?
+6. **Order handoff:** Lead-based? Cart item? Both?
+7. **Generation ledger:** Medusa DB (extend schema)? Separate PostgreSQL? Supabase?
+8. **Budget per generation:** What's your max cost per image? (DALL-E 3 ≈ $0.04–$0.08/image)
+
+---
+
+Would you like me to start implementing any specific phase? Or would you like to discuss the open decisions first?

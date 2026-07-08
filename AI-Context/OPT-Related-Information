@@ -1,0 +1,170 @@
+# OTP Implementation — Scope, Provider Selection & Effort
+
+---
+
+## What Exists Today (Mock)
+
+Your frontend already has the complete OTP flow working:
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Mobile input UI | `mobile-otp-auth.tsx` | ✅ Done |
+| OTP input UI (6-digit) | `mobile-otp-auth.tsx` | ✅ Done |
+| Resend countdown (30s) | `mobile-otp-auth.tsx` | ✅ Done |
+| Success state | `mobile-otp-auth.tsx` | ✅ Done |
+| Send OTP API | `src/app/api/auth/otp/send/route.ts` | ⚠️ Mock (logs to console) |
+| Verify OTP API | `src/app/api/auth/otp/verify/route.ts` | ⚠️ Mock (any 6 digits pass) |
+| Medusa customer creation | `verify/route.ts` | ✅ Done (real) |
+| JWT cookie setting | `verify/route.ts` | ✅ Done (real) |
+
+**The UI is 100% done. Only the backend OTP sending/verification needs to be real.**
+
+---
+
+## What Needs to Change
+
+| File | Change | Size |
+|------|--------|------|
+| `src/app/api/auth/otp/send/route.ts` (frontend) | Replace mock with real provider call + Redis storage | ~40 lines changed |
+| `src/app/api/auth/otp/verify/route.ts` (frontend) | Replace mock check with Redis lookup + provider verification | ~20 lines changed |
+| **New:** Redis utility (if not already) | Simple get/set/incr helper | ~30 lines |
+
+**Total code change: ~90 lines across 2-3 files.**
+
+That's it. No new UI, no new pages, no new components.
+
+---
+
+## Time Estimate
+
+| Task | Time (with GenAI) |
+|------|-------------------|
+| Choose provider + create account | 10 min |
+| Get API keys + DLT template approved | 30 min – 24 hrs* |
+| Write code (3 files) | 15 min |
+| Test end-to-end | 15 min |
+| **Total (excluding DLT approval)** | **~1 hour** |
+
+*\*DLT registration is mandatory in India for transactional SMS. If your provider already has pre-approved templates, it's instant. If not, DLT approval takes 1-3 business days.*
+
+---
+
+## Provider Comparison
+
+| | MSG91 | Twilio | Gupshup | Authkey |
+|---|---|---|---|---|
+| **India focus** | ✅ Built for India | ⚠️ Global (India supported) | ✅ India-first | ✅ India-first |
+| **DLT compliance** | ✅ Handles for you | ⚠️ You manage DLT yourself | ✅ Handles for you | ✅ Handles for you |
+| **OTP-specific API** | ✅ Dedicated OTP API (auto-generate, auto-verify) | ❌ Generic SMS (you build OTP logic) | ✅ Has OTP API | ✅ Has OTP API |
+| **Pricing** | ₹0.15–0.20/SMS | ₹0.50–0.80/SMS | ₹0.12–0.18/SMS | ₹0.10–0.15/SMS |
+| **Free tier** | 5,000 free on signup | $15 credit (~200 SMS to India) | No free tier | 1,000 free |
+| **Auto-retry** | ✅ Retries on different route | ❌ No | ✅ Yes | ✅ Yes |
+| **OTP auto-verify** | ✅ Server-side verify API | ❌ You store & compare | ✅ Yes | ✅ Yes |
+| **Delivery speed** | 2-5 sec | 3-8 sec | 2-5 sec | 2-4 sec |
+| **Reliability (India)** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **API simplicity** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **Dashboard/Analytics** | ✅ Excellent | ✅ Good | ✅ Good | ⚠️ Basic |
+| **WhatsApp OTP fallback** | ✅ Built-in | ✅ Separate product | ✅ Built-in | ❌ No |
+| **Initial investment** | ₹0 (free tier) | ~₹1,200 ($15 credit) | ₹500 min recharge | ₹0 (free tier) |
+
+---
+
+## My Recommendation: MSG91
+
+| Reason | Detail |
+|--------|--------|
+| **OTP-as-a-service** | You don't store OTPs, don't manage expiry, don't handle retries. MSG91 does it all. |
+| **One API call to send** | `POST /otp/send` → MSG91 generates OTP, sends it, stores it |
+| **One API call to verify** | `POST /otp/verify` → MSG91 checks if code matches. Returns yes/no. |
+| **No Redis needed for OTP** | MSG91 manages OTP state server-side. You don't need to store OTP in Redis. |
+| **DLT handled** | They manage DLT registration and templates |
+| **5,000 free SMS** | Enough for months of testing + early launch |
+| **WhatsApp fallback** | If SMS fails, auto-sends via WhatsApp |
+| **India delivery rate** | 98%+ delivery in 2-5 seconds |
+
+### With MSG91, our code becomes even simpler:
+
+```
+SEND:   POST to MSG91 → they generate + send + store OTP
+VERIFY: POST to MSG91 → they check + return result
+```
+
+**We don't even need Redis for OTP storage.** MSG91 handles the entire OTP lifecycle.
+
+(We still use Redis for rate limiting in Step 3, but OTP itself needs zero Redis.)
+
+---
+
+## MSG91 Integration — What the Code Looks Like
+
+### Send OTP (replace mock):
+```ts
+// ~15 lines of real code
+const response = await fetch("https://control.msg91.com/api/v5/otp", {
+  method: "POST",
+  headers: {
+    "authkey": process.env.MSG91_AUTH_KEY,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    mobile: `91${mobile}`,
+    template_id: process.env.MSG91_TEMPLATE_ID,
+    otp_length: 6,
+    otp_expiry: 5 // minutes
+  })
+})
+```
+
+### Verify OTP (replace mock):
+```ts
+// ~10 lines of real code
+const response = await fetch(
+  `https://control.msg91.com/api/v5/otp/verify?mobile=91${mobile}&otp=${otp}`,
+  {
+    headers: { "authkey": process.env.MSG91_AUTH_KEY }
+  }
+)
+const data = await response.json()
+if (data.type === "success") { /* OTP is valid */ }
+```
+
+That's literally it. The rest of your existing code (Medusa customer creation, JWT, cookie) stays exactly the same.
+
+---
+
+## What You Need from MSG91
+
+1. **Create account:** [msg91.com](https://msg91.com) → Sign up
+2. **Get Auth Key:** Dashboard → Settings → Auth Key
+3. **Create OTP Template:** Dashboard → OTP → Create Template
+   - Template example: `Your CrossFriend OTP is {{otp}}. Valid for 5 minutes.`
+   - Get the `template_id`
+4. **DLT Registration:** MSG91 guides you through this (or may already have it if you use their pre-approved sender)
+
+### Env vars to add:
+```env
+MSG91_AUTH_KEY=<your-auth-key>
+MSG91_TEMPLATE_ID=<your-template-id>
+```
+
+---
+
+## Summary
+
+| Aspect | Answer |
+|--------|--------|
+| **Provider** | MSG91 (recommended) |
+| **Code changes** | ~90 lines across 2 files (frontend API routes) |
+| **New files** | 0 (just modify existing) |
+| **Time to code** | 15 minutes |
+| **Time to set up provider** | 10 min (account) + DLT approval (instant if MSG91 handles) |
+| **Cost** | ₹0 for first 5,000 OTPs, then ₹0.15-0.20/SMS |
+| **Redis needed?** | No (MSG91 manages OTP state) |
+| **Backend changes?** | None (OTP stays in frontend API routes) |
+
+---
+
+Want me to:
+- **A)** Write the MSG91 integration code now (2 files, ready to paste)?
+- **B)** Wait until you create MSG91 account first?
+- **C)** Move to Step 2 (Quota & Credits) instead?

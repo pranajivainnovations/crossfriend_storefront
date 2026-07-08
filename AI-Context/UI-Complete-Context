@@ -1,0 +1,413 @@
+Here's your comprehensive context document. Save this and paste it at the start of any new conversation with me:
+
+---
+
+# CrossFriend AI Cake Studio — Full Project Context
+
+**Last updated:** 8 July 2026
+
+---
+
+## 1. Project Overview
+
+**CrossFriend** is an India-only e-commerce storefront for cakes, decor, gifts, costumes, and wellness products. The **AI Cake Studio** is a flagship feature that lets users generate AI cake design concepts from text prompts and selections, then convert those into real orders with local verified bakers.
+
+**Live domain:** pranajiva.in
+
+---
+
+## 2. Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion |
+| Backend | Medusa V1 (JS client `@medusajs/medusa-js` v6.1.7) running on port 9001 |
+| Auth | OTP-based (mobile → mapped to `{mobile}@pranajiva.in` email in Medusa) |
+| Payments | Stripe, PayPal (configured but not AI Studio specific) |
+| Search | MeiliSearch / Algolia (optional) |
+| Deployment | Vercel (frontend), Medusa server separate |
+
+---
+
+## 3. Architecture & Routing
+
+```
+src/
+├── app/
+│   ├── [countryCode]/(main)/ai-cake-studio/page.tsx   ← AI Studio page
+│   ├── [countryCode]/(main)/layout.tsx                ← Main layout (Nav, Footer, Providers)
+│   ├── [countryCode]/(checkout)/                      ← Checkout flow
+│   └── api/
+│       ├── ai-cake-studio-config/route.ts             ← GET: serves JSON config
+│       ├── cake-addons/route.ts                       ← GET: fetches add-ons from Medusa
+│       ├── bakers/route.ts                            ← GET: pincode-based baker search (mock)
+│       └── auth/otp/
+│           ├── send/route.ts                          ← POST: sends OTP (mock)
+│           └── verify/route.ts                        ← POST: verifies OTP, creates/logs in customer
+├── lib/
+│   ├── config.ts                                      ← Medusa client init (baseUrl from env)
+│   └── data/index.ts                                  ← All Medusa API functions (cart, products, auth, etc.)
+├── modules/
+│   └── ai-cake-studio/
+│       ├── components/
+│       │   ├── hero-section.tsx
+│       │   ├── inspiration-cards.tsx
+│       │   ├── how-it-works.tsx
+│       │   ├── showcase-gallery.tsx
+│       │   ├── ai-studio-section.tsx                  ← Main form + generation logic
+│       │   ├── price-estimator.tsx                    ← Dynamic price calculator
+│       │   ├── baker-finder.tsx                       ← Pincode-based baker discovery
+│       │   ├── design-to-real-section.tsx
+│       │   ├── bottom-cta.tsx
+│       │   └── mobile-otp-auth.tsx                    ← Inline OTP login (no redirect)
+│       ├── config/
+│       │   └── ai-cake-studio-config.json             ← Pricing, selectors, free attempts
+│       ├── data/
+│       │   └── mock-data.ts                           ← Inspiration, styles, designs, bakers, prompts
+│       └── types/
+│           └── index.ts                               ← All TypeScript interfaces
+├── styles/global.css
+└── middleware.ts                                       ← Simplified India-only (no countryCode routing)
+```
+
+---
+
+## 4. Middleware
+
+Simplified for India-only. No `[countryCode]` prefix enforcement. Handles onboarding cookie and cart_id param. Matcher excludes `/api` and `_next/static`.
+
+---
+
+## 5. Main Layout (`[countryCode]/(main)/layout.tsx`)
+
+Wraps all main pages with: `PincodeProvider` → `WishlistProvider` → `ReviewsProvider` → `PlanningProvider` → `Nav` + `children` + `Footer` + `PlanningWizard` + `WhatsAppWidget`. Uses `export const dynamic = "force-dynamic"` to avoid build-time Medusa calls.
+
+---
+
+## 6. Medusa Client (`src/lib/config.ts`)
+
+```ts
+import Medusa from "@medusajs/medusa-js"
+const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
+export const medusaClient = new Medusa({ baseUrl: MEDUSA_BACKEND_URL, maxRetries: 3 })
+```
+
+---
+
+## 7. Key Data Functions (`src/lib/data/index.ts`)
+
+- `getMedusaHeaders(tags)` — reads `_medusa_jwt` cookie, returns auth + cache headers
+- `getCustomer()` — retrieves authenticated customer (returns null on failure)
+- `getToken(credentials)` — authenticates and sets `_medusa_jwt` cookie
+- `getRegion(countryCode?)` — resolves region (defaults to "in")
+- `getProductsList(...)` — fetches products filtered by `metadata.brand = "crossfriend"`
+- `getCollectionsList(...)` — fetches collections filtered by brand
+- `listCategories()` — fetches categories filtered by brand
+- Cart actions: `createCart`, `updateCart`, `getCart`, `addItem`, `updateItem`, `removeItem`
+- Order: `retrieveOrder`, `listCustomerOrders`
+- Shipping: `listCartShippingMethods`, `addShippingMethod`
+- Checkout: `createPaymentSessions`, `setPaymentSession`, `completeCart`
+- Generic `getProducts(options)` — resolves type/collection/tags to Medusa IDs
+
+---
+
+## 8. AI Cake Studio Page (`ai-cake-studio/page.tsx`)
+
+Server component. Fetches `customer` via `getCustomer()` (catches errors → null). Renders sections in order: Hero → Inspiration → HowItWorks → Showcase → AiStudioSection(customer) → DesignToReal → BottomCta. Uses `force-dynamic`.
+
+---
+
+## 9. AI Studio Section (Main Form) — Key Behaviors
+
+- **Props:** `{ customer }` (Medusa Customer or null)
+- **State:** prompt, style/occasion/flavor selectors, DOB/zodiac, generation state, attempts counter
+- **Config loading:** Fetches `/api/ai-cake-studio-config` on mount; falls back to hardcoded selectors
+- **Free attempts:** Default 3 (overridden by config's `freeAttemptsLimit`, currently set to 50 for testing)
+- **Generation:** Currently MOCK — 1.8s delay, shows `MOCK_GENERATED_DESIGNS`
+- **Auth gate:** If not logged in, shows `MobileOtpAuth` inline component instead of generate button
+- **Exhausted state:** Disabled button + amber banner
+- **Post-generation:** User selects a design → action panel (Find baker / Price estimate / Share)
+- **Share:** Uses `navigator.share` on mobile, custom sheet with WhatsApp + copy link on desktop
+- **Sub-components rendered:** `PriceEstimator` and `BakerFinder` (both only visible after generation)
+
+---
+
+## 10. Mobile OTP Auth (`mobile-otp-auth.tsx`)
+
+Inline 3-step flow (no page redirect): Mobile input → OTP input → Success. Calls `/api/auth/otp/send` and `/api/auth/otp/verify`. On success, calls `router.refresh()` to pick up new session. Shows "+91" prefix, 30s resend countdown, handles new vs returning user messaging.
+
+---
+
+## 11. OTP Auth Backend
+
+### `/api/auth/otp/send`
+- Validates Indian mobile (starts 6-9, 10 digits)
+- MOCK: generates random 6-digit OTP, logs to console in dev
+- TODO: Replace with MSG91/Twilio
+
+### `/api/auth/otp/verify`
+- MOCK: accepts any 6-digit code
+- Maps mobile to email: `{mobile}@pranajiva.in`
+- Derives deterministic password: `CF_{mobile}_{salt_prefix}` (uses `OTP_PASSWORD_SALT` env var)
+- Tries `medusaClient.auth.getToken()` first (existing customer)
+- If fails, creates customer via `medusaClient.customers.create()` then gets token
+- Sets `_medusa_jwt` cookie (7 days, httpOnly, strict, secure in prod)
+- Returns `{ success: true, isNewUser: boolean }`
+
+---
+
+## 12. Price Estimator (`price-estimator.tsx`)
+
+- Appears only after generation (`generated` prop)
+- Collapsible accordion UI
+- Loads config from `/api/ai-cake-studio-config` + live add-ons from `/api/cake-addons`
+- Falls back to hardcoded config/add-ons if APIs fail
+- Computes price from: base + weight + tiers + shape + style + flavor + options (eggless/express/midnight)
+- Add-ons: suggested based on occasion+style, others in collapsible "More add-ons"
+- Each add-on has: id, label, description, price, emoji, suggestFor, optional productId/variantId/thumbnail
+- Grand total = base cake + selected add-ons
+- CTA: "Find a Baker for This Price" scrolls to baker section
+
+---
+
+## 13. Cake Add-ons API (`/api/cake-addons`)
+
+- Queries Medusa for product category with handle `cake-addons`
+- Fetches products in that category (expands variants + prices)
+- Transforms to `Addon[]` using product metadata: `emoji`, `suggestFor` (comma-separated), `price` (₹ override)
+- If no category exists or fetch fails, returns `{ addons: [] }` (graceful fallback)
+- Price logic: metadata.price override → else cheapest variant amount ÷ 100 (paise → ₹)
+
+---
+
+## 14. Baker Finder (`baker-finder.tsx`)
+
+- Appears only after generation
+- Collapsible accordion UI
+- User enters 6-digit pincode → calls `/api/bakers?pincode=XXXXXX`
+- Shows baker cards with: avatar, name, specialty, rating, distance, turnaround, min price
+- CTA per baker: WhatsApp link (if whatsapp field set) or "Request Quote" button
+- Currently returns mock data seeded by pincode
+
+---
+
+## 15. Config File (`ai-cake-studio-config.json`)
+
+- `freeAttemptsLimit`: 50 (testing; production should be 3)
+- `pricing`: basePrice ₹800, factors for weight/tiers/shape/style/flavor/eggless/express/midnight/message/photo
+- `selectors`: weights (0.5–5kg with serves), tiers (1–4), shapes, flavors (9), styles (7 with emoji), occasions (6)
+- Add-ons note: managed in Medusa admin under `cake-addons` category
+
+---
+
+## 16. Type Definitions (`types/index.ts`)
+
+Key interfaces: `InspirationCard`, `GeneratedDesign`, `AiAnalysis`, `Baker`, `BakerProfile`, `HowItWorksStep`, `ShowcaseCreation`, `StudioState`, `EstimatorSelections`, `Addon` (with optional `productId`, `variantId`, `thumbnail`), `PricingFactors`, `StudioConfig`, `StudioConfigSelector`
+
+---
+
+## 17. Mock Data (`mock-data.ts`)
+
+- `INSPIRATION_CARDS` (6): Birthday, Wedding, Kids, Luxury, Minimal, Festival
+- `CAKE_STYLES` (7), `COLOR_PALETTES` (5), `CAKE_THEMES` (6)
+- `MOCK_GENERATED_DESIGNS` (3): Celestial Dream, Enchanted Garden, Geometric Luxe
+- `MOCK_AI_ANALYSIS`: complexity, cost estimate, baking time, serves, bakery readiness
+- `MOCK_BAKERS` (3): Priya's Sweet Studio, The Cake Lab, Sugar & Bloom
+- `HOW_IT_WORKS_STEPS` (3): Describe → Get designs → Order from baker
+- `SHOWCASE_CREATIONS` (6): Various cake examples
+- `HERO_PROMPT_EXAMPLES` (5): Sample prompts for hero section
+- `PROMPT_TEMPLATES` (8): Quick-start chips with label + full prompt + occasion
+- `CF_OCCASION_MESSAGES`: Curated messages per occasion from CrossFriend
+
+---
+
+## 18. Current Status (as of July 2026)
+
+### ✅ Completed
+- Full AI Cake Studio UI (all sections)
+- OTP auth flow (mock OTP, real Medusa customer creation)
+- Price estimator with live Medusa add-ons support
+- Baker finder UI (mock data)
+- Config-driven selectors and pricing
+- Zodiac/horoscope influence feature
+- Share functionality (WhatsApp + copy link)
+- Graceful fallbacks when APIs unavailable
+
+### 🔄 In Progress
+- Build validation and cleanup
+- Final asset replacement
+
+### ❌ Not Done Yet
+- **Real AI image generation** (no provider connected)
+- **Server-side quota/credit tracking** (attempts counter is client-side only)
+- **Rate limiting / abuse protection**
+- **Generation ledger/history**
+- **Real OTP provider** (MSG91/Twilio)
+- **Real baker data** (currently mock)
+- **Order handoff flow** (what happens after selecting a design)
+- **Admin visibility** into generation consumption
+- **Production QA** across devices
+
+---
+
+## 19. Planned Usage Policy
+
+- Browsing: public
+- Generation: requires login
+- Free attempts: 3 per new user (currently 50 for testing)
+- Each generation returns up to 3 concepts
+- Failed generations don't consume credits
+- Future: bonus credits (verify email +1, first order +5), paid packs
+
+---
+
+## 20. Planned Data Model (Not Yet Implemented)
+
+**Per user:**
+- `free_generation_limit`, `free_generations_used`, `bonus_generation_balance`
+- `last_generation_at`, `generation_locked`
+
+**Generation ledger:**
+- `id`, `customer_id`, `prompt`, `occasion`, `style`, `provider`, `provider_model`
+- `status`, `image_count`, `credit_cost`, `created_at`, `failed_reason`
+
+---
+
+## 21. Key Environment Variables
+
+```
+MEDUSA_BACKEND_URL=http://localhost:9001
+OTP_PASSWORD_SALT=<strong-random-value>
+NEXT_PUBLIC_BASE_URL=https://pranajiva.in
+NEXT_PUBLIC_DEFAULT_REGION=in
+NEXT_PUBLIC_STRIPE_KEY=<stripe-public-key>
+NEXT_PUBLIC_PAYPAL_CLIENT_ID=<paypal-client-id>
+```
+
+---
+
+## 22. Important Design Decisions
+
+- **India-only:** No multi-country routing; middleware simplified
+- **Brand filtering:** All product/collection/category queries filter by `metadata.brand = "crossfriend"`
+- **OTP over password:** Mobile-first auth; email is synthetic (`mobile@pranajiva.in`)
+- **Counter vs Token:** UI says "attempts", backend uses "credits"
+- **Graceful degradation:** All API calls have fallbacks; page never crashes if Medusa is down
+- **Config-driven:** Pricing, selectors, and limits come from JSON config (editable without redeploy)
+
+---
+
+## 23. File Reference (ask me for these if needed)
+
+| File | Purpose |
+|------|---------|
+| `src/app/[countryCode]/(main)/ai-cake-studio/page.tsx` | Page entry |
+| `src/modules/ai-cake-studio/components/ai-studio-section.tsx` | Main form + generation |
+| `src/modules/ai-cake-studio/components/price-estimator.tsx` | Price calculator |
+| `src/modules/ai-cake-studio/components/baker-finder.tsx` | Baker search |
+| `src/modules/ai-cake-studio/components/mobile-otp-auth.tsx` | Inline OTP auth |
+| `src/modules/ai-cake-studio/components/hero-section.tsx` | Hero |
+| `src/modules/ai-cake-studio/components/how-it-works.tsx` | Steps |
+| `src/modules/ai-cake-studio/components/inspiration-cards.tsx` | Inspiration grid |
+| `src/modules/ai-cake-studio/components/showcase-gallery.tsx` | Gallery |
+| `src/modules/ai-cake-studio/components/design-to-real-section.tsx` | Baker handoff |
+| `src/modules/ai-cake-studio/components/bottom-cta.tsx` | Bottom CTA |
+| `src/modules/ai-cake-studio/config/ai-cake-studio-config.json` | Config |
+| `src/modules/ai-cake-studio/data/mock-data.ts` | Mock data |
+| `src/modules/ai-cake-studio/types/index.ts` | Types |
+| `src/app/api/ai-cake-studio-config/route.ts` | Config API |
+| `src/app/api/cake-addons/route.ts` | Add-ons API |
+| `src/app/api/bakers/route.ts` | Bakers API |
+| `src/app/api/auth/otp/send/route.ts` | OTP send |
+| `src/app/api/auth/otp/verify/route.ts` | OTP verify |
+| `src/lib/config.ts` | Medusa client |
+| `src/lib/data/index.ts` | Data layer |
+| `src/middleware.ts` | Middleware |
+| `src/app/[countryCode]/(main)/layout.tsx` | Main layout |
+| `package.json` | Dependencies |
+
+---
+
+## 24. Storefronts Summary
+
+
+Property	CrossFriend	PranaJiva
+Domain	crossfriend.in	pranajiva.in
+Category	Cakes, Decor, Gifts, Costumes, Celebrations	Ayurvedic, Wellness, Health
+AI Feature (current)	AI Cake Studio (image generation)	None
+AI Feature (future)	Same	AI Ayurvedic Chatbot (text-based Q&A)
+Product filter	metadata.brand = "crossfriend"	metadata.brand = "pranajiva"
+Frontend codebase	Shared Next.js app	Same shared Next.js app
+Backend	Shared Medusa V1	Same shared Medusa V1
+Feature gating	Frontend shows AI Cake Studio pages	Frontend hides AI Cake Studio pages
+
+## 25. Multi-Storefront Architecture (Frontend Perspective)
+Single Codebase, Two Domains
+The same Next.js 14 application is deployed to serve both storefronts:
+
+
+
+Domain	Brand	What's Shown
+crossfriend.in	CrossFriend	Cakes, Decor, Gifts, Costumes, AI Cake Studio
+pranajiva.in	PranaJiva	Ayurvedic & Wellness products
+How Brand Differentiation Works
+Product/Collection/Category filtering: All data-layer queries in src/lib/data/index.ts filter by metadata.brand = "crossfriend". PranaJiva storefront filters by metadata.brand = "pranajiva".
+Feature gating: The frontend decides which pages/features are accessible on which domain. AI Cake Studio is only shown on crossfriend.in.
+Backend is brand-agnostic: The Medusa backend serves all data without brand filtering. Filtering is purely a frontend responsibility.
+AI Cake Studio — Frontend's Responsibility
+The frontend is responsible for:
+
+Showing AI Cake Studio only on crossfriend.in (not on pranajiva.in)
+Calling backend APIs (/store/ai-studio/generate, /store/ai-studio/credits, etc.) — these are brand-agnostic endpoints
+Displaying results with CrossFriend branding (violet theme, CrossFriend messaging)
+Gating access — the "Login to Generate" flow, attempts badge, exhausted state
+NOT sending any brand identifier to the backend — backend doesn't need it
+What Backend Provides (Brand-Agnostic)
+The backend exposes generic task-specific APIs:
+
+
+
+Endpoint	What It Does	Frontend's Job
+POST /store/ai-studio/generate	Generates cake images for any authenticated customer	Only call this from CrossFriend's AI Cake Studio page
+GET /store/ai-studio/credits	Returns credit balance for any customer	Only show this on CrossFriend
+GET /store/ai-studio/history	Returns generation history for any customer	Only show this on CrossFriend
+POST /store/ai-studio/leads	Creates a baker lead for any customer	Only trigger from CrossFriend's baker flow
+Customer Accounts
+Shared across brands. A customer who signs up via OTP on crossfriend.in has the same Medusa customer record as if they logged in on pranajiva.in.
+Credits are per-customer, not per-brand. If a customer has 3 free AI generations, that's their balance regardless of which domain they're on.
+Frontend prevents cross-brand access by simply not showing the AI Cake Studio UI on pranajiva.in.
+Future: PranaJiva AI Chatbot
+Will be a separate set of frontend components (not AI Cake Studio)
+Will call different backend endpoints (e.g., /store/ai-chatbot/ask)
+Will only be shown on pranajiva.in
+Backend will have a separate service (ai-chatbot.ts) specialized for Ayurvedic text Q&A
+Same infrastructure: Redis, PostgreSQL, same Medusa customer auth
+24. Updated Design Decisions
+
+
+#	Decision	Details
+1	Backend is brand-agnostic	No brand logic in any backend service or API
+2	Backend services are task-specific	AI Cake Studio = cake images only. Future chatbot = text Q&A only.
+3	Frontend owns feature gating	Which features appear on which domain is frontend's decision
+4	Customer accounts are shared	Same customer across both brands
+5	Credits are per-customer	Not per-brand, not per-domain
+6	Frontend never sends brand to backend	Backend APIs don't accept or use a brand parameter
+
+
+
+## 26. How to Use This Context
+
+When starting a new conversation, paste this entire document and then state your specific request. Examples:
+
+- "Implement real AI generation using OpenAI DALL-E 3"
+- "Add server-side quota tracking using Medusa customer metadata"
+- "Connect real OTP provider (MSG91)"
+- "Fix build errors"
+- "Implement the order handoff flow after design selection"
+- "Add rate limiting to the generation endpoint"
+
+I will ask for specific file contents only if the task requires seeing the exact current code of a file that may have changed since this context was written.
+
+---
+
+*End of context document.*

@@ -1,0 +1,315 @@
+---
+
+# APPENDIX C — AI Cake Studio Backend Implementation Context
+
+**Last updated:** 8 July 2026
+**Status:** Implementation in progress
+
+---
+
+## 1. What We're Building
+
+A **backend service for AI cake image generation** that:
+- Takes user inputs (prompt, style, occasion, flavor, zodiac)
+- Generates cake design images via AI provider
+- Stores images permanently on S3
+- Persists all metadata in a dedicated PostgreSQL schema
+- Makes designs searchable and reusable for recommendations
+- Tracks generation history per customer
+- Is provider-agnostic (switch AI models via config, not code)
+
+---
+
+## 2. Architecture Decisions Made
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| AI Provider (current) | Replicate FLUX.1-pro | Best cost-to-quality ratio, ₹2–3 per generation, zero initial investment |
+| AI Provider (future) | OpenAI DALL-E 3 | Can switch via env var when budget allows |
+| Provider architecture | Interface + Adapter pattern | Change provider = change env var, zero code changes |
+| Image storage | AWS S3 (existing bucket: `pranajiva-innovations`) | Already configured, no new infra |
+| S3 prefix | `ai-studio/cake-designs/` | Clean separation, generic top-level, task-specific subfolder |
+| S3 file path | `ai-studio/cake-designs/{generation_id}/design-{index}-{short_uuid}.png` | No customer PII in URLs, CDN-friendly |
+| Database | Separate PostgreSQL schema: `ai_studio` | Clean separation from Medusa core tables |
+| Core table | `ai_studio.cake_designs` — one row per generated image | Each image is independently searchable, saveable, orderable |
+| Grouping table | `ai_studio.generations` — one row per generation request | Links multiple designs, tracks cost/status/timing |
+| Search (MVP) | Attribute-based: style + occasion + flavor + tags | Simple, effective, no extra infra |
+| Search (future) | pgvector embeddings for visual similarity | Phase 3 enhancement |
+| Tags | Auto-derived from prompt + attributes | GIN-indexed for fast filtering |
+| Backend brand logic | None — completely brand-agnostic | Frontend decides who sees this feature |
+| Recommendations | Public designs shown to other users as inspiration | `is_public`, `is_featured`, engagement counters |
+
+---
+
+## 3. Files Created So Far
+
+```
+src/services/ai-image/
+├── types.ts                    ✅ DONE — Provider interface, request/result types
+├── provider-factory.ts         ✅ DONE — Reads env, returns correct provider instance
+├── prompt-builder.ts           ✅ DONE — Cake-specialized prompt engineering
+├── s3-uploader.ts              ⚠️ NEEDS UPDATE — Must reflect new S3 path + schema decisions
+└── providers/
+    └── replicate-provider.ts   ✅ DONE — Full Replicate/FLUX implementation
+```
+
+---
+
+## 4. Files Still To Create
+
+```
+src/services/ai-image/
+├── s3-uploader.ts              🔄 UPDATE with new path: ai-studio/cake-designs/{generation_id}/...
+├── ai-generation-service.ts    ❌ TODO — Main orchestrator (prompt build → generate → upload → persist)
+└── tag-extractor.ts            ❌ TODO — Derives searchable tags from prompt + attributes
+
+src/migrations/
+└── XXXX-CreateAiStudioSchema.ts  ❌ TODO — Creates ai_studio schema + tables + indexes
+
+src/api/store/
+└── ai-studio/
+    └── generate/route.ts       ❌ TODO — POST endpoint (auth → rate limit → credits → generate)
+
+(Future files — not in current sprint)
+src/api/store/ai-studio/credits/route.ts
+src/api/store/ai-studio/history/route.ts
+src/api/store/ai-studio/designs/[id]/route.ts
+src/api/store/ai-studio/leads/route.ts
+src/services/ai-credits.ts
+src/services/ai-rate-limiter.ts
+```
+
+---
+
+## 5. Database Schema Design
+
+### Schema: `ai_studio`
+
+### Table: `ai_studio.generations`
+| Column | Type | Purpose |
+|--------|------|---------|
+| id | UUID PK | Generation request ID |
+| customer_id | VARCHAR(255) | Medusa customer who requested |
+| prompt | TEXT | User's original prompt |
+| style | VARCHAR(50) | Selected style (Luxury, Cartoon, etc.) |
+| occasion | VARCHAR(50) | Selected occasion (Birthday, Wedding, etc.) |
+| flavor | VARCHAR(50) | Selected flavor |
+| zodiac_sign | VARCHAR(20) | Optional zodiac |
+| zodiac_suggestion | TEXT | Optional zodiac design suggestion |
+| provider | VARCHAR(30) | replicate / openai / stability |
+| provider_model | VARCHAR(100) | black-forest-labs/flux-1.1-pro |
+| status | VARCHAR(20) | pending → processing → completed / failed |
+| image_count | INT | Number of images generated |
+| credit_cost | INT | Credits consumed |
+| failed_reason | TEXT | Error message if failed |
+| created_at | TIMESTAMPTZ | Request time |
+| started_at | TIMESTAMPTZ | When provider call started |
+| completed_at | TIMESTAMPTZ | When generation finished |
+| duration_ms | INT | Total time taken |
+
+### Table: `ai_studio.cake_designs`
+| Column | Type | Purpose |
+|--------|------|---------|
+| id | UUID PK | Unique design ID |
+| generation_id | UUID FK | Links to parent generation |
+| customer_id | VARCHAR(255) | Who generated this |
+| image_url | TEXT | Permanent S3 URL |
+| s3_key | TEXT | S3 object key (for management) |
+| image_index | SMALLINT | Position in batch (0, 1, 2) |
+| prompt | TEXT | Original prompt |
+| style | VARCHAR(50) | Style used |
+| occasion | VARCHAR(50) | Occasion |
+| flavor | VARCHAR(50) | Flavor |
+| zodiac_sign | VARCHAR(20) | Optional |
+| provider | VARCHAR(30) | Which AI provider |
+| provider_model | VARCHAR(100) | Which model |
+| tags | TEXT[] | Auto-derived searchable tags |
+| embedding | VECTOR(512) | Future: visual similarity |
+| view_count | INT | Times shown in recommendations |
+| save_count | INT | Times saved by users |
+| order_count | INT | Times led to an order |
+| is_public | BOOLEAN | Can be shown to others |
+| is_featured | BOOLEAN | Admin-curated |
+| status | VARCHAR(20) | active / archived / deleted / flagged |
+| created_at | TIMESTAMPTZ | Creation time |
+| updated_at | TIMESTAMPTZ | Last update |
+
+### Indexes
+- `generation_id` — group designs by request
+- `customer_id` — user's history
+- `style`, `occasion`, `flavor` — attribute search
+- `tags` (GIN) — tag-based filtering
+- `is_public, is_featured` (partial, WHERE status='active') — recommendations
+- `created_at DESC` — chronological listing
+
+---
+
+## 6. S3 Storage Structure
+
+```
+pranajiva-innovations/                    ← existing bucket
+├── (existing Medusa product images)
+└── ai-studio/                            ← new top-level (generic)
+    └── cake-designs/                     ← task-specific
+        └── {generation_id}/              ← grouped by generation
+            ├── design-1-{short_uuid}.png
+            ├── design-2-{short_uuid}.png
+            └── design-3-{short_uuid}.png
+```
+
+**Public URL pattern:**
+```
+https://pranajiva-innovations.s3.eu-north-1.amazonaws.com/ai-studio/cake-designs/{generation_id}/design-1-a7f2c3.png
+```
+
+---
+
+## 7. Provider Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│         ImageProvider Interface              │
+│                                             │
+│  generate(prompt, options) → GeneratedImage[] │
+└──────────────────┬──────────────────────────┘
+                   │
+     ┌─────────────┼─────────────┐
+     │             │             │
+┌────▼─────┐ ┌────▼─────┐ ┌────▼──────┐
+│Replicate │ │ OpenAI   │ │Stability  │
+│(FLUX.1)  │ │(DALL-E 3)│ │(SDXL)     │
+│          │ │          │ │           │
+│ ✅ DONE  │ │ stub     │ │ stub      │
+└──────────┘ └──────────┘ └───────────┘
+```
+
+**Switching:** Change `AI_IMAGE_PROVIDER` and `AI_IMAGE_MODEL` in `.env` → restart → done.
+
+---
+
+## 8. Environment Variables to Add
+
+```env
+# AI Image Generation
+AI_IMAGE_PROVIDER=replicate
+AI_IMAGE_MODEL=black-forest-labs/flux-1.1-pro
+AI_IMAGE_COUNT=3
+AI_IMAGE_WIDTH=1024
+AI_IMAGE_HEIGHT=1024
+AI_IMAGE_QUALITY=high
+AI_STUDIO_S3_PREFIX=ai-studio/cake-designs
+
+# Replicate
+REPLICATE_API_TOKEN=<token>
+
+# (Future — only needed when switching)
+# OPENAI_API_KEY=<key>
+# STABILITY_API_KEY=<key>
+```
+
+---
+
+## 9. Generation Flow (End-to-End)
+
+```
+Frontend                          Backend API                        Services
+────────                          ───────────                        ────────
+
+User fills form                        │
+User clicks Generate                   │
+        │                              │
+        ▼                              │
+POST /store/ai-studio/generate ───────►│
+  { prompt, style, occasion,           │
+    flavor, zodiac }                   │
+                                       ▼
+                              1. Authenticate (JWT)
+                              2. Rate limit check (Redis)
+                              3. Credit check (customer metadata or DB)
+                              4. Set generation lock (Redis)
+                              5. Create generation record (status: pending)
+                                       │
+                                       ▼
+                              6. Build prompt (prompt-builder.ts)
+                              7. Call AI provider (provider-factory → replicate-provider)
+                              8. Receive temporary image URLs
+                                       │
+                                       ▼
+                              9. Upload images to S3 (s3-uploader.ts)
+                              10. Extract tags (tag-extractor.ts)
+                              11. Save cake_designs records
+                              12. Update generation record (status: completed)
+                              13. Deduct credit
+                              14. Release generation lock
+                                       │
+                                       ▼
+                              Return response ──────────────────► Frontend
+                              { generationId, designs[], creditsRemaining }
+```
+
+---
+
+## 10. NPM Packages to Install
+
+```bash
+# Already installed (via medusa-file-s3):
+# - AWS SDK is available but we need v3 client specifically
+
+# New packages needed:
+npm install @aws-sdk/client-s3
+```
+
+No other external packages needed. Replicate API is called via native `fetch`.
+
+---
+
+## 11. Current Sprint — Remaining Files
+
+| # | File | Status | Description |
+|---|------|--------|-------------|
+| 1 | `src/services/ai-image/types.ts` | ✅ Done | Types & interfaces |
+| 2 | `src/services/ai-image/provider-factory.ts` | ✅ Done | Provider selection |
+| 3 | `src/services/ai-image/providers/replicate-provider.ts` | ✅ Done | Replicate adapter |
+| 4 | `src/services/ai-image/prompt-builder.ts` | ✅ Done | Cake prompt engineering |
+| 5 | `src/services/ai-image/s3-uploader.ts` | 🔄 Needs update | New S3 paths |
+| 6 | `src/services/ai-image/tag-extractor.ts` | ❌ Next | Derive tags from prompt |
+| 7 | `src/services/ai-image/ai-generation-service.ts` | ❌ Next | Main orchestrator |
+| 8 | `src/migrations/XXXX-CreateAiStudioSchema.ts` | ❌ Next | DB migration |
+| 9 | `src/api/store/ai-studio/generate/route.ts` | ❌ Next | API endpoint |
+
+---
+
+## 12. How to Resume This Work
+
+When starting a new chat:
+
+1. Paste the **Backend Context Document** (includes Appendix A about multi-brand)
+2. Paste this **Appendix C** (implementation progress)
+3. State: "Continue AI Cake Studio backend implementation from File {N}"
+
+The AI will:
+- Know the full architecture
+- Know what's already built
+- Know the exact file to produce next
+- Not re-ask decisions already made
+
+---
+
+## 13. Key Principles Being Followed
+
+1. **Provider-agnostic:** Switch AI models via env, not code
+2. **Task-specific:** This service only does cake images
+3. **Brand-agnostic:** Backend doesn't know about CrossFriend/PranaJiva
+4. **Searchable by design:** Every image has metadata, tags, and future embedding support
+5. **Reusable:** Generated designs can be shown as recommendations to other users
+6. **Separated data:** Own PostgreSQL schema (`ai_studio`), own S3 prefix (`ai-studio/`)
+7. **Graceful failure:** Provider failures don't crash the system or deduct credits
+8. **Auditable:** Every generation is logged with provider, model, cost, timing
+
+---
+
+*End of Appendix C.*
+
+---
+
+Now shall I continue with the updated `s3-uploader.ts` (File 5 revised)?

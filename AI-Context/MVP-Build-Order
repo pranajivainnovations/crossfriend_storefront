@@ -1,0 +1,175 @@
+# AI Cake Studio — MVP Build Order (Feature-First Thinking)
+
+---
+
+## The Core Question: What Makes This Feature SHIPPABLE?
+
+A user visits → designs a cake → gets real AI images → does something with it.
+
+If any link in this chain is broken, **the feature cannot ship.**
+
+---
+
+## The Critical Path (MVP Chain)
+
+```
+User lands on page (✅ DONE)
+        │
+        ▼
+User fills form (✅ DONE)
+        │
+        ▼
+User clicks "Generate" 
+        │
+        ▼
+┌───────────────────────────────┐
+│  Is user logged in?           │
+│  YES → check quota → generate │
+│  NO  → authenticate first     │
+└───────────────────────────────┘
+        │
+        ▼
+Real AI images appear
+        │
+        ▼
+User selects a design
+        │
+        ▼
+User takes an action (order/save/share)
+        │
+        ▼
+✅ FEATURE IS SHIPPABLE
+```
+
+---
+
+## MVP Build Order — By What Blocks Shipping
+
+| # | What | Why It's This Priority | Blocked Without It |
+|---|------|----------------------|-------------------|
+| **1** | **AI Generation + Image Storage** | This IS the feature. Without real images, there's nothing to ship. Everything else is supporting infrastructure. | The entire product. Mock designs = demo, not product. |
+| **2** | **Quota & Credits** | You're spending real money per generation (₹3–6 per image). Without quota, one user can bankrupt you in an hour. Ships same day as generation. | Financial safety. Cannot go live without it. |
+| **3** | **Rate Limiting** | Even with quota, a user can spam 3 requests in 1 second. Need basic throttle. Tiny code, massive protection. | DDoS / abuse protection. 50 lines of code but critical. |
+| **4** | **Real OTP** | Current mock OTP means anyone types any 6 digits and gets in. Quota is meaningless if auth is fake. | Auth integrity. Quota is bypassable without real OTP. |
+| **5** | **Generation Ledger** | User generates → refreshes page → designs gone forever. Must persist. Also needed for "My Designs" and cost tracking. | User experience. Designs must survive page refresh. |
+| **6** | **Order Handoff** | User has a design they love. Now what? Without a next step, the feature is a toy, not a business tool. | Revenue. This is where money comes from. |
+
+**After these 6 → the feature is LIVE and EARNING.**
+
+---
+
+## Post-MVP (Ship Later, Improve Over Time)
+
+| # | What | Why It Can Wait |
+|---|------|----------------|
+| **7** | Real Baker Data | Mock bakers still give the user a "next step" feeling. Replace with real data as bakers onboard. Not a blocker for launch. |
+| **8** | Admin Monitoring | You can check DB directly or use simple queries for first few weeks. Build dashboard when volume grows. |
+| **9** | Notifications | Nice-to-have. Users can WhatsApp bakers directly (link already works). Automated notifications are a polish feature. |
+
+---
+
+## Revised Dependency Ladder (MVP Only)
+
+```
+┌─────────────────────────────────────────┐
+│  STEP 1: AI Generation + Image Storage  │
+│  (The product. Everything else serves   │
+│   this. Build it first, test it first.) │
+└──────────────────┬──────────────────────┘
+                   │
+┌──────────────────▼──────────────────────┐
+│  STEP 2: Quota & Credits                │
+│  (Wraps around generation. "Can this    │
+│   user generate?" check runs BEFORE     │
+│   the AI call. Deduct AFTER success.)   │
+└──────────────────┬──────────────────────┘
+                   │
+┌──────────────────▼──────────────────────┐
+│  STEP 3: Rate Limiting                  │
+│  (Sits in front of everything.          │
+│   Prevents rapid-fire abuse.            │
+│   Needs Redis → set up Redis here.)     │
+└──────────────────┬──────────────────────┘
+                   │
+┌──────────────────▼──────────────────────┐
+│  STEP 4: Real OTP                       │
+│  (Redis already running from Step 3.    │
+│   Now make auth real so quota/limits    │
+│   can't be bypassed with fake logins.)  │
+└──────────────────┬──────────────────────┘
+                   │
+┌──────────────────▼──────────────────────┐
+│  STEP 5: Generation Ledger + History    │
+│  (Persist designs so users can come     │
+│   back. Also gives you cost data.)      │
+└──────────────────┬──────────────────────┘
+                   │
+┌──────────────────▼──────────────────────┐
+│  STEP 6: Order Handoff                  │
+│  (Leads + saved designs. Connects       │
+│   the generated design to revenue.)     │
+└─────────────────────────────────────────┘
+
+         ═══════════════════════
+              MVP IS LIVE ✅
+         ═══════════════════════
+
+         ... then later ...
+
+┌─────────────────────────────────────────┐
+│  STEP 7: Real Baker Data                │
+│  STEP 8: Admin Monitoring               │
+│  STEP 9: Notifications                  │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Why This Order (Not Auth First)?
+
+**Traditional thinking:** "Auth first, then build features on top."
+
+**Product thinking:** "The feature IS the AI generation. Build that first, prove it works, then secure it."
+
+Here's the logic:
+
+1. **Step 1 (Generation)** — You need to know it works. Test with your own account. Validate image quality, prompt engineering, storage. If the AI output is bad, nothing else matters.
+
+2. **Step 2 (Quota)** — Immediately after generation works, wrap it with "can this user afford this call?" Otherwise you're exposed financially during testing.
+
+3. **Step 3 (Rate Limit)** — Now that generation + quota work, add the speed bump. This is where Redis gets set up.
+
+4. **Step 4 (Real OTP)** — Redis is already running. Now make auth real. This seals the system — real users, real limits, real generation.
+
+5. **Step 5 (Ledger)** — Now that everything is real and protected, persist the results.
+
+6. **Step 6 (Handoff)** — Now that designs persist, let users DO something with them.
+
+---
+
+## Sprint Plan (With GenAI)
+
+| Session | Steps | Time | You Ship After This? |
+|---------|-------|------|---------------------|
+| **Session 1** | Step 1 (AI Gen + Storage) | ~3 hrs | ❌ Not yet (no protection) |
+| **Session 2** | Step 2 + 3 (Quota + Rate Limit) | ~2 hrs | ⚠️ Soft launch possible (internal testing) |
+| **Session 3** | Step 4 (Real OTP) | ~2 hrs | ✅ **Can go live with limited users** |
+| **Session 4** | Step 5 + 6 (Ledger + Handoff) | ~4 hrs | ✅ **Full MVP live** |
+
+**Total to shippable MVP: ~11 hours of conversation across 4 sessions**
+
+---
+
+## Decisions Needed Before Step 1
+
+| # | Decision | My Recommendation |
+|---|----------|-------------------|
+| 1 | AI Provider | **OpenAI DALL-E 3** — best cake image quality, simple API, ~$0.04/image |
+| 2 | Image Storage | **Cloudflare R2** — free egress, $0.015/GB stored, S3-compatible |
+| 3 | Redis (for Steps 3+4) | **Upstash** — serverless, free tier (10K commands/day), perfect for Vercel |
+| 4 | OTP Provider (for Step 4) | **MSG91** — Indian, cheapest, DLT compliant |
+| 5 | Generation DB (for Step 5) | **Same PostgreSQL as Medusa** — no extra infra |
+
+---
+
+Want to start **Step 1 (AI Generation + Image Storage)**? Just tell me your AI provider choice and I'll deliver the complete implementation.

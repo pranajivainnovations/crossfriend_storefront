@@ -1,0 +1,733 @@
+---
+
+# CrossFriend Backend — Complete Project Context
+
+**Last updated:** 8 July 2026
+
+---
+
+## 1. Backend Overview
+
+**Project:** CrossFriend (brand name) / PranaJiva (company name)
+**Backend framework:** Medusa V1 (v1.20.9)
+**Purpose:** Headless e-commerce backend for an India-only storefront selling cakes, decor, gifts, costumes, and wellness products. Also powers the **AI Cake Studio** feature (AI-generated cake designs → real baker orders).
+
+---
+
+## 2. Infrastructure
+
+| Resource | Provider | Details |
+|----------|----------|---------|
+| **Server** | Oracle Cloud (VPS) | IP: `144.24.104.236` |
+| **PostgreSQL** | Self-hosted on same VPS | Port 5432, DB: `pranajiva_db`, User: `pranajiva` |
+| **Redis** | Self-hosted on same VPS | Port 6379, password protected |
+| **AWS S3** | Amazon | Bucket: `pranajiva-innovations`, Region: `eu-north-1`, URL: `https://pranajiva-innovations.s3.eu-north-1.amazonaws.com` |
+| **Medusa Backend** | Runs on port 9001 | `http://localhost:9001` |
+| **Medusa Admin** | Built-in `@medusajs/admin` | Served from same port, auto-rebuild enabled |
+| **Frontend** | Next.js 14 (separate project) | Runs on port 8000, connects to Medusa on 9001 |
+
+---
+
+## 3. Tech Stack & Dependencies
+
+```json
+{
+  "@medusajs/medusa": "^1.20.9",
+  "@medusajs/admin": "^7.1.16",
+  "@medusajs/cache-redis": "^1.9.2",
+  "@medusajs/event-bus-redis": "^1.8.14",
+  "@medusajs/cache-inmemory": "1.8.11",
+  "@medusajs/event-bus-local": "1.9.9",
+  "@medusajs/file-local": "1.0.4",
+  "medusa-file-s3": "^1.4.2",
+  "medusa-fulfillment-manual": "1.1.41",
+  "medusa-payment-manual": "1.0.25",
+  "medusa-payment-stripe": "6.0.11",
+  "medusa-interfaces": "1.3.10",
+  "pg": "^8.20.0",
+  "typeorm": "0.3.16",
+  "express": "^4.17.2",
+  "cors": "^2.8.5",
+  "dotenv": "16.3.1",
+  "body-parser": "^1.19.0"
+}
+```
+
+**Dev dependencies:** TypeScript 4.5, ts-jest, cross-env, rimraf, medusa-cli 1.3.23
+
+---
+
+## 4. Configuration (`medusa-config.js`)
+
+```js
+// Plugins
+plugins = [
+  "medusa-fulfillment-manual",
+  "medusa-payment-manual",
+  {
+    resolve: "medusa-file-s3",
+    options: {
+      s3_url: process.env.S3_URL,        // https://pranajiva-innovations.s3.eu-north-1.amazonaws.com
+      bucket: process.env.S3_BUCKET,      // pranajiva-innovations
+      region: process.env.S3_REGION,      // eu-north-1
+      access_key_id: process.env.S3_ACCESS_KEY_ID,
+      secret_access_key: process.env.S3_SECRET_ACCESS_KEY,
+      cache_control: "max-age=3600",
+    },
+  },
+  {
+    resolve: "@medusajs/admin",
+    options: {
+      autoRebuild: true,
+      backend: process.env.MEDUSA_BACKEND_URL || "http://localhost:9001",
+    },
+  },
+]
+
+// Modules
+modules = {
+  eventBus: { resolve: "@medusajs/event-bus-redis", options: { redisUrl: REDIS_URL } },
+  cacheService: { resolve: "@medusajs/cache-redis", options: { redisUrl: REDIS_URL } },
+}
+
+// Project config
+projectConfig = {
+  jwt_secret: process.env.JWT_SECRET,
+  cookie_secret: process.env.COOKIE_SECRET,
+  store_cors: STORE_CORS,
+  database_url: DATABASE_URL,
+  admin_cors: ADMIN_CORS,
+  redis_url: REDIS_URL,
+  port: 9001,
+}
+
+// Feature flags
+featureFlags = { product_categories: true }
+
+// Server
+serverConfig = { port: 9001, host: "0.0.0.0" }
+```
+
+---
+
+## 5. Environment Variables
+
+```env
+# Core
+JWT_SECRET=pranajiva_jwt_secret_key_2026_secure
+COOKIE_SECRET=pranajiva_cookie_secret_key_2026_secure
+DATABASE_TYPE=postgres
+DATABASE_URL=postgres://pranajiva:<password>@144.24.104.236:5432/pranajiva_db
+REDIS_URL=redis://:<password>@144.24.104.236:6379
+PORT=9001
+MEDUSA_BACKEND_URL=http://localhost:9001
+NODE_ENV=development
+
+# CORS
+ADMIN_CORS=http://localhost:9001,http://localhost:7001,http://localhost:7002
+STORE_CORS=http://localhost:3000
+
+# AWS S3
+S3_URL=https://pranajiva-innovations.s3.eu-north-1.amazonaws.com
+S3_BUCKET=pranajiva-innovations
+S3_REGION=eu-north-1
+S3_ACCESS_KEY_ID=<set>
+S3_SECRET_ACCESS_KEY=<set>
+
+# Payments (placeholder — not yet configured)
+RAZORPAY_ID=<not set>
+RAZORPAY_SECRET=<not set>
+
+# Shipping (placeholder — not yet configured)
+SHIPROCKET_EMAIL=<not set>
+SHIPROCKET_PASSWORD=<not set>
+
+# Cloudinary (placeholder — not yet configured)
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=<not set>
+CLOUDINARY_API_KEY=<not set>
+CLOUDINARY_API_SECRET=<not set>
+
+# === NOT YET ADDED (needed for AI Cake Studio) ===
+# OTP_PROVIDER=msg91
+# MSG91_AUTH_KEY=<not set>
+# MSG91_TEMPLATE_ID=<not set>
+# AI_PROVIDER=openai
+# OPENAI_API_KEY=<not set>
+# OTP_PASSWORD_SALT=<not set>
+```
+
+---
+
+## 6. Directory Structure
+
+```
+pranajiva-backend/
+├── medusa-config.js
+├── package.json
+├── tsconfig.json
+├── tsconfig.server.json
+├── .env
+├── data/
+│   └── seed.json
+└── src/
+    ├── index.js                          ← Entry point
+    ├── admin/
+    │   ├── components/
+    │   │   ├── onboarding-flow/          ← Default onboarding UI (default + nextjs variants)
+    │   │   └── shared/                   ← Accordion, Card, Icons
+    │   ├── types/
+    │   │   └── icon-type.ts
+    │   ├── utils/
+    │   │   ├── prepare-region.ts
+    │   │   ├── prepare-shipping-options.ts
+    │   │   └── sample-products.ts
+    │   └── widgets/
+    │       └── onboarding-flow/
+    │           └── onboarding-flow.tsx
+    ├── api/
+    │   ├── README.md
+    │   ├── admin/
+    │   │   ├── custom/route.ts           ← Empty custom admin route
+    │   │   └── onboarding/route.ts       ← Onboarding status endpoint
+    │   └── store/
+    │       └── custom/route.ts           ← Empty custom store route
+    ├── jobs/
+    │   └── README.md                     ← Empty (no jobs yet)
+    ├── loaders/
+    │   └── README.md                     ← Empty (no loaders yet)
+    ├── migrations/
+    │   ├── 1685715079776-CreateOnboarding.ts
+    │   ├── 1690996567455-CorrectOnboardingFields.ts
+    │   ├── 1686062614694-AddOnboardingProduct.ts
+    │   └── README.md
+    ├── models/
+    │   ├── onboarding.ts                 ← Only custom model (onboarding status)
+    │   └── README.md
+    ├── repositories/
+    │   └── onboarding.ts                 ← Only custom repository
+    ├── services/
+    │   ├── onboarding.ts                 ← Only custom service
+    │   ├── README.md
+    │   └── __tests__/
+    │       └── test-service.spec.ts
+    ├── subscribers/
+    │   └── README.md                     ← Empty (no subscribers yet)
+    └── types/
+        └── onboarding.ts                 ← Onboarding type definitions
+```
+
+---
+
+## 7. Current Custom Code (Only Onboarding)
+
+The backend is essentially the **default Medusa starter**. The only customization is the onboarding flow:
+
+- **Model:** `src/models/onboarding.ts` — tracks onboarding status
+- **Repository:** `src/repositories/onboarding.ts`
+- **Service:** `src/services/onboarding.ts` — CRUD for onboarding state
+- **API:** `src/api/admin/onboarding/route.ts` — admin endpoint for onboarding
+- **Migrations:** 3 migrations for onboarding table
+- **Admin widget:** `src/admin/widgets/onboarding-flow/` — onboarding UI in admin panel
+
+**No custom business logic for AI Cake Studio, cakes, bakers, or OTP exists yet.**
+
+---
+
+## 8. Medusa V1 Extension Patterns (How to Add Custom Features)
+
+### Custom API Routes
+```
+src/api/store/{feature}/route.ts     ← Public storefront endpoints
+src/api/admin/{feature}/route.ts     ← Admin-only endpoints
+```
+- Express-style route handlers
+- Access Medusa services via `req.scope.resolve("serviceName")`
+- Auth middleware available for protected routes
+
+### Custom Models (TypeORM Entities)
+```ts
+// src/models/my-entity.ts
+import { BaseEntity } from "@medusajs/medusa"
+import { Entity, Column } from "typeorm"
+
+@Entity()
+export class MyEntity extends BaseEntity {
+  @Column()
+  name: string
+}
+```
+
+### Custom Repositories
+```ts
+// src/repositories/my-entity.ts
+import { dataSource } from "@medusajs/medusa/dist/loaders/database"
+import { MyEntity } from "../models/my-entity"
+
+export const MyEntityRepository = dataSource.getRepository(MyEntity)
+export default MyEntityRepository
+```
+
+### Custom Services
+```ts
+// src/services/my-service.ts
+import { TransactionBaseService } from "@medusajs/medusa"
+
+class MyService extends TransactionBaseService {
+  constructor(container) {
+    super(container)
+    // resolve other services: this.customerService_ = container.customerService
+  }
+}
+export default MyService
+```
+
+### Custom Migrations
+```ts
+// src/migrations/TIMESTAMP-CreateMyTable.ts
+import { MigrationInterface, QueryRunner } from "typeorm"
+
+export class CreateMyTable1234567890 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE TABLE ...`)
+  }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TABLE ...`)
+  }
+}
+```
+
+### Subscribers (Event Listeners)
+```ts
+// src/subscribers/my-subscriber.ts
+class MySubscriber {
+  constructor({ eventBusService }) {
+    eventBusService.subscribe("order.placed", this.handleOrder)
+  }
+  handleOrder = async (data) => { /* ... */ }
+}
+export default MySubscriber
+```
+
+### Scheduled Jobs
+```ts
+// src/jobs/my-job.ts
+export default async function handler(container, options) {
+  // runs on schedule
+}
+export const config = { name: "my-job", schedule: "0 * * * *" } // every hour
+```
+
+---
+
+## 9. What Needs to Be Built for AI Cake Studio
+
+### New Files to Create
+
+```
+src/
+├── api/store/
+│   └── ai-studio/
+│       ├── generate/route.ts            ← POST: Generate AI cake images
+│       ├── credits/route.ts             ← GET: Check user's remaining credits
+│       ├── history/route.ts             ← GET: User's generation history
+│       ├── designs/[id]/route.ts        ← GET: Single design detail
+│       └── leads/route.ts              ← POST: Create baker lead from design
+├── models/
+│   ├── ai-generation.ts                ← Generation record entity
+│   └── cake-lead.ts                    ← Baker lead entity
+├── migrations/
+│   ├── XXXX-CreateAiGeneration.ts      ← ai_generations table
+│   └── XXXX-CreateCakeLead.ts          ← cake_leads table
+├── repositories/
+│   ├── ai-generation.ts
+│   └── cake-lead.ts
+├── services/
+│   ├── ai-generation.ts                ← Core: prompt building, provider call, image upload
+│   ├── ai-credits.ts                   ← Quota: check/deduct/restore credits
+│   └── ai-rate-limiter.ts             ← Redis: rate limiting + locks
+├── subscribers/
+│   └── ai-generation.ts               ← Post-generation events (optional)
+└── jobs/
+    └── cleanup-old-generations.ts      ← Scheduled: delete expired unclaimed designs
+```
+
+### New Environment Variables Needed
+
+```env
+# AI Provider
+AI_PROVIDER=openai                       # or "stability"
+OPENAI_API_KEY=<key>
+
+# OTP Provider
+OTP_PROVIDER=msg91                       # or "twilio"
+MSG91_AUTH_KEY=<key>
+MSG91_TEMPLATE_ID=<template>
+MSG91_SENDER_ID=<sender>
+
+# AI Studio Config
+AI_STUDIO_FREE_ATTEMPTS=3
+AI_STUDIO_MAX_DAILY_GENERATIONS=5
+AI_STUDIO_COOLDOWN_SECONDS=20
+AI_STUDIO_S3_PREFIX=ai-generations/      # folder in existing S3 bucket
+
+# OTP
+OTP_PASSWORD_SALT=<strong-random-value>
+OTP_EXPIRY_SECONDS=300
+OTP_MAX_ATTEMPTS=5
+```
+
+---
+
+## 10. Database Schema to Add
+
+### `ai_generations` table
+```sql
+CREATE TABLE ai_generations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id VARCHAR NOT NULL,
+  prompt TEXT NOT NULL,
+  occasion VARCHAR(50),
+  style VARCHAR(50),
+  flavor VARCHAR(50),
+  zodiac_sign VARCHAR(20),
+  provider VARCHAR(30) NOT NULL,
+  provider_model VARCHAR(50),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  image_urls JSONB DEFAULT '[]',
+  image_count INT DEFAULT 0,
+  credit_cost INT DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  failed_reason TEXT,
+  metadata JSONB DEFAULT '{}',
+  CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customer(id)
+);
+
+CREATE INDEX idx_ai_gen_customer ON ai_generations(customer_id);
+CREATE INDEX idx_ai_gen_status ON ai_generations(status);
+CREATE INDEX idx_ai_gen_created ON ai_generations(created_at DESC);
+```
+
+### `cake_leads` table
+```sql
+CREATE TABLE cake_leads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id VARCHAR NOT NULL,
+  generation_id UUID REFERENCES ai_generations(id),
+  design_image_url TEXT,
+  baker_id VARCHAR,
+  pincode VARCHAR(6),
+  weight VARCHAR(10),
+  tiers VARCHAR(5),
+  shape VARCHAR(30),
+  flavor VARCHAR(50),
+  addons JSONB DEFAULT '[]',
+  estimated_price INT,
+  message TEXT,
+  status VARCHAR(20) DEFAULT 'new',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT fk_lead_customer FOREIGN KEY (customer_id) REFERENCES customer(id)
+);
+
+CREATE INDEX idx_leads_customer ON cake_leads(customer_id);
+CREATE INDEX idx_leads_status ON cake_leads(status);
+```
+
+### Customer metadata extension (no migration needed — uses existing JSONB `metadata` column)
+```json
+{
+  "ai_studio": {
+    "free_limit": 3,
+    "free_used": 0,
+    "bonus_balance": 0,
+    "last_generation_at": null,
+    "generation_locked": false
+  }
+}
+```
+
+---
+
+## 11. Redis Keys Structure (for Rate Limiting + OTP)
+
+```
+# OTP storage
+otp:{mobile}              → hashed OTP value, TTL 300s
+otp:attempts:{mobile}     → attempt count, TTL 600s
+otp:send_count:{mobile}   → send count (rate limit), TTL 600s
+
+# Rate limiting
+ratelimit:gen:{customer_id}    → last generation timestamp, TTL 30s
+ratelimit:gen:daily:{customer_id} → daily count, TTL 86400s
+ratelimit:ip:{ip}              → request count, TTL 60s
+
+# Generation lock
+genlock:{customer_id}          → "1" while generation in-flight, TTL 120s
+```
+
+---
+
+## 12. API Contracts (What Frontend Expects)
+
+### `POST /store/ai-studio/generate`
+```ts
+// Request (authenticated — needs _medusa_jwt)
+{
+  prompt: string
+  style: string
+  occasion: string
+  flavor: string
+  zodiacInfluence?: { sign: string; suggestion: string }
+  imageCount?: number  // default 3
+}
+
+// Response 200
+{
+  success: true
+  generationId: string
+  designs: [{ id: string, imageUrl: string, title: string, description: string, style: string }]
+  creditsRemaining: number
+}
+
+// Response 4xx/5xx
+{
+  success: false
+  error: string
+  code: "QUOTA_EXHAUSTED" | "RATE_LIMITED" | "PROVIDER_ERROR" | "AUTH_REQUIRED" | "GENERATION_LOCKED"
+}
+```
+
+### `GET /store/ai-studio/credits`
+```ts
+// Response (authenticated)
+{
+  freeLimit: number
+  freeUsed: number
+  bonusBalance: number
+  totalRemaining: number
+  isLocked: boolean
+  cooldownEndsAt?: string  // ISO date
+}
+```
+
+### `GET /store/ai-studio/history`
+```ts
+// Response (authenticated)
+{
+  generations: [{
+    id: string
+    prompt: string
+    occasion: string
+    style: string
+    status: string
+    imageUrls: string[]
+    createdAt: string
+  }]
+  total: number
+}
+```
+
+### `POST /store/ai-studio/leads`
+```ts
+// Request (authenticated)
+{
+  generationId: string
+  designImageUrl: string
+  pincode?: string
+  weight?: string
+  tiers?: string
+  shape?: string
+  flavor?: string
+  addons?: string[]
+  estimatedPrice?: number
+  message?: string
+}
+
+// Response 200
+{
+  success: true
+  leadId: string
+}
+```
+
+---
+
+## 13. S3 Image Storage Strategy
+
+- **Existing bucket:** `pranajiva-innovations` (eu-north-1)
+- **AI images prefix:** `ai-generations/{customer_id}/{generation_id}/`
+- **File naming:** `design-1.png`, `design-2.png`, `design-3.png`
+- **Public URL pattern:** `https://pranajiva-innovations.s3.eu-north-1.amazonaws.com/ai-generations/{customer_id}/{generation_id}/design-1.png`
+- **Lifecycle rule (optional):** Auto-delete objects under `ai-generations/` after 90 days if not referenced by a lead
+
+---
+
+## 14. MVP Build Order (Dependency-Based)
+
+```
+Step 1: AI Generation + S3 Upload
+  └── Needs: OPENAI_API_KEY, S3 (already have)
+  └── Creates: src/services/ai-generation.ts, src/api/store/ai-studio/generate/route.ts
+
+Step 2: Quota & Credits
+  └── Needs: Step 1 (wraps around it), customer metadata
+  └── Creates: src/services/ai-credits.ts, src/api/store/ai-studio/credits/route.ts
+
+Step 3: Rate Limiting
+  └── Needs: Redis (already have)
+  └── Creates: src/services/ai-rate-limiter.ts
+
+Step 4: Real OTP
+  └── Needs: Redis (already have), MSG91/Twilio key
+  └── Modifies: Frontend /api/auth/otp/send and /api/auth/otp/verify (or moves to Medusa backend)
+
+Step 5: Generation Ledger + History
+  └── Needs: Step 1 (generation data to persist)
+  └── Creates: src/models/ai-generation.ts, migration, repository, src/api/store/ai-studio/history/route.ts
+
+Step 6: Order Handoff (Leads)
+  └── Needs: Step 5 (references generation records)
+  └── Creates: src/models/cake-lead.ts, migration, repository, src/api/store/ai-studio/leads/route.ts
+```
+
+---
+
+## 15. Decisions Still Needed
+
+| # | Decision | Options | Status |
+|---|----------|---------|--------|
+| 1 | AI Provider | OpenAI DALL-E 3 / Stability AI / Replicate | **Not decided** |
+| 2 | OTP Provider | MSG91 / Twilio / Gupshup | **Not decided** |
+| 3 | OTP handling location | Medusa backend custom route OR keep in Next.js API route | **Not decided** (recommend: Medusa backend) |
+| 4 | Baker data storage | Medusa custom entity / Separate table / Products with type="baker" | **Not decided** |
+| 5 | Generation images per request | 2 or 3 | **Not decided** (recommend: 3) |
+| 6 | Credit storage | Customer metadata (simple) / Separate table (scalable) | **Not decided** (recommend: metadata for MVP) |
+
+---
+
+## 16. How to Use This Context
+
+When starting a new conversation about the **backend**, paste this document and state your request. Examples:
+
+- "Build Step 1: AI Generation service + S3 upload + API route"
+- "Create the ai_generations migration and model"
+- "Implement rate limiting service using Redis"
+- "Set up MSG91 OTP integration in Medusa backend"
+- "Create the credits checking service and API"
+
+I will ask for specific file contents only if the task requires seeing code that may have changed since this context was written.
+
+---
+
+## 17. Companion Context Document
+
+There is a separate **Frontend Context Document** covering:
+- Next.js 14 storefront structure
+- AI Cake Studio UI components
+- Frontend API routes (`/api/auth/otp/*`, `/api/cake-addons`, `/api/bakers`, `/api/ai-cake-studio-config`)
+- Mock data and types
+- OTP auth flow (frontend side)
+- Price estimator and baker finder
+
+## 18. Multi-Storefront Architecture
+Single Backend, Multiple Frontends
+
+
+┌─────────────────────────────────────────────────────┐
+│              Medusa V1 Backend (Port 9001)           │
+│                                                     │
+│  • Brand-AGNOSTIC — no brand logic anywhere         │
+│  • Serves ANY authenticated customer equally        │
+│  • Products/Collections have metadata.brand but     │
+│    backend never filters by it — that's frontend's  │
+│    job                                              │
+│                                                     │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  Task-Specific Services                       │  │
+│  │                                               │  │
+│  │  • AI Cake Studio Service → cake images       │  │
+│  │  • (Future) AI Chatbot Service → text Q&A     │  │
+│  │  • (Future) Other AI services                 │  │
+│  │                                               │  │
+│  │  Each service is specialized for ONE task.    │  │
+│  │  Each service is independent of brands.       │  │
+│  └───────────────────────────────────────────────┘  │
+└──────────────────┬──────────────────┬───────────────┘
+                   │                  │
+        ┌──────────▼──────┐  ┌────────▼────────┐
+        │  crossfriend.in │  │  pranajiva.in   │
+        │  (Next.js)      │  │  (Next.js)      │
+        │                 │  │                 │
+        │  Uses:          │  │  Uses:          │
+        │  • AI Cake      │  │  • (Future)     │
+        │    Studio       │  │    AI Chatbot   │
+        │  • Cake/Decor/  │  │  • Ayurvedic    │
+        │    Gift store   │  │    products     │
+        └─────────────────┘  └─────────────────┘
+Core Principles
+Backend is brand-agnostic. No brand column, no brand filtering, no brand-aware logic in any service, model, or API route.
+
+Backend services are task-specific. Each service does ONE thing well:
+
+AI Cake Studio Service = generates cake images, period.
+It doesn't know if the caller is CrossFriend or some future brand.
+It only cares: is this customer authenticated? do they have credits? are they rate-limited?
+Frontend owns feature gating. Which features are shown on which domain is 100% a frontend decision. Backend exposes capabilities; frontend decides who sees them.
+
+Customer accounts are shared. One Medusa customer table serves both storefronts. A customer who signs up on CrossFriend could theoretically log in on PranaJiva too (same email/phone → same account). Credits, history, and leads are tied to the customer ID, not to a brand.
+
+Data is not partitioned by brand. The ai_generations table stores ALL generations regardless of which frontend triggered them. If in the future PranaJiva also uses image generation, the same table stores those too. Filtering/display is frontend's job.
+
+What This Means for AI Cake Studio Backend
+DO: Build a generic "AI image generation for cakes" service
+DO: Authenticate via Medusa customer JWT (standard _medusa_jwt cookie)
+DO: Track credits per customer (not per brand)
+DO: Rate-limit per customer (not per brand)
+DO: Store generations per customer (not per brand)
+DON'T: Add any brand field to tables
+DON'T: Check which domain the request came from
+DON'T: Filter responses by brand
+DON'T: Have different behavior for different storefronts_
+AI Cake Studio Service — Specialization
+The AI Cake Studio backend service is specialized for cake image generation. This means:
+
+Prompt engineering is optimized for cake/bakery imagery
+The system prompt sent to the AI provider will include cake-specific context (tiers, fondant, buttercream, decorations, etc.)
+The generation metadata captures cake-specific fields (occasion, style, flavor, weight, tiers)
+The leads system is designed for baker handoff (not generic e-commerce)
+Price estimation factors are cake-specific (weight, tiers, shape, eggless, etc.)
+But it does NOT:
+
+Know about CrossFriend branding
+Apply brand-specific rules
+Behave differently based on caller identity beyond auth + credits
+
+## 19. Storefronts Summary
+
+
+Property	CrossFriend	PranaJiva
+Domain	crossfriend.in	pranajiva.in
+Category	Cakes, Decor, Gifts, Costumes, Celebrations	Ayurvedic, Wellness, Health
+AI Feature (current)	AI Cake Studio (image generation)	None
+AI Feature (future)	Same	AI Ayurvedic Chatbot (text-based Q&A)
+Product filter	metadata.brand = "crossfriend"	metadata.brand = "pranajiva"
+Frontend codebase	Shared Next.js app	Same shared Next.js app
+Backend	Shared Medusa V1	Same shared Medusa V1
+Feature gating	Frontend shows AI Cake Studio pages	Frontend hides AI Cake Studio pages
+
+
+#	Decision	Options	Status
+1	AI Provider	OpenAI DALL-E 3 / Stability AI / Replicate	Not decided
+2	OTP Provider	MSG91 / Twilio / Gupshup	Not decided
+3	OTP handling location	Medusa backend custom route OR keep in Next.js API route	Not decided
+4	Baker data storage	Medusa custom entity / Separate table	Not decided
+5	Generation images per request	2 or 3	Not decided
+6	Credit storage	Customer metadata (simple) / Separate table (scalable)	Not decided
+End of Backend Appendix A.
+
+**Always provide BOTH context documents** when the task involves full-stack changes.
+
+---
+
+*End of backend context document.*
