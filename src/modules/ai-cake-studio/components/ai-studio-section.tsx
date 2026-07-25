@@ -1,5 +1,7 @@
 "use client"
 
+import DesignLightbox from "./design-lightbox"
+
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import type { Customer } from "@medusajs/medusa"
@@ -13,22 +15,28 @@ import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 
-const FREE_ATTEMPTS_LIMIT = 3 // fallback; overridden by ai-cake-studio-config.json → freeAttemptsLimit
+const FREE_ATTEMPTS_LIMIT = 3
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type BuilderOption = { value: string; label: string; emoji?: string }
+type BuilderOption = { value: string; label: string; emoji?: string; serves?: string }
 
 type StudioSelectors = {
   occasions: BuilderOption[]
   flavors: BuilderOption[]
   styles: BuilderOption[]
+  weights?: BuilderOption[]
+  tiers?: BuilderOption[]
 }
 
 type SelectorState = {
   style: string
   occasion: string
   flavor: string
+  tiers: string
+  shape: string
+  color: string
+  cakeMessage: string
 }
 
 type Props = {
@@ -71,26 +79,26 @@ function getZodiac(dob: string): ZodiacInfo | null {
   return { sign: "Pisces", emoji: "♓", suggestion: "Dreamy pastels, ocean-inspired waves, ethereal shimmer" }
 }
 
-// ─── Fallback selectors (mirrors ai-cake-studio-config.json) ─────────────
+// ─── Fallback selectors ──────────────────────────────────────────────────
 
 const FALLBACK_SELECTORS: StudioSelectors = {
   occasions: [
-    { value: "Birthday", label: "Birthday" },
-    { value: "Anniversary", label: "Anniversary" },
-    { value: "Wedding", label: "Wedding" },
-    { value: "Festival", label: "Festival" },
-    { value: "Kids", label: "Kids Party" },
-    { value: "Special", label: "Special" },
+    { value: "Birthday", label: "Birthday", emoji: "🎂" },
+    { value: "Anniversary", label: "Anniversary", emoji: "💍" },
+    { value: "Wedding", label: "Wedding", emoji: "👰" },
+    { value: "Festival", label: "Festival", emoji: "🎪" },
+    { value: "Kids", label: "Kids Party", emoji: "👶" },
+    { value: "Special", label: "Special", emoji: "🎁" },
   ],
   flavors: [
-    { value: "Chocolate", label: "Chocolate" },
-    { value: "Vanilla", label: "Vanilla" },
-    { value: "Red Velvet", label: "Red Velvet" },
-    { value: "Strawberry", label: "Strawberry" },
-    { value: "Butterscotch", label: "Butterscotch" },
-    { value: "Salted Caramel", label: "Salted Caramel" },
-    { value: "Mango", label: "Mango" },
-    { value: "Blueberry", label: "Blueberry" },
+    { value: "Chocolate", label: "Chocolate", emoji: "🍫" },
+    { value: "Vanilla", label: "Vanilla", emoji: "🍦" },
+    { value: "Red Velvet", label: "Red Velvet", emoji: "❤️" },
+    { value: "Strawberry", label: "Strawberry", emoji: "🍓" },
+    { value: "Butterscotch", label: "Butterscotch", emoji: "🧈" },
+    { value: "Caramel", label: "Caramel", emoji: "🍮" },
+    { value: "Mango", label: "Mango", emoji: "🥭" },
+    { value: "Blueberry", label: "Blueberry", emoji: "🫐" },
   ],
   styles: [
     { value: "Realistic", label: "Realistic", emoji: "🎂" },
@@ -101,7 +109,41 @@ const FALLBACK_SELECTORS: StudioSelectors = {
     { value: "Wedding", label: "Wedding", emoji: "💍" },
     { value: "Kids", label: "Kids", emoji: "🎠" },
   ],
+  weights: [
+    { value: "0.5kg", label: "0.5 kg", serves: "2-4" },
+    { value: "1kg", label: "1 kg", serves: "6-8" },
+    { value: "1.5kg", label: "1.5 kg", serves: "10-12" },
+    { value: "2kg", label: "2 kg", serves: "15-20" },
+    { value: "3kg", label: "3 kg", serves: "25-30" },
+    { value: "4kg", label: "4 kg", serves: "35-40" },
+    { value: "5kg", label: "5 kg", serves: "50+" },
+  ],
+  tiers: [
+    { value: "1", label: "Single", emoji: "1️⃣" },
+    { value: "2", label: "Two Tier", emoji: "2️⃣" },
+    { value: "3", label: "Three Tier", emoji: "3️⃣" },
+    { value: "4", label: "Four Tier", emoji: "4️⃣" },
+  ],
 }
+
+const SHAPE_OPTIONS: BuilderOption[] = [
+  { value: "Round", label: "Round", emoji: "⭕" },
+  { value: "Square", label: "Square", emoji: "⬜" },
+  { value: "Heart", label: "Heart", emoji: "💗" },
+  { value: "Oval", label: "Oval", emoji: "🥚" },
+]
+
+
+const COLOR_OPTIONS: BuilderOption[] = [
+  { value: "Pink", label: "Pink", emoji: "🩷" },
+  { value: "Blue", label: "Blue", emoji: "💙" },
+  { value: "White", label: "White", emoji: "🤍" },
+  { value: "Gold", label: "Gold", emoji: "✨" },
+  { value: "Black", label: "Black", emoji: "🖤" },
+  { value: "Pastel", label: "Pastel", emoji: "🌸" },
+  { value: "Rainbow", label: "Rainbow", emoji: "🌈" },
+  { value: "No preference", label: "Any", emoji: "🎨" },
+]
 
 // ─── Sub-components ────────────────────────────────────────────────────────
 
@@ -115,14 +157,55 @@ function EmptyCreationsPanel() {
   )
 }
 
-function DesignCard({ design, selected }: { design: GeneratedDesign; selected: boolean }) {
+function DesignCard({
+  design,
+  selected,
+  onExpand,
+}: {
+  design: GeneratedDesign
+  selected: boolean
+  onExpand: (e: React.MouseEvent) => void
+}) {
+  const hasImage = Boolean(design.imageUrl)
+
   return (
     <div
       className={`overflow-hidden rounded-xl border bg-white transition ${
         selected ? "border-violet-400 ring-2 ring-violet-300 shadow-sm" : "border-violet-100"
       }`}
     >
-      <div className={`h-28 w-full bg-gradient-to-br ${design.gradient}`} />
+      <div className="relative">
+        {hasImage ? (
+          <img
+            src={design.imageUrl}
+            alt={design.title}
+            className="h-40 w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className={`h-28 w-full bg-gradient-to-br ${design.gradient}`} />
+        )}
+
+        <button
+          type="button"
+          onClick={onExpand}
+          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition hover:bg-black/70 hover:scale-110"
+          title="View full size"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+            <path d="M13.28 7.78l3.22-3.22v2.69a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.69l-3.22 3.22a.75.75 0 001.06 1.06zM2 17.25v-4.5a.75.75 0 011.5 0v2.69l3.22-3.22a.75.75 0 011.06 1.06L4.56 16.5h2.69a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75z" />
+          </svg>
+        </button>
+
+        {selected && (
+          <div className="absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white shadow">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+              <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+            </svg>
+          </div>
+        )}
+      </div>
+
       <div className="p-3">
         <h4 className="text-sm font-semibold text-slate-900">{design.title}</h4>
         <p className="mt-1 line-clamp-2 text-xs text-slate-500">{design.description}</p>
@@ -153,6 +236,45 @@ function ExhaustedBanner() {
   )
 }
 
+/** Reusable pill selector row */
+function PillSelector({
+  options,
+  value,
+  onChange,
+  disabled,
+  size = "normal",
+}: {
+  options: BuilderOption[]
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  size?: "normal" | "small"
+}) {
+  const baseClass = size === "small"
+    ? "rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60"
+    : "rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60"
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(opt.value)}
+          className={`${baseClass} ${
+            value === opt.value
+              ? "bg-violet-600 text-white"
+              : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
+          }`}
+        >
+          {opt.emoji && <>{opt.emoji} </>}{opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ─── Main component ────────────────────────────────────────────────────────
 
 export default function AiStudioSection({ customer }: Props) {
@@ -164,13 +286,16 @@ export default function AiStudioSection({ customer }: Props) {
     style: FALLBACK_SELECTORS.styles[0].value,
     occasion: FALLBACK_SELECTORS.occasions[0].value,
     flavor: FALLBACK_SELECTORS.flavors[0].value,
+    tiers: "1",
+    shape: "Round",
+    color: "No preference",
+    cakeMessage: "",
   })
 
   // DOB + horoscope
   const [dob, setDob] = useState("")
   const [zodiacInfluence, setZodiacInfluence] = useState(false)
   const zodiac = useMemo(() => getZodiac(dob), [dob])
-  // Computed once on client to avoid SSR/client hydration mismatch
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
 
   // Generation state
@@ -178,14 +303,18 @@ export default function AiStudioSection({ customer }: Props) {
   const [generated, setGenerated] = useState(false)
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null)
   const [showUsePanel, setShowUsePanel] = useState(false)
-  const [designs] = useState<GeneratedDesign[]>(MOCK_GENERATED_DESIGNS)
+  const [designs, setDesigns] = useState<GeneratedDesign[]>(MOCK_GENERATED_DESIGNS)
   const [attemptsLeft, setAttemptsLeft] = useState(isLoggedIn ? FREE_ATTEMPTS_LIMIT : 0)
+
+  // Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   const hasAttempts = attemptsLeft > 0
   const canGenerate = isLoggedIn && hasAttempts && prompt.trim().length > 0 && !generating
   const cfMessage = CF_OCCASION_MESSAGES[sel.occasion] ?? CF_OCCASION_MESSAGES["Special"]
 
-  // Load selectors from AI cake studio config (not the custom-cake-builder config)
+  // Load selectors from config
   useEffect(() => {
     fetch("/api/ai-cake-studio-config")
       .then((r) => r.json())
@@ -195,14 +324,34 @@ export default function AiStudioSection({ customer }: Props) {
         }
         if (!data.selectors) return
         setSelectors(data.selectors)
-        setSel({
-          style: data.selectors.styles?.[0]?.value ?? FALLBACK_SELECTORS.styles[0].value,
-          occasion: data.selectors.occasions?.[0]?.value ?? FALLBACK_SELECTORS.occasions[0].value,
-          flavor: data.selectors.flavors?.[0]?.value ?? FALLBACK_SELECTORS.flavors[0].value,
-        })
+        setSel((prev) => ({
+          ...prev,
+          style: data.selectors!.styles?.[0]?.value ?? prev.style,
+          occasion: data.selectors!.occasions?.[0]?.value ?? prev.occasion,
+          flavor: data.selectors!.flavors?.[0]?.value ?? prev.flavor,
+        }))
       })
-      .catch(() => {}) // keep fallback silently
+      .catch(() => {})
   }, [isLoggedIn])
+
+  // Listen for "Use this prompt" from showcase gallery
+  useEffect(() => {
+    // Check if navigated from gallery page with a prompt
+    const storedPrompt = sessionStorage.getItem("cf-use-prompt")
+    if (storedPrompt) {
+      setPrompt(storedPrompt)
+      sessionStorage.removeItem("cf-use-prompt")
+    }
+    // Listen for same-page event from compact showcase
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ prompt: string }>).detail
+      if (detail?.prompt) {
+        setPrompt(detail.prompt)
+      }
+    }
+    window.addEventListener("use-showcase-prompt", handler)
+    return () => window.removeEventListener("use-showcase-prompt", handler)
+  }, [])
 
   const handleGenerate = async () => {
     if (!canGenerate) return
@@ -213,6 +362,7 @@ export default function AiStudioSection({ customer }: Props) {
     await new Promise((resolve) => setTimeout(resolve, 1800))
     setGenerating(false)
     setGenerated(true)
+    setDesigns(MOCK_GENERATED_DESIGNS)
     setAttemptsLeft((prev) => Math.max(0, prev - 1))
   }
 
@@ -221,7 +371,13 @@ export default function AiStudioSection({ customer }: Props) {
     setShowUsePanel(true)
   }
 
-  // ── Share logic ──────────────────────────────────────────────────────────
+  const handleExpandDesign = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setLightboxIndex(index)
+    setLightboxOpen(true)
+  }
+
+  // Share logic
   const [showShareSheet, setShowShareSheet] = useState(false)
 
   const handleShare = async (design: GeneratedDesign) => {
@@ -233,347 +389,351 @@ export default function AiStudioSection({ customer }: Props) {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ title: design.title, text, url })
-      } catch {
-        // user cancelled — ignore
-      }
+      } catch {}
       return
     }
-    // No native share API (desktop) → show our sheet
     setShowShareSheet(true)
   }
 
   return (
-    <section id="ai-studio" className="px-6 py-8 sm:px-8 lg:px-12">
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-[26px] border border-violet-100 bg-white shadow-[0_24px_60px_rgba(109,40,217,0.12)]">
-        <div className="grid gap-6 p-5 lg:grid-cols-[1.45fr_0.85fr] lg:p-6">
+    <section id="ai-studio" className="px-4 py-8 sm:px-6 lg:px-12">
+      <div className="mx-auto max-w-5xl">
+        <div className="overflow-hidden rounded-[26px] border border-violet-100 bg-white p-5 shadow-[0_24px_60px_rgba(109,40,217,0.12)] sm:p-6">
 
-          {/* ── Left panel: inputs ── */}
-          <div>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-heading text-3xl font-bold text-slate-900">Create Your Cake with AI</h3>
-              <p className="text-xs text-slate-500">Describe, choose style and let AI do the magic ✨</p>
-            </div>
+          {/* Header */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">Create Your Cake with AI</h3>
+            <p className="text-xs text-slate-500">Describe, choose style and let AI do the magic ✨</p>
+          </div>
 
-            {/* Prompt textarea */}
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Describe your cake idea...
-            </label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value.slice(0, 320))}
-              rows={4}
-              disabled={generating}
-              placeholder="e.g. A two tier princess cake with pink roses and golden crown"
-              className="w-full resize-none rounded-2xl border border-violet-100 bg-violet-50/30 p-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-            <p className="mt-1 text-right text-[11px] text-slate-400">{prompt.length}/320</p>
+          {/* Prompt textarea */}
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Describe your cake idea...
+          </label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value.slice(0, 320))}
+            rows={3}
+            disabled={generating}
+            placeholder="e.g. A two tier princess cake with pink roses and golden crown"
+            className="w-full resize-none rounded-2xl border border-violet-100 bg-violet-50/30 p-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
+          />
+          <p className="mt-1 text-right text-[11px] text-slate-400">{prompt.length}/320</p>
 
-            {/* Prompt templates */}
-            <div className="mt-3">
-              <p className="mb-2 text-xs font-semibold text-slate-500">Not sure what to type? Pick a template:</p>
-              <div className="flex flex-wrap gap-2">
-                {PROMPT_TEMPLATES.map((t) => (
-                  <button
-                    key={t.label}
-                    type="button"
-                    disabled={generating}
-                    onClick={() => setPrompt(t.prompt)}
-                    className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100 disabled:opacity-50"
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Style / Occasion / Flavor */}
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Style</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectors.styles.map((s) => (
-                    <button
-                      key={s.value}
-                      type="button"
-                      disabled={generating}
-                      onClick={() => setSel((c) => ({ ...c, style: s.value }))}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
-                        sel.style === s.value
-                          ? "bg-violet-600 text-white"
-                          : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
-                      }`}
-                    >
-                      {s.emoji} {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Occasion</p>
-                <select
-                  value={sel.occasion}
+          {/* Prompt templates */}
+          <div className="mt-3">
+            <p className="mb-2 text-xs font-semibold text-slate-500">Not sure what to type? Pick a template:</p>
+            <div className="flex flex-wrap gap-2">
+              {PROMPT_TEMPLATES.map((t) => (
+                <button
+                  key={t.label}
+                  type="button"
                   disabled={generating}
-                  onChange={(e) => setSel((c) => ({ ...c, occasion: e.target.value }))}
-                  className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none disabled:opacity-60"
+                  onClick={() => setPrompt(t.prompt)}
+                  className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100 disabled:opacity-50"
                 >
-                  {selectors.occasions.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Flavor</p>
-                <select
-                  value={sel.flavor}
-                  disabled={generating}
-                  onChange={(e) => setSel((c) => ({ ...c, flavor: e.target.value }))}
-                  className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none disabled:opacity-60"
-                >
-                  {selectors.flavors.map((f) => (
-                    <option key={f.value} value={f.value}>{f.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* DOB + Horoscope */}
-            <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/30 p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-                🔮 Horoscope influence (optional)
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <div>
-                  <p className="mb-1 text-[11px] text-slate-400">Date of birth</p>
-                  <input
-                    type="date"
-                    value={dob}
-                    onChange={(e) => { setDob(e.target.value); setZodiacInfluence(false) }}
-                    max={todayStr}
-                    className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none"
-                  />
-                </div>
-                {zodiac && (
-                  <div className="space-y-1.5">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-bold text-violet-700 ring-1 ring-violet-200">
-                      {zodiac.emoji} {zodiac.sign}
-                    </span>
-                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={zodiacInfluence}
-                        onChange={(e) => setZodiacInfluence(e.target.checked)}
-                        className="h-3.5 w-3.5 accent-violet-600"
-                      />
-                      Add {zodiac.sign} influence to design
-                    </label>
-                  </div>
-                )}
-              </div>
-              {zodiac && zodiacInfluence && (
-                <p className="mt-2 rounded-xl bg-violet-100/60 px-3 py-2 text-xs italic text-violet-700">
-                  ✨ {zodiac.suggestion}
-                </p>
-              )}
-              {!dob && (
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Enter a date of birth to unlock horoscope-inspired design suggestions
-                </p>
-              )}
-            </div>
-
-            {/* CTA area */}
-            <div className="mt-4">
-              {/* Guest: inline OTP auth — no redirect */}
-              {!isLoggedIn && <MobileOtpAuth attemptsLimit={FREE_ATTEMPTS_LIMIT} />}
-
-              {/* Logged-in, no attempts left */}
-              {isLoggedIn && !hasAttempts && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    disabled
-                    className="cursor-not-allowed rounded-xl bg-slate-200 px-5 py-3 text-sm font-bold text-slate-500"
-                  >
-                    No free attempts left
-                  </button>
-                  <ExhaustedBanner />
-                </div>
-              )}
-
-              {/* Logged-in, has attempts */}
-              {isLoggedIn && hasAttempts && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <motion.button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={!canGenerate}
-                    whileTap={canGenerate ? { scale: 0.98 } : {}}
-                    className={`rounded-xl px-5 py-3 text-sm font-bold text-white transition ${
-                      canGenerate
-                        ? "bg-gradient-to-r from-violet-600 to-purple-600 shadow-md shadow-violet-200 hover:from-violet-700 hover:to-purple-700"
-                        : "cursor-not-allowed bg-slate-300"
-                    }`}
-                  >
-                    {generating ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 11-8 8z" />
-                        </svg>
-                        Generating...
-                      </span>
-                    ) : (
-                      "✨ Generate Cake Ideas"
-                    )}
-                  </motion.button>
-
-                  <AttemptsBadge attemptsLeft={attemptsLeft} />
-
-                  <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                    <span>100% Unique Designs</span>
-                    <span>·</span>
-                    <span>Multiple Variations</span>
-                    <span>·</span>
-                    <span>Instant Results</span>
-                  </div>
-                </div>
-              )}
+                  {t.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* ── Right panel: results ── */}
-          <div className="rounded-2xl border border-violet-100 bg-slate-50/40 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-800">Your AI Creations</h4>
-              {generated ? (
-                <span className="rounded-full bg-green-100 px-2 py-1 text-[11px] font-semibold text-green-700">Ready</span>
-              ) : (
-                <span className="rounded-full bg-violet-100 px-2 py-1 text-[11px] font-semibold text-violet-700">New</span>
+          {/* Style */}
+          <div className="mt-5">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Style</p>
+            <PillSelector
+              options={selectors.styles}
+              value={sel.style}
+              onChange={(v) => setSel((c) => ({ ...c, style: v }))}
+              disabled={generating}
+            />
+          </div>
+
+          {/* Occasion */}
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Occasion</p>
+            <PillSelector
+              options={selectors.occasions}
+              value={sel.occasion}
+              onChange={(v) => setSel((c) => ({ ...c, occasion: v }))}
+              disabled={generating}
+            />
+          </div>
+
+          {/* Flavor */}
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Flavor</p>
+            <PillSelector
+              options={selectors.flavors}
+              value={sel.flavor}
+              onChange={(v) => setSel((c) => ({ ...c, flavor: v }))}
+              disabled={generating}
+            />
+          </div>
+
+          {/* Tiers */}
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Tiers</p>
+            <PillSelector
+              options={selectors.tiers || FALLBACK_SELECTORS.tiers!}
+              value={sel.tiers}
+              onChange={(v) => setSel((c) => ({ ...c, tiers: v }))}
+              disabled={generating}
+            />
+          </div>
+
+          {/* Shape */}
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Shape</p>
+            <PillSelector
+              options={SHAPE_OPTIONS}
+              value={sel.shape}
+              onChange={(v) => setSel((c) => ({ ...c, shape: v }))}
+              disabled={generating}
+            />
+          </div>
+          
+
+          {/* Personalize */}
+          <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/20 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">✍️ Personalize</p>
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1 text-[11px] font-medium text-slate-500">Message on cake (optional)</p>
+                <input
+                  type="text"
+                  placeholder="e.g. Happy Birthday Priya"
+                  value={sel.cakeMessage}
+                  onChange={(e) => setSel((c) => ({ ...c, cakeMessage: e.target.value.slice(0, 50) }))}
+                  disabled={generating}
+                  className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none disabled:opacity-60"
+                />
+                <p className="mt-1 text-right text-[10px] text-slate-400">{sel.cakeMessage.length}/50</p>
+              </div>
+              <div>
+                <p className="mb-2 text-[11px] font-medium text-slate-500">Color preference</p>
+                <PillSelector
+                  options={COLOR_OPTIONS}
+                  value={sel.color}
+                  onChange={(v) => setSel((c) => ({ ...c, color: v }))}
+                  disabled={generating}
+                  size="small"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Horoscope */}
+          <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/20 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+              🔮 Horoscope influence (optional)
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <p className="mb-1 text-[11px] text-slate-400">Date of birth</p>
+                <input
+                  type="date"
+                  value={dob}
+                  onChange={(e) => { setDob(e.target.value); setZodiacInfluence(false) }}
+                  max={todayStr}
+                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none"
+                />
+              </div>
+              {zodiac && (
+                <div className="space-y-1.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-bold text-violet-700 ring-1 ring-violet-200">
+                    {zodiac.emoji} {zodiac.sign}
+                  </span>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={zodiacInfluence}
+                      onChange={(e) => setZodiacInfluence(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-violet-600"
+                    />
+                    Add {zodiac.sign} influence to design
+                  </label>
+                </div>
               )}
             </div>
+            {zodiac && zodiacInfluence && (
+              <p className="mt-2 rounded-xl bg-violet-100/60 px-3 py-2 text-xs italic text-violet-700">
+                ✨ {zodiac.suggestion}
+              </p>
+            )}
+          </div>
 
-            <AnimatePresence mode="wait">
-              {!generated && !generating ? (
-                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <EmptyCreationsPanel />
-                </motion.div>
-              ) : null}
+          {/* CTA area */}
+          <div className="mt-4">
+            {!isLoggedIn && <MobileOtpAuth attemptsLimit={FREE_ATTEMPTS_LIMIT} />}
 
-              {generating ? (
-                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                  {[1, 2, 3].map((n) => (
-                    <div key={n} className="h-24 animate-pulse rounded-xl bg-white" />
-                  ))}
-                </motion.div>
-              ) : null}
+            {isLoggedIn && !hasAttempts && (
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" disabled className="cursor-not-allowed rounded-xl bg-slate-200 px-5 py-3 text-sm font-bold text-slate-500">
+                  No free attempts left
+                </button>
+                <ExhaustedBanner />
+              </div>
+            )}
 
-              {generated && !generating ? (
-                <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            {isLoggedIn && hasAttempts && (
+              <div className="flex flex-wrap items-center gap-3">
+                <motion.button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={!canGenerate}
+                  whileTap={canGenerate ? { scale: 0.98 } : {}}
+                  className={`rounded-xl px-5 py-3 text-sm font-bold text-white transition ${
+                    canGenerate
+                      ? "bg-gradient-to-r from-violet-600 to-purple-600 shadow-md shadow-violet-200 hover:from-violet-700 hover:to-purple-700"
+                      : "cursor-not-allowed bg-slate-300"
+                  }`}
+                >
+                  {generating ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 11-8 8z" />
+                      </svg>
+                      Generating...
+                    </span>
+                  ) : (
+                    "✨ Generate Cake Ideas"
+                  )}
+                </motion.button>
 
-                  {/* CrossFriend occasion message */}
-                  <div className="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50 to-purple-50 p-3">
-                    <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">
-                      💜 A note from CrossFriend
-                    </p>
-                    <p className="text-xs leading-relaxed text-slate-600 italic">{cfMessage}</p>
-                  </div>
+                <AttemptsBadge attemptsLeft={attemptsLeft} />
+              </div>
+            )}
+          </div>
+        </div>
 
-                  {/* Design cards */}
-                  {designs.map((design) => (
+        {/* ── Results panel (below form) ── */}
+        <div className="mt-6">
+          <AnimatePresence mode="wait">
+            {!generated && !generating ? (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <EmptyCreationsPanel />
+              </motion.div>
+            ) : null}
+
+            {generating ? (
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4 sm:grid-cols-3">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="h-48 animate-pulse rounded-xl bg-white border border-violet-100" />
+                ))}
+              </motion.div>
+            ) : null}
+
+            {generated && !generating ? (
+              <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+
+                {/* CrossFriend occasion message */}
+                <div className="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50 to-purple-50 p-3">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">
+                    💜 A note from CrossFriend
+                  </p>
+                  <p className="text-xs leading-relaxed text-slate-600 italic">{cfMessage}</p>
+                </div>
+
+                {/* Design cards — horizontal grid */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {designs.map((design, index) => (
                     <button
                       key={design.id}
                       type="button"
                       onClick={() => handleSelectDesign(design.id)}
                       className="block w-full rounded-xl text-left"
                     >
-                      <DesignCard design={design} selected={selectedDesignId === design.id} />
+                      <DesignCard
+                        design={design}
+                        selected={selectedDesignId === design.id}
+                        onExpand={(e) => handleExpandDesign(index, e)}
+                      />
                     </button>
                   ))}
+                </div>
 
-                  {/* "Use selected design" action panel */}
-                  <AnimatePresence>
-                    {showUsePanel && selectedDesignId && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="space-y-2 rounded-2xl border border-violet-200 bg-white p-4">
-                          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                            What would you like to do?
-                          </p>
+                {/* Action panel */}
+                <AnimatePresence>
+                  {showUsePanel && selectedDesignId && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-2 rounded-2xl border border-violet-200 bg-white p-4">
+                        <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                          What would you like to do?
+                        </p>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              document.getElementById("baker-section")?.scrollIntoView({ behavior: "smooth" })
-                            }
-                            className="flex w-full items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-left transition hover:bg-violet-100"
-                          >
-                            <span className="mt-0.5 text-base">📍</span>
-                            <div>
-                              <p className="text-sm font-semibold text-violet-800">Find a baker near me</p>
-                              <p className="text-xs text-slate-500">Connect with a verified local baker to make this exact cake</p>
-                            </div>
-                          </button>
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById("baker-section")?.scrollIntoView({ behavior: "smooth" })}
+                          className="flex w-full items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-left transition hover:bg-violet-100"
+                        >
+                          <span className="mt-0.5 text-base">📍</span>
+                          <div>
+                            <p className="text-sm font-semibold text-violet-800">Find a baker near me</p>
+                            <p className="text-xs text-slate-500">Connect with a verified local baker to make this exact cake</p>
+                          </div>
+                        </button>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              document.querySelector("[data-price-estimator]")?.scrollIntoView({ behavior: "smooth" })
-                            }
-                            className="flex w-full items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-left transition hover:bg-violet-100"
-                          >
-                            <span className="mt-0.5 text-base">💰</span>
-                            <div>
-                              <p className="text-sm font-semibold text-violet-800">See price estimate</p>
-                              <p className="text-xs text-slate-500">Customise weight, add-ons and get an indicative price</p>
-                            </div>
-                          </button>
+                        <button
+                          type="button"
+                          onClick={() => document.querySelector("[data-price-estimator]")?.scrollIntoView({ behavior: "smooth" })}
+                          className="flex w-full items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-left transition hover:bg-violet-100"
+                        >
+                          <span className="mt-0.5 text-base">💰</span>
+                          <div>
+                            <p className="text-sm font-semibold text-violet-800">See price estimate</p>
+                            <p className="text-xs text-slate-500">Customise weight, add-ons and get an indicative price</p>
+                          </div>
+                        </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const d = designs.find((x) => x.id === selectedDesignId)
-                              if (d) handleShare(d)
-                            }}
-                            className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
-                          >
-                            <span className="mt-0.5 text-base">📤</span>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-700">Share this design</p>
-                              <p className="text-xs text-slate-500">WhatsApp · copy link · or any app on your device</p>
-                            </div>
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = designs.find((x) => x.id === selectedDesignId)
+                            if (d) handleShare(d)
+                          }}
+                          className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+                        >
+                          <span className="mt-0.5 text-base">📤</span>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-700">Share this design</p>
+                            <p className="text-xs text-slate-500">WhatsApp · copy link · or any app on your device</p>
+                          </div>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
-      </div>
 
-      {/* Price Estimator — slides in after generation */}
-      <div data-price-estimator="" className="px-5 pb-2 sm:px-6">
-        <PriceEstimator
+        {/* Price Estimator */}
+        <div data-price-estimator="" className="mt-6">
+          <PriceEstimator
           cakeStyle={sel.style}
           occasion={sel.occasion}
           generated={generated}
-        />
+          initialTiers={sel.tiers}
+          initialFlavor={sel.flavor}
+          initialShape={sel.shape}
+          />
+        </div>
+
+        {/* Baker Finder */}
+        <div id="baker-section" className="mt-4">
+          <BakerFinder generated={generated} />
+        </div>
       </div>
 
-      {/* Baker Finder — pincode-based, slides in after generation */}
-      <div className="px-5 pb-5 sm:px-6">
-        <BakerFinder generated={generated} />
-      </div>
-
-      {/* Share sheet — shown on desktop when navigator.share is unavailable */}
+      {/* Share sheet */}
       <AnimatePresence>
         {showShareSheet && selectedDesignId && (() => {
           const design = designs.find((x) => x.id === selectedDesignId)
@@ -639,6 +799,14 @@ export default function AiStudioSection({ customer }: Props) {
           )
         })()}
       </AnimatePresence>
+
+      {/* Design Lightbox */}
+      <DesignLightbox
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        designs={designs}
+        startIndex={lightboxIndex}
+      />
     </section>
   )
 }

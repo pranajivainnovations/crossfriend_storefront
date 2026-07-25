@@ -35,6 +35,7 @@ export interface GeneratedDesign {
   gradient: string
   style: string
   liked: boolean
+  imageUrl?: string  // ← needs this
 }
 
 export interface AiAnalysis {

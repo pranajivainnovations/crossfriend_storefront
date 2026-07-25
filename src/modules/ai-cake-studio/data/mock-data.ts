@@ -114,6 +114,7 @@ export const MOCK_GENERATED_DESIGNS: GeneratedDesign[] = [
     gradient: "from-violet-400 via-purple-300 to-indigo-400",
     style: "Luxury",
     liked: false,
+    imageUrl: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1024&h=1024&fit=crop",
   },
   {
     id: "gen-2",
@@ -122,6 +123,7 @@ export const MOCK_GENERATED_DESIGNS: GeneratedDesign[] = [
     gradient: "from-pink-300 via-rose-200 to-amber-200",
     style: "Realistic",
     liked: false,
+    imageUrl: "https://images.unsplash.com/photo-1535254973040-607b474cb50d?w=1024&h=1024&fit=crop",
   },
   {
     id: "gen-3",
@@ -130,6 +132,7 @@ export const MOCK_GENERATED_DESIGNS: GeneratedDesign[] = [
     gradient: "from-slate-300 via-violet-200 to-purple-200",
     style: "Minimal",
     liked: false,
+    imageUrl: "https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=1024&h=1024&fit=crop",
   },
 ]
 

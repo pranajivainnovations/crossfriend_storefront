@@ -1,11 +1,8 @@
 import { Metadata } from "next"
 import { getCustomer } from "@lib/data"
 import HeroSection from "@modules/ai-cake-studio/components/hero-section"
-import InspirationCards from "@modules/ai-cake-studio/components/inspiration-cards"
-import HowItWorks from "@modules/ai-cake-studio/components/how-it-works"
-import ShowcaseGallery from "@modules/ai-cake-studio/components/showcase-gallery"
 import AiStudioSection from "@modules/ai-cake-studio/components/ai-studio-section"
-import DesignToRealSection from "@modules/ai-cake-studio/components/design-to-real-section"
+import ShowcaseGallery from "@modules/ai-cake-studio/components/showcase-gallery"
 import BottomCta from "@modules/ai-cake-studio/components/bottom-cta"
 
 export const dynamic = "force-dynamic"
@@ -14,6 +11,7 @@ export const metadata: Metadata = {
   title: "AI Cake Studio | CrossFriend",
   description:
     "Design your dream cake in 60 seconds with AI and order from local verified bakers.",
+  authors: [{ name: "CrossFriend" }],
   keywords: [
     "AI cake studio",
     "custom cake design",
@@ -28,16 +26,18 @@ export const metadata: Metadata = {
 }
 
 export default async function AiCakeStudioPage() {
-  const customer = await getCustomer().catch(() => null)
+  let customer = null
+  try {
+    customer = await getCustomer()
+  } catch {
+    customer = null
+  }
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#f9f6ff] via-white to-[#fcfaff]">
       <HeroSection />
-      <InspirationCards />
-      <HowItWorks />
-      <ShowcaseGallery />
       <AiStudioSection customer={customer} />
-      <DesignToRealSection />
+      <ShowcaseGallery />
       <BottomCta />
     </main>
   )

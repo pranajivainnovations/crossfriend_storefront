@@ -3,96 +3,167 @@
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
-import type { Addon, EstimatorSelections, StudioConfig } from "../types"
+import type { Addon } from "../types"
 
-// ─── Fallback config (mirrors ai-cake-studio-config.json) ───────────────────
+// ─── Pricing types (matches new config structure) ────────────────────────────
 
-const FALLBACK_CONFIG: Pick<StudioConfig, "pricing" | "selectors" | "addons"> = {
-  pricing: {
-    basePrice: 800,
-    currency: "₹",
-    factors: {
-      weight:          { "0.5": 0, "1": 0, "1.5": 200, "2": 400, "2.5": 650, "3": 900, "4": 1400, "5": 2000 },
-      tiers:           { "1": 0, "2": 600, "3": 1400, "4": 2400 },
-      shape:           { Round: 0, Square: 150, Heart: 250, Oval: 200, Custom: 500 },
-      style:           { Realistic: 0, Cartoon: 200, Luxury: 800, Minimal: 0, "3D Sculpted": 1200, Wedding: 600, Kids: 300 },
-      flavor:          { Vanilla: 0, Chocolate: 0, "Red Velvet": 100, Strawberry: 100, Butterscotch: 150, "Salted Caramel": 200, Mango: 150, Blueberry: 200, Lemon: 100 },
-      eggless:          150,
-      expressDelivery:  300,
-      midnightDelivery: 200,
-      messageOnCake:    0,
-      photoOnCake:      250,
-    },
-  },
-  selectors: {
-    weights:   [
-      { value: "0.5", label: "0.5 kg",  serves: "4–6"   },
-      { value: "1",   label: "1 kg",    serves: "8–10"  },
-      { value: "1.5", label: "1.5 kg",  serves: "12–15" },
-      { value: "2",   label: "2 kg",    serves: "16–20" },
-      { value: "2.5", label: "2.5 kg",  serves: "20–25" },
-      { value: "3",   label: "3 kg",    serves: "25–30" },
-    ],
-    tiers:     [
-      { value: "1", label: "Single tier" },
-      { value: "2", label: "Two tiers"   },
-      { value: "3", label: "Three tiers" },
-      { value: "4", label: "Four tiers"  },
-    ],
-    shapes:    [
-      { value: "Round",  label: "Round"  },
-      { value: "Square", label: "Square" },
-      { value: "Heart",  label: "Heart"  },
-      { value: "Oval",   label: "Oval"   },
-    ],
-    flavors:   [
-      { value: "Chocolate",      label: "Chocolate"      },
-      { value: "Vanilla",        label: "Vanilla"        },
-      { value: "Red Velvet",     label: "Red Velvet"     },
-      { value: "Strawberry",     label: "Strawberry"     },
-      { value: "Butterscotch",   label: "Butterscotch"   },
-      { value: "Salted Caramel", label: "Salted Caramel" },
-    ],
-    styles:    [],
-    occasions: [],
-  },
-  addons: [
-    { id: "candles",      label: "Birthday Candles",       description: "Designer number + spiral candles",        price: 120, emoji: "🕯️", suggestFor: ["Birthday", "Kids"]                    },
-    { id: "flowers",      label: "Fresh Flower Topper",    description: "Real edible flowers arranged on top",      price: 350, emoji: "🌸", suggestFor: ["Wedding", "Anniversary", "Luxury"]   },
-    { id: "gold-dust",    label: "Edible Gold Dust",       description: "Premium shimmer finish over fondant",      price: 250, emoji: "✨", suggestFor: ["Luxury", "Anniversary", "Wedding"]   },
-    { id: "photo",        label: "Photo Print on Cake",    description: "Edible image printed and placed on top",   price: 250, emoji: "📸", suggestFor: ["Birthday", "Anniversary", "Special"] },
-    { id: "balloon-arch", label: "Balloon Arch",           description: "Mini balloon arrangement (5 balloons)",    price: 180, emoji: "🎈", suggestFor: ["Birthday", "Kids", "Festival"]       },
-    { id: "gift-wrap",    label: "Gift Box Packaging",     description: "Premium branded box with ribbon and card", price: 149, emoji: "🎁", suggestFor: ["Birthday", "Anniversary", "Special"] },
-    { id: "sparklers",    label: "Cake Sparklers",         description: "Safe indoor sparklers for dramatic reveal",price: 199, emoji: "🎇", suggestFor: ["Birthday", "Kids", "Festival"]       },
-    { id: "topper",       label: "Custom Name Topper",     description: "Acrylic or chocolate name tag",            price: 220, emoji: "🎀", suggestFor: ["Birthday", "Kids", "Anniversary"]    },
-    { id: "message-card", label: "Handwritten Message Card",description: "Personalised card with delivery",        price: 79,  emoji: "💌", suggestFor: ["Birthday", "Anniversary", "Special"] },
-    { id: "knife-set",    label: "Cake Knife & Server Set",description: "Premium stainless steel with ribbon",     price: 299, emoji: "🍴", suggestFor: ["Wedding", "Anniversary"]             },
+interface PricingConfig {
+  currency: string
+  disclaimer: string
+  baseByWeight: Record<string, number>
+  tierMultiplier: Record<string, number>
+  shapeAdjustment: Record<string, number>
+  styleAdjustment: Record<string, number>
+  flavorAdjustment: Record<string, number>
+  options: {
+    expressDelivery: number
+    midnightDelivery: number
+    messageOnCake: number
+    photoOnCake: number
+  }
+}
+
+interface SelectorOption {
+  value: string
+  label: string
+  serves?: string
+  emoji?: string
+}
+
+interface SelectorsConfig {
+  weights: SelectorOption[]
+  tiers: SelectorOption[]
+  shapes: SelectorOption[]
+  flavors: SelectorOption[]
+}
+
+interface EstimatorSelections {
+  weight: string
+  tiers: string
+  shape: string
+  flavor: string
+  expressDelivery: boolean
+  midnightDelivery: boolean
+}
+
+// ─── Fallback config ─────────────────────────────────────────────────────────
+
+const FALLBACK_PRICING: PricingConfig = {
+  currency: "₹",
+  disclaimer: "Indicative price only. Final price will be confirmed by your baker.",
+  baseByWeight: { "0.5": 500, "1": 900, "1.5": 1350, "2": 1800, "2.5": 2250, "3": 2700, "4": 3600, "5": 4500 },
+  tierMultiplier: { "1": 1.0, "2": 1.4, "3": 1.8, "4": 2.3 },
+  shapeAdjustment: { Round: 0, Square: 150, Heart: 200, Oval: 150 },
+  styleAdjustment: { Realistic: 0, Cartoon: 200, Luxury: 500, Minimal: 0, "3D Sculpted": 600, Wedding: 400, Kids: 200 },
+  flavorAdjustment: { Chocolate: 0, Vanilla: 0, "Red Velvet": 100, Strawberry: 100, Butterscotch: 50, "Salted Caramel": 150, Mango: 150, Blueberry: 200, Lemon: 100 },
+  options: { expressDelivery: 300, midnightDelivery: 200, messageOnCake: 50, photoOnCake: 150 },
+}
+
+const FALLBACK_SELECTORS: SelectorsConfig = {
+  weights: [
+    { value: "0.5", label: "0.5 kg", serves: "4–6" },
+    { value: "1", label: "1 kg", serves: "8–10" },
+    { value: "1.5", label: "1.5 kg", serves: "12–15" },
+    { value: "2", label: "2 kg", serves: "16–20" },
+    { value: "2.5", label: "2.5 kg", serves: "20–25" },
+    { value: "3", label: "3 kg", serves: "25–30" },
+    { value: "4", label: "4 kg", serves: "30–40" },
+    { value: "5", label: "5 kg", serves: "40–50" },
+  ],
+  tiers: [
+    { value: "1", label: "Single tier" },
+    { value: "2", label: "Two tiers" },
+    { value: "3", label: "Three tiers" },
+    { value: "4", label: "Four tiers" },
+  ],
+  shapes: [
+    { value: "Round", label: "Round" },
+    { value: "Square", label: "Square" },
+    { value: "Heart", label: "Heart" },
+    { value: "Oval", label: "Oval" },
+  ],
+  flavors: [
+    { value: "Chocolate", label: "Chocolate", emoji: "🍫" },
+    { value: "Vanilla", label: "Vanilla", emoji: "🍦" },
+    { value: "Red Velvet", label: "Red Velvet", emoji: "❤️" },
+    { value: "Strawberry", label: "Strawberry", emoji: "🍓" },
+    { value: "Butterscotch", label: "Butterscotch", emoji: "🧈" },
+    { value: "Salted Caramel", label: "Salted Caramel", emoji: "🍮" },
+    { value: "Mango", label: "Mango", emoji: "🥭" },
+    { value: "Blueberry", label: "Blueberry", emoji: "🫐" },
+    { value: "Lemon", label: "Lemon", emoji: "🍋" },
   ],
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const FALLBACK_ADDONS: Addon[] = [
+  { id: "candles", label: "Birthday Candles", description: "Designer number + spiral candles", price: 120, emoji: "🕯️", suggestFor: ["Birthday", "Kids"] },
+  { id: "flowers", label: "Fresh Flower Topper", description: "Real edible flowers arranged on top", price: 350, emoji: "🌸", suggestFor: ["Wedding", "Anniversary", "Luxury"] },
+  { id: "gold-dust", label: "Edible Gold Dust", description: "Premium shimmer finish over fondant", price: 250, emoji: "✨", suggestFor: ["Luxury", "Anniversary", "Wedding"] },
+  { id: "photo", label: "Photo Print on Cake", description: "Edible image printed and placed on top", price: 250, emoji: "📸", suggestFor: ["Birthday", "Anniversary", "Special"] },
+  { id: "balloon-arch", label: "Balloon Arch", description: "Mini balloon arrangement (5 balloons)", price: 180, emoji: "🎈", suggestFor: ["Birthday", "Kids", "Festival"] },
+  { id: "gift-wrap", label: "Gift Box Packaging", description: "Premium branded box with ribbon and card", price: 149, emoji: "🎁", suggestFor: ["Birthday", "Anniversary", "Special"] },
+  { id: "sparklers", label: "Cake Sparklers", description: "Safe indoor sparklers for dramatic reveal", price: 199, emoji: "🎇", suggestFor: ["Birthday", "Kids", "Festival"] },
+  { id: "topper", label: "Custom Name Topper", description: "Acrylic or chocolate name tag", price: 220, emoji: "🎀", suggestFor: ["Birthday", "Kids", "Anniversary"] },
+  { id: "message-card", label: "Handwritten Message Card", description: "Personalised card with delivery", price: 79, emoji: "💌", suggestFor: ["Birthday", "Anniversary", "Special"] },
+  { id: "knife-set", label: "Cake Knife & Server Set", description: "Premium stainless steel with ribbon", price: 299, emoji: "🍴", suggestFor: ["Wedding", "Anniversary"] },
+]
 
-function pick(map: Record<string, number>, key: string): number {
-  return map[key] ?? 0
+// Default weight suggestion based on tiers
+const TIER_DEFAULT_WEIGHT: Record<string, string> = {
+  "1": "1",
+  "2": "2",
+  "3": "3",
+  "4": "4",
 }
 
-function computeTotal(
+// ─── Price calculation ───────────────────────────────────────────────────────
+
+function computePrice(
   sel: EstimatorSelections,
   style: string,
-  pricing: StudioConfig["pricing"],
-  selectedAddons: string[]
-): number {
-  const f = pricing.factors
-  let total = pricing.basePrice
-  total += pick(f.weight, sel.weight)
-  total += pick(f.tiers,  sel.tiers)
-  total += pick(f.shape,  sel.shape)
-  total += pick(f.style,  style)
-  total += pick(f.flavor, sel.flavor)
-  if (sel.eggless)          total += f.eggless
-  if (sel.expressDelivery)  total += f.expressDelivery
-  if (sel.midnightDelivery) total += f.midnightDelivery
-  return total
+  pricing: PricingConfig
+): { total: number; breakdown: { label: string; amount: number }[] } {
+  const breakdown: { label: string; amount: number }[] = []
+
+  // Base price from weight
+  const base = pricing.baseByWeight[sel.weight] ?? 900
+  breakdown.push({ label: `Base (${sel.weight} kg)`, amount: base })
+
+  // Tier multiplier
+  const multiplier = pricing.tierMultiplier[sel.tiers] ?? 1.0
+  const tierExtra = Math.round(base * (multiplier - 1))
+  if (tierExtra > 0) {
+    breakdown.push({ label: `${sel.tiers === "1" ? "Single" : sel.tiers + " tier"} (×${multiplier})`, amount: tierExtra })
+  }
+
+  // Shape
+  const shapeExtra = pricing.shapeAdjustment[sel.shape] ?? 0
+  if (shapeExtra > 0) {
+    breakdown.push({ label: `${sel.shape} shape`, amount: shapeExtra })
+  }
+
+  // Style
+  const styleExtra = pricing.styleAdjustment[style] ?? 0
+  if (styleExtra > 0) {
+    breakdown.push({ label: `${style} style`, amount: styleExtra })
+  }
+
+  // Flavor
+  const flavorExtra = pricing.flavorAdjustment[sel.flavor] ?? 0
+  if (flavorExtra > 0) {
+    breakdown.push({ label: `${sel.flavor} flavor`, amount: flavorExtra })
+  }
+
+  // Options
+  if (sel.expressDelivery) {
+    breakdown.push({ label: "Express delivery", amount: pricing.options.expressDelivery })
+  }
+  if (sel.midnightDelivery) {
+    breakdown.push({ label: "Midnight delivery", amount: pricing.options.midnightDelivery })
+  }
+
+  const total = breakdown.reduce((sum, item) => sum + item.amount, 0)
+  return { total, breakdown }
 }
 
 function suggestedAddons(allAddons: Addon[], occasion: string, style: string): Addon[] {
@@ -117,7 +188,7 @@ function PillGroup({
   value,
   onChange,
 }: {
-  options: { value: string; label: string }[]
+  options: SelectorOption[]
   value: string
   onChange: (v: string) => void
 }) {
@@ -134,7 +205,7 @@ function PillGroup({
               : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
           }`}
         >
-          {o.label}
+          {o.emoji && <>{o.emoji} </>}{o.label}
         </button>
       ))}
     </div>
@@ -187,59 +258,64 @@ function AddonCard({
   )
 }
 
-function PriceRow({
-  label,
-  amount,
-  muted,
-}: {
-  label: string
-  amount: number
-  muted?: boolean
-}) {
-  if (amount === 0) return null
-  return (
-    <div className={`flex items-center justify-between text-xs ${muted ? "text-slate-400" : "text-slate-600"}`}>
-      <span>{label}</span>
-      <span className="font-semibold">+₹{amount}</span>
-    </div>
-  )
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Main component ──────────────────────────────────────────────────────────
 
 interface PriceEstimatorProps {
-  /** Style selected in the AI Studio form (e.g. "Luxury", "Cartoon") */
   cakeStyle: string
-  /** Occasion selected in the AI Studio form (e.g. "Birthday") */
   occasion: string
-  /** Whether a design has been generated yet */
   generated: boolean
+  initialTiers?: string
+  initialFlavor?: string
+  initialShape?: string
 }
 
-export default function PriceEstimator({ cakeStyle, occasion, generated }: PriceEstimatorProps) {
+export default function PriceEstimator({
+  cakeStyle,
+  occasion,
+  generated,
+  initialTiers,
+  initialFlavor,
+  initialShape,
+}: PriceEstimatorProps) {
   const [open, setOpen] = useState(false)
-  const [config, setConfig] = useState<StudioConfig | null>(null)
+  const [pricing, setPricing] = useState<PricingConfig>(FALLBACK_PRICING)
+  const [selectors, setSelectors] = useState<SelectorsConfig>(FALLBACK_SELECTORS)
   const [dbAddons, setDbAddons] = useState<Addon[] | null>(null)
+  const [configLoaded, setConfigLoaded] = useState(false)
 
+  // Initialize selections with values from generation form
   const [sel, setSel] = useState<EstimatorSelections>({
-    weight:          "1",
-    tiers:           "1",
-    shape:           "Round",
-    flavor:          "Chocolate",
-    eggless:         false,
+    weight: TIER_DEFAULT_WEIGHT[initialTiers || "1"] || "1",
+    tiers: initialTiers || "1",
+    shape: initialShape || "Round",
+    flavor: initialFlavor || "Chocolate",
     expressDelivery: false,
-    midnightDelivery:false,
+    midnightDelivery: false,
   })
-  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
 
-  // Load config + live add-ons from Medusa on first open
+  // Update selections when initial values change (e.g., user regenerates)
   useEffect(() => {
-    if (!open || config) return
+    setSel((prev) => ({
+      ...prev,
+      tiers: initialTiers || prev.tiers,
+      shape: initialShape || prev.shape,
+      flavor: initialFlavor || prev.flavor,
+      weight: TIER_DEFAULT_WEIGHT[initialTiers || "1"] || prev.weight,
+    }))
+  }, [initialTiers, initialFlavor, initialShape])
+
+  // Load config + live add-ons on first open
+  useEffect(() => {
+    if (!open || configLoaded) return
 
     fetch("/api/ai-cake-studio-config")
       .then((r) => r.json())
-      .then((data: StudioConfig) => setConfig(data))
-      .catch(() => setConfig(FALLBACK_CONFIG as StudioConfig))
+      .then((data: any) => {
+        if (data.pricing) setPricing(data.pricing)
+        if (data.selectors) setSelectors(data.selectors)
+        setConfigLoaded(true)
+      })
+      .catch(() => setConfigLoaded(true))
 
     fetch("/api/cake-addons")
       .then((r) => r.json())
@@ -248,23 +324,20 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
           setDbAddons(data.addons)
         }
       })
-      .catch(() => { /* silently fall back to config/hardcoded add-ons */ })
-  }, [open, config])
+      .catch(() => {})
+  }, [open, configLoaded])
 
-  const cfg = config ?? (FALLBACK_CONFIG as StudioConfig)
-  const pricing = cfg.pricing
-  const selectors = cfg.selectors
+  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
 
-  // Use live DB add-ons when available; fall back to JSON config, then hardcoded
-  const activeAddons: Addon[] = dbAddons ?? cfg.addons ?? FALLBACK_CONFIG.addons
+  const activeAddons: Addon[] = dbAddons ?? FALLBACK_ADDONS
 
-  // Compute base price
-  const baseTotal = useMemo(
-    () => computeTotal(sel, cakeStyle, pricing, Array.from(selectedAddons)),
-    [sel, cakeStyle, pricing, selectedAddons]
+  // Compute price
+  const { total: cakeTotal, breakdown } = useMemo(
+    () => computePrice(sel, cakeStyle, pricing),
+    [sel, cakeStyle, pricing]
   )
 
-  // Addons: suggested (based on occasion+style) + rest
+  // Addons
   const suggested = useMemo(
     () => suggestedAddons(activeAddons, occasion, cakeStyle),
     [activeAddons, occasion, cakeStyle]
@@ -274,14 +347,13 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
     [activeAddons, suggested]
   )
 
-  // Addon total
   const addonTotal = useMemo(() => {
     return activeAddons
       .filter((a) => selectedAddons.has(a.id))
       .reduce((sum, a) => sum + a.price, 0)
   }, [activeAddons, selectedAddons])
 
-  const grandTotal = baseTotal + addonTotal
+  const grandTotal = cakeTotal + addonTotal
 
   const toggleAddon = (id: string) => {
     setSelectedAddons((prev) => {
@@ -302,43 +374,34 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="mt-4 overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm"
     >
-      {/* ── Header / Toggle ── */}
+      {/* Header / Toggle */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-3 px-5 py-4"
       >
         <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-base">
-            💰
-          </span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-base">💰</span>
           <div className="text-left">
-            <p className="text-sm font-bold text-slate-900">Get a Price Estimate</p>
+            <p className="text-sm font-bold text-slate-900">Price Estimate</p>
             <p className="text-xs text-slate-500">
-              {open
-                ? "Customise weight, add-ons and options"
-                : `Estimated from ₹${grandTotal.toLocaleString("en-IN")}`}
+              {open ? "Adjust options to see price change" : `Starting from ₹${grandTotal.toLocaleString("en-IN")}`}
             </p>
           </div>
         </div>
-
         <div className="flex items-center gap-3">
           {!open && (
             <span className="rounded-xl bg-violet-600 px-3 py-1 text-sm font-bold text-white">
               ₹{grandTotal.toLocaleString("en-IN")}
             </span>
           )}
-          <motion.span
-            animate={{ rotate: open ? 180 : 0 }}
-            transition={{ duration: 0.25 }}
-            className="text-slate-400"
-          >
+          <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.25 }} className="text-slate-400">
             ▼
           </motion.span>
         </div>
       </button>
 
-      {/* ── Slide-down body ── */}
+      {/* Body */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -351,79 +414,53 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
           >
             <div className="border-t border-violet-100 px-5 pb-5 pt-4 space-y-5">
 
-              {/* ── Live Cake Price Banner (top, updates as options change) ── */}
+              {/* Live price banner */}
               <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 p-4 text-white">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-200">
-                      Cake Price
-                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-200">Estimated Price</p>
                     <p className="mt-0.5 truncate text-[11px] text-violet-200">
-                      {sel.weight} kg · {sel.tiers}-tier · {sel.shape} · {cakeStyle} · {sel.flavor}
+                      {sel.weight} kg · {sel.tiers === "1" ? "Single" : sel.tiers + "-tier"} · {sel.shape} · {cakeStyle} · {sel.flavor}
                     </p>
                   </div>
                   <motion.p
-                    key={baseTotal}
+                    key={grandTotal}
                     initial={{ scale: 1.18, opacity: 0.6 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 380, damping: 24 }}
                     className="shrink-0 text-3xl font-black"
                   >
-                    ₹{baseTotal.toLocaleString("en-IN")}
+                    ₹{grandTotal.toLocaleString("en-IN")}
                   </motion.p>
                 </div>
-                {(sel.eggless || sel.expressDelivery || sel.midnightDelivery) && (
-                  <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-white/20 pt-2.5">
-                    {sel.eggless && (
-                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold">
-                        🥚 Eggless +₹{pricing.factors.eggless}
-                      </span>
-                    )}
-                    {sel.expressDelivery && (
-                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold">
-                        ⚡ Express +₹{pricing.factors.expressDelivery}
-                      </span>
-                    )}
-                    {sel.midnightDelivery && (
-                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold">
-                        🌙 Midnight +₹{pricing.factors.midnightDelivery}
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
 
-              {/* Weight */}
+              {/* Design selections (from generation — read-only display) */}
+              <div className="rounded-xl border border-violet-100 bg-violet-50/30 px-4 py-3">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">From your design</p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-violet-200">
+                    {cakeStyle} style
+                  </span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-violet-200">
+                    {sel.tiers === "1" ? "Single tier" : sel.tiers + " tiers"}
+                  </span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-violet-200">
+                    {sel.shape}
+                  </span>
+                </div>
+              </div>
+
+              {/* Weight (main pricing lever) */}
               <div>
                 <SectionLabel>
-                  Weight
-                  {selectedWeight?.serves ? ` — serves ${selectedWeight.serves}` : ""}
+                  Weight{selectedWeight?.serves ? ` — serves ${selectedWeight.serves}` : ""}
                 </SectionLabel>
                 <PillGroup
                   options={selectors.weights}
                   value={sel.weight}
                   onChange={(v) => setSel((s) => ({ ...s, weight: v }))}
                 />
-              </div>
-
-              {/* Tiers + Shape */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <SectionLabel>Tiers</SectionLabel>
-                  <PillGroup
-                    options={selectors.tiers}
-                    value={sel.tiers}
-                    onChange={(v) => setSel((s) => ({ ...s, tiers: v }))}
-                  />
-                </div>
-                <div>
-                  <SectionLabel>Shape</SectionLabel>
-                  <PillGroup
-                    options={selectors.shapes}
-                    value={sel.shape}
-                    onChange={(v) => setSel((s) => ({ ...s, shape: v }))}
-                  />
-                </div>
               </div>
 
               {/* Flavor */}
@@ -436,37 +473,34 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
                 />
               </div>
 
-              {/* Toggles */}
+              {/* Delivery options */}
               <div>
-                <SectionLabel>Options</SectionLabel>
+                <SectionLabel>Delivery Options</SectionLabel>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { key: "eggless" as const,          label: "🥚 Eggless",           extra: pricing.factors.eggless          },
-                    { key: "expressDelivery" as const,   label: "⚡ Express delivery",   extra: pricing.factors.expressDelivery  },
-                    { key: "midnightDelivery" as const,  label: "🌙 Midnight delivery",  extra: pricing.factors.midnightDelivery },
+                    { key: "expressDelivery" as const, label: "⚡ Express (same day)", extra: pricing.options.expressDelivery },
+                    { key: "midnightDelivery" as const, label: "🌙 Midnight delivery", extra: pricing.options.midnightDelivery },
                   ].map(({ key, label, extra }) => (
                     <button
                       key={key}
                       type="button"
                       onClick={() => setSel((s) => ({ ...s, [key]: !s[key] }))}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                         sel[key]
                           ? "bg-violet-600 text-white"
                           : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
                       }`}
                     >
                       {label}
-                      {extra > 0 && (
-                        <span className={sel[key] ? "ml-1 text-violet-200" : "ml-1 text-violet-400"}>
-                          +₹{extra}
-                        </span>
-                      )}
+                      <span className={sel[key] ? "ml-1 text-violet-200" : "ml-1 text-violet-400"}>
+                        +₹{extra}
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* ── Add-ons ── */}
+              {/* Add-ons: Suggested */}
               {suggested.length > 0 && (
                 <div>
                   <SectionLabel>Suggested Add-ons</SectionLabel>
@@ -483,6 +517,7 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
                 </div>
               )}
 
+              {/* Add-ons: More */}
               {otherAddons.length > 0 && (
                 <details className="group">
                   <summary className="cursor-pointer list-none">
@@ -504,31 +539,27 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
                 </details>
               )}
 
-              {/* ── Grand Total ── */}
+              {/* Breakdown + Grand Total */}
               <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
-                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Summary
-                </p>
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Breakdown</p>
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600">Cake</span>
-                    <span className="font-semibold text-slate-800">₹{baseTotal.toLocaleString("en-IN")}</span>
-                  </div>
-                  {selectedAddons.size > 0 && (
-                    <>
-                      {activeAddons
-                        .filter((a) => selectedAddons.has(a.id))
-                        .map((a) => (
-                          <div key={a.id} className="flex items-center justify-between text-xs text-slate-500">
-                            <span>{a.emoji} {a.label}</span>
-                            <span>+₹{a.price}</span>
-                          </div>
-                        ))}
-                    </>
-                  )}
+                  {breakdown.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs text-slate-600">
+                      <span>{item.label}</span>
+                      <span className="font-semibold">₹{item.amount.toLocaleString("en-IN")}</span>
+                    </div>
+                  ))}
+                  {activeAddons
+                    .filter((a) => selectedAddons.has(a.id))
+                    .map((a) => (
+                      <div key={a.id} className="flex items-center justify-between text-xs text-slate-500">
+                        <span>{a.emoji} {a.label}</span>
+                        <span>+₹{a.price}</span>
+                      </div>
+                    ))}
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-violet-200 pt-3">
-                  <p className="text-sm font-bold text-slate-900">Grand Total</p>
+                  <p className="text-sm font-bold text-slate-900">Estimated Total</p>
                   <motion.p
                     key={grandTotal}
                     initial={{ scale: 1.12, opacity: 0.7 }}
@@ -539,8 +570,8 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
                     ₹{grandTotal.toLocaleString("en-IN")}
                   </motion.p>
                 </div>
-                <p className="mt-1.5 text-[11px] text-slate-400">
-                  * Indicative estimate. Final price confirmed by your baker.
+                <p className="mt-2 text-[11px] text-slate-400 italic">
+                  {pricing.disclaimer}
                 </p>
               </div>
 
@@ -548,9 +579,7 @@ export default function PriceEstimator({ cakeStyle, occasion, generated }: Price
               <button
                 type="button"
                 className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 py-3 text-sm font-bold text-white shadow-md shadow-violet-200 transition hover:from-violet-700 hover:to-purple-700"
-                onClick={() =>
-                  document.getElementById("baker-section")?.scrollIntoView({ behavior: "smooth" })
-                }
+                onClick={() => document.getElementById("baker-section")?.scrollIntoView({ behavior: "smooth" })}
               >
                 Find a Baker for This Price →
               </button>
