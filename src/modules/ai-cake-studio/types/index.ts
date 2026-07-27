@@ -36,6 +36,8 @@ export interface GeneratedDesign {
   style: string
   liked: boolean
   imageUrl?: string  // ← needs this
+  /** Exact compiled prompt sent to the image provider — shown via "View AI Prompt" so it can be reused elsewhere */
+  compiledPrompt?: string
 }
 
 export interface AiAnalysis {

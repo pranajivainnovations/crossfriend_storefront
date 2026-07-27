@@ -119,6 +119,15 @@
     ]
   },
 
+  "aiImageModels": {
+    "_note": "Which AI image models are offered in the 'Create Your Cake' picker, and which is used by default. Toggle 'enabled' to show/hide an option (e.g. disable Gemini for now) without deleting it — no rebuild needed, just edit here + POST /api/revalidate. 'provider' must match a provider implemented in the backend's src/services/ai-image/provider-factory.ts; 'model' must be on that provider's ALLOWED_REQUEST_MODELS allowlist there. To offer a second model from the SAME provider later (e.g. OpenAI's dall-e-3 alongside gpt-image-1), just add another entry with the same provider and a different model/label/id.",
+    "options": [
+      { "id": "openai-gpt-image-1", "provider": "openai", "model": "gpt-image-1", "label": "GPT Image", "hint": "Best for on-cake text & detailed, multi-element scenes", "enabled": true, "default": true },
+      { "id": "replicate-flux", "provider": "replicate", "model": "black-forest-labs/flux-1.1-pro", "label": "FLUX", "hint": "Fast, photorealistic bakery-style shots", "enabled": true, "default": false },
+      { "id": "gemini-2.5-flash-image", "provider": "gemini", "model": "gemini-2.5-flash-image", "label": "Gemini", "hint": "Detailed, multi-element scenes", "enabled": false, "default": false }
+    ]
+  },
+
   "defaultsByTier": {
     "_note": "Auto-suggest weight when user selects tiers (for Price Estimator default)",
     "1": "1",

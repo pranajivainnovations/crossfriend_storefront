@@ -6,12 +6,15 @@ import Link from "next/link"
 import type { Customer } from "@medusajs/medusa"
 import DesignLightbox from "./design-lightbox"
 import LikeButton from "./like-button"
+import PromptReveal from "./prompt-reveal"
 import type { GeneratedDesign } from "../types"
 
 interface ShowcaseDesign {
   id: string
   imageUrl: string
   prompt: string
+  /** Exact compiled prompt sent to the image provider — public by design, so visitors can reuse it elsewhere */
+  compiledPrompt?: string
   style: string
   occasion: string
   flavor: string
@@ -62,12 +65,19 @@ export default function ShowcaseGallery({ customer }: Props) {
       .finally(() => setLoading(false))
   }, [filter])
 
-  const handleUsePrompt = (prompt: string) => {
+  const handleUsePrompt = (design: ShowcaseDesign) => {
     const studio = document.getElementById("ai-studio")
     if (studio) {
       studio.scrollIntoView({ behavior: "smooth" })
       window.dispatchEvent(
-        new CustomEvent("use-showcase-prompt", { detail: { prompt } })
+        new CustomEvent("use-showcase-prompt", {
+          detail: {
+            prompt: design.prompt,
+            style: design.style,
+            occasion: design.occasion,
+            flavor: design.flavor,
+          },
+        })
       )
     }
   }
@@ -86,6 +96,7 @@ export default function ShowcaseGallery({ customer }: Props) {
             occasion: design.occasion,
             flavor: design.flavor,
             prompt: design.prompt,
+            compiledPrompt: design.compiledPrompt,
           },
         })
       )
@@ -101,6 +112,7 @@ export default function ShowcaseGallery({ customer }: Props) {
     style: d.style,
     liked: false,
     imageUrl: d.imageUrl,
+    compiledPrompt: d.compiledPrompt,
   }))
 
   // Don't render section if no designs and not loading
@@ -231,7 +243,7 @@ export default function ShowcaseGallery({ customer }: Props) {
                   <div className="mt-2 flex gap-1.5">
                     <button
                       type="button"
-                      onClick={() => handleUsePrompt(design.prompt)}
+                      onClick={() => handleUsePrompt(design)}
                       className="flex-1 rounded-xl border border-violet-200 bg-violet-50 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
                     >
                       <span className="hidden sm:inline">✨ Use this prompt</span>
@@ -246,6 +258,8 @@ export default function ShowcaseGallery({ customer }: Props) {
                       <span className="sm:hidden">🎂 Cake</span>
                     </button>
                   </div>
+
+                  <PromptReveal prompt={design.compiledPrompt} compact />
                 </div>
               </motion.article>
             ))}

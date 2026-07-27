@@ -6,12 +6,15 @@ import Link from "next/link"
 import type { Customer } from "@medusajs/medusa"
 import DesignLightbox from "@modules/ai-cake-studio/components/design-lightbox"
 import LikeButton from "@modules/ai-cake-studio/components/like-button"
+import PromptReveal from "@modules/ai-cake-studio/components/prompt-reveal"
 import type { GeneratedDesign } from "@modules/ai-cake-studio/types"
 
 interface ShowcaseDesign {
   id: string
   imageUrl: string
   prompt: string
+  /** Exact compiled prompt sent to the image provider — public by design, so visitors can reuse it elsewhere */
+  compiledPrompt?: string
   style: string
   occasion: string
   flavor: string
@@ -119,10 +122,18 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
     fetchDesigns(true)
   }
 
-  // Use prompt — navigate to studio page
-  const handleUsePrompt = (prompt: string) => {
-    // Store prompt in sessionStorage, then navigate
-    sessionStorage.setItem("cf-use-prompt", prompt)
+  // Use prompt — navigate to studio page, carrying this design's known
+  // style/occasion/flavor along with it (the studio asks whether to apply them).
+  const handleUsePrompt = (design: ShowcaseDesign) => {
+    sessionStorage.setItem(
+      "cf-use-prompt",
+      JSON.stringify({
+        prompt: design.prompt,
+        style: design.style,
+        occasion: design.occasion,
+        flavor: design.flavor,
+      })
+    )
     window.location.href = "/ai-cake-studio"
   }
 
@@ -138,6 +149,7 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
         occasion: design.occasion,
         flavor: design.flavor,
         prompt: design.prompt,
+        compiledPrompt: design.compiledPrompt,
       })
     )
     window.location.href = "/ai-cake-studio"
@@ -152,6 +164,7 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
     style: d.style,
     liked: false,
     imageUrl: d.imageUrl,
+    compiledPrompt: d.compiledPrompt,
   }))
 
   return (
@@ -334,7 +347,7 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
                   <div className="mt-2 flex gap-1.5">
                     <button
                       type="button"
-                      onClick={() => handleUsePrompt(design.prompt)}
+                      onClick={() => handleUsePrompt(design)}
                       className="flex-1 rounded-xl border border-violet-200 bg-violet-50 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
                     >
                       <span className="hidden sm:inline">✨ Use this prompt</span>
@@ -349,6 +362,8 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
                       <span className="sm:hidden">🎂 Cake</span>
                     </button>
                   </div>
+
+                  <PromptReveal prompt={design.compiledPrompt} compact />
                 </div>
               </motion.article>
             ))}

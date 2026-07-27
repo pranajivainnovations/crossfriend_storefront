@@ -10,6 +10,7 @@ import "yet-another-react-lightbox/styles.css"
 import type { GeneratedDesign } from "../types"
 import CommentSection from "./comment-section"
 import ReportButton from "./report-button"
+import PromptReveal from "./prompt-reveal"
 
 interface Props {
   open: boolean
@@ -91,6 +92,7 @@ export default function DesignLightboxContent({ open, onClose, designs, startInd
             <div className="mb-2 flex justify-end">
               <ReportButton designId={currentDesign.id} isLoggedIn={isLoggedIn} />
             </div>
+            <PromptReveal prompt={currentDesign.compiledPrompt} variant="dark" />
             <CommentSection designId={currentDesign.id} isLoggedIn={isLoggedIn} />
           </div>,
           document.body

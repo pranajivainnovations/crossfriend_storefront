@@ -14,20 +14,43 @@ import {
 import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
+import PromptReveal from "./prompt-reveal"
 import { generateCakeDesigns } from "@lib/data/ai-studio"
 
 const FREE_ATTEMPTS_LIMIT = 3
 
-// Model picker shown next to the prompt textarea — the customer's own choice
-// per generation, not a fixed server setting. FLUX is faster/cheaper and
-// great for photorealistic bakery shots; Gemini tends to handle detailed,
-// multi-element scenes and on-cake text well; GPT Image is kept as a third
-// option for comparison.
-const AI_MODEL_OPTIONS: { value: "replicate" | "gemini" | "openai"; label: string; hint: string }[] = [
-  { value: "replicate", label: "FLUX", hint: "Fast, photorealistic bakery-style shots" },
-  { value: "gemini", label: "Gemini", hint: "Best for on-cake text & detailed, multi-element scenes" },
-  { value: "openai", label: "GPT Image", hint: "Alternative option for comparison" },
+// ─── AI model picker — config-driven ────────────────────────────────────────
+//
+// The actual list (which models show, which is default) comes from
+// aiImageModels.options in ai-cake-studio-config.json, fetched at runtime —
+// so enabling/disabling a model (e.g. re-enabling Gemini later) or adding a
+// second model from the same provider is a config edit, not a code change.
+// This constant is only the fallback used before that fetch resolves (or if
+// it fails), so it must mirror the config file's shape and intent.
+type AiModelOption = {
+  id: string
+  provider: string
+  model: string
+  label: string
+  hint: string
+  enabled: boolean
+  default?: boolean
+}
+
+const FALLBACK_AI_MODEL_OPTIONS: AiModelOption[] = [
+  { id: "openai-gpt-image-1", provider: "openai", model: "gpt-image-1", label: "GPT Image", hint: "Best for on-cake text & detailed, multi-element scenes", enabled: true, default: true },
+  { id: "replicate-flux", provider: "replicate", model: "black-forest-labs/flux-1.1-pro", label: "FLUX", hint: "Fast, photorealistic bakery-style shots", enabled: true },
+  { id: "gemini-2.5-flash-image", provider: "gemini", model: "gemini-2.5-flash-image", label: "Gemini", hint: "Detailed, multi-element scenes", enabled: false },
 ]
+
+function pickDefaultModelId(options: AiModelOption[]): string {
+  return (
+    options.find((o) => o.enabled && o.default)?.id ??
+    options.find((o) => o.enabled)?.id ??
+    options[0]?.id ??
+    ""
+  )
+}
 
 // Mock designs are only used when explicitly enabled (local dev) so that we
 // never hit the paid AI provider by accident. Unset/false in every deployed
@@ -67,6 +90,16 @@ type UseCakePayload = {
   occasion: string
   flavor: string
   prompt: string
+  compiledPrompt?: string
+}
+
+/** "Use this prompt" handoff — style/occasion/flavor are optional since older
+ * payloads (or a malformed one) might only carry the prompt text. */
+type UsePromptPayload = {
+  prompt: string
+  style?: string
+  occasion?: string
+  flavor?: string
 }
 
 type Props = {
@@ -203,6 +236,73 @@ function EmptyCreationsPanel() {
   )
 }
 
+const CAKE_BUILDING_PHRASES = [
+  "Whisking the batter...",
+  "Baking the layers...",
+  "Adding the frosting...",
+  "Piping the details...",
+  "Final touches...",
+]
+
+/**
+ * Lightweight "building a cake" indicator shown while generating — tiers pop
+ * in one by one (looping) with a bobbing candle and rotating status text, so
+ * a wait doesn't read as "nothing is happening." Pure CSS transforms via
+ * framer-motion, no images/video.
+ */
+function CakeBuildingAnimation({ compact = false }: { compact?: boolean }) {
+  const [phraseIndex, setPhraseIndex] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPhraseIndex((i) => (i + 1) % CAKE_BUILDING_PHRASES.length)
+    }, 1600)
+    return () => clearInterval(id)
+  }, [])
+
+  const tiers = [
+    { w: "w-24", color: "bg-amber-200" },
+    { w: "w-20", color: "bg-pink-200" },
+    { w: "w-14", color: "bg-violet-300" },
+  ]
+
+  return (
+    <div
+      className={`flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 ${
+        compact ? "px-2" : "px-4"
+      }`}
+    >
+      <div className="flex flex-col-reverse items-center gap-1">
+        {tiers.map((tier, i) => (
+          <motion.div
+            key={i}
+            className={`h-4 ${tier.w} rounded-md ${tier.color} shadow-sm`}
+            initial={{ scaleX: 0, opacity: 0 }}
+            animate={{ scaleX: 1, opacity: 1 }}
+            transition={{
+              duration: 0.5,
+              delay: i * 0.3,
+              repeat: Infinity,
+              repeatDelay: 1.1,
+              repeatType: "reverse",
+            }}
+          />
+        ))}
+        <motion.span
+          className="text-lg"
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+        >
+          🕯️
+        </motion.span>
+      </div>
+      <p className="text-center text-xs font-semibold text-violet-500">
+        {CAKE_BUILDING_PHRASES[phraseIndex]}
+      </p>
+    </div>
+  )
+}
+
 function DesignCard({
   design,
   selected,
@@ -328,7 +428,8 @@ export default function AiStudioSection({ customer }: Props) {
 
   const [selectors, setSelectors] = useState<StudioSelectors>(FALLBACK_SELECTORS)
   const [prompt, setPrompt] = useState("")
-  const [aiModel, setAiModel] = useState<"replicate" | "gemini" | "openai">(AI_MODEL_OPTIONS[0].value)
+  const [aiModelOptions, setAiModelOptions] = useState<AiModelOption[]>(FALLBACK_AI_MODEL_OPTIONS)
+  const [aiModelId, setAiModelId] = useState<string>(() => pickDefaultModelId(FALLBACK_AI_MODEL_OPTIONS))
   const [sel, setSel] = useState<SelectorState>({
     style: FALLBACK_SELECTORS.styles[0].value,
     occasion: FALLBACK_SELECTORS.occasions[0].value,
@@ -373,22 +474,32 @@ export default function AiStudioSection({ customer }: Props) {
   const canGenerate = isLoggedIn && hasAttempts && prompt.trim().length > 0 && !generating
   const cfMessage = CF_OCCASION_MESSAGES[sel.occasion] ?? CF_OCCASION_MESSAGES["Special"]
 
-  // Load selectors from config
+  // Load selectors + AI model options from config
   useEffect(() => {
     fetch("/api/ai-cake-studio-config")
       .then((r) => r.json())
-      .then((data: { selectors?: StudioSelectors; freeAttemptsLimit?: number }) => {
+      .then((data: {
+        selectors?: StudioSelectors
+        freeAttemptsLimit?: number
+        aiImageModels?: { options?: AiModelOption[] }
+      }) => {
         if (data.freeAttemptsLimit != null) {
           setAttemptsLeft(isLoggedIn ? data.freeAttemptsLimit : 0)
         }
-        if (!data.selectors) return
-        setSelectors(data.selectors)
-        setSel((prev) => ({
-          ...prev,
-          style: data.selectors!.styles?.[0]?.value ?? prev.style,
-          occasion: data.selectors!.occasions?.[0]?.value ?? prev.occasion,
-          flavor: data.selectors!.flavors?.[0]?.value ?? prev.flavor,
-        }))
+        if (data.selectors) {
+          setSelectors(data.selectors)
+          setSel((prev) => ({
+            ...prev,
+            style: data.selectors!.styles?.[0]?.value ?? prev.style,
+            occasion: data.selectors!.occasions?.[0]?.value ?? prev.occasion,
+            flavor: data.selectors!.flavors?.[0]?.value ?? prev.flavor,
+          }))
+        }
+        const fetchedOptions = data.aiImageModels?.options
+        if (fetchedOptions && fetchedOptions.length > 0) {
+          setAiModelOptions(fetchedOptions)
+          setAiModelId(pickDefaultModelId(fetchedOptions))
+        }
       })
       .catch(() => {})
   }, [isLoggedIn])
@@ -398,7 +509,12 @@ export default function AiStudioSection({ customer }: Props) {
     // Check if navigated from gallery page with a prompt
     const storedPrompt = sessionStorage.getItem("cf-use-prompt")
     if (storedPrompt) {
-      setPrompt(storedPrompt)
+      try {
+        applyUsePromptPayload(JSON.parse(storedPrompt))
+      } catch {
+        // Older/malformed payload (plain string, not JSON) — still usable as the prompt itself
+        applyUsePromptPayload({ prompt: storedPrompt })
+      }
       sessionStorage.removeItem("cf-use-prompt")
     }
     // Check if navigated from gallery page with a specific cake — skips the
@@ -414,9 +530,9 @@ export default function AiStudioSection({ customer }: Props) {
     }
     // Listen for same-page events from the compact showcase section
     const promptHandler = (e: Event) => {
-      const detail = (e as CustomEvent<{ prompt: string }>).detail
+      const detail = (e as CustomEvent<UsePromptPayload>).detail
       if (detail?.prompt) {
-        setPrompt(detail.prompt)
+        applyUsePromptPayload(detail)
       }
     }
     const cakeHandler = (e: Event) => {
@@ -460,6 +576,8 @@ export default function AiStudioSection({ customer }: Props) {
       return
     }
 
+    const selectedModel = aiModelOptions.find((o) => o.id === aiModelId)
+
     const result = await generateCakeDesigns({
       prompt,
       style: sel.style,
@@ -471,7 +589,8 @@ export default function AiStudioSection({ customer }: Props) {
       cakeMessage: sel.cakeMessage.trim() || undefined,
       zodiacInfluence: { sign: effectiveZodiac.sign, suggestion: effectiveZodiac.suggestion },
       age: age ?? undefined,
-      imageProvider: aiModel,
+      imageProvider: selectedModel?.provider,
+      imageModel: selectedModel?.model,
     })
 
     setGenerating(false)
@@ -493,6 +612,7 @@ export default function AiStudioSection({ customer }: Props) {
         gradient: "from-violet-400 via-purple-300 to-indigo-400",
         liked: false,
         imageUrl: d.imageUrl,
+        compiledPrompt: d.compiledPrompt,
       })),
     ])
     setGenerated(true)
@@ -540,6 +660,7 @@ export default function AiStudioSection({ customer }: Props) {
       style: payload.style,
       liked: false,
       imageUrl: payload.imageUrl,
+      compiledPrompt: payload.compiledPrompt,
     }
     setSel((c) => ({
       ...c,
@@ -551,6 +672,32 @@ export default function AiStudioSection({ customer }: Props) {
     document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })
     // Wait a tick for the card to actually exist before selecting/scrolling to it.
     setTimeout(() => handleAcceptDesign(adopted.id), 250)
+  }
+
+  /**
+   * "Use this prompt" — always loads the prompt text; if the design also
+   * carried known style/occasion/flavor, asks before overwriting whatever
+   * the customer may have already picked in the form, rather than silently
+   * clobbering it (unlike "Use this cake," which replaces the whole design
+   * outright, this flow is meant to be a starting point the customer keeps
+   * customizing from).
+   */
+  const applyUsePromptPayload = (payload: UsePromptPayload) => {
+    setPrompt(payload.prompt)
+    const hasSettings = Boolean(payload.style || payload.occasion || payload.flavor)
+    if (!hasSettings) return
+
+    const wantsSettings =
+      typeof window !== "undefined" &&
+      window.confirm("Also load this design's style, occasion and flavor settings?")
+    if (wantsSettings) {
+      setSel((c) => ({
+        ...c,
+        style: payload.style || c.style,
+        occasion: payload.occasion || c.occasion,
+        flavor: payload.flavor || c.flavor,
+      }))
+    }
   }
 
   const handleExpandDesign = (index: number, e: React.MouseEvent) => {
@@ -598,17 +745,17 @@ export default function AiStudioSection({ customer }: Props) {
               aria-label="AI model"
               className="flex items-center gap-1 rounded-full border border-violet-100 bg-violet-50/60 p-1"
             >
-              {AI_MODEL_OPTIONS.map((opt) => (
+              {aiModelOptions.filter((opt) => opt.enabled).map((opt) => (
                 <button
-                  key={opt.value}
+                  key={opt.id}
                   type="button"
                   role="radio"
-                  aria-checked={aiModel === opt.value}
+                  aria-checked={aiModelId === opt.id}
                   title={opt.hint}
                   disabled={generating}
-                  onClick={() => setAiModel(opt.value)}
+                  onClick={() => setAiModelId(opt.id)}
                   className={`rounded-full px-3 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    aiModel === opt.value
+                    aiModelId === opt.id
                       ? "bg-violet-600 text-white shadow-sm"
                       : "text-violet-500 hover:bg-violet-100"
                   }`}
@@ -828,10 +975,8 @@ export default function AiStudioSection({ customer }: Props) {
             ) : null}
 
             {generating && designs.length === 0 ? (
-              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4 sm:grid-cols-3">
-                {[1, 2, 3].map((n) => (
-                  <div key={n} className="h-48 animate-pulse rounded-xl bg-white border border-violet-100" />
-                ))}
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <CakeBuildingAnimation />
               </motion.div>
             ) : null}
 
@@ -860,17 +1005,29 @@ export default function AiStudioSection({ customer }: Props) {
                 <div className="grid gap-4 sm:grid-cols-3">
                   {designs.map((design, index) => (
                     <div key={design.id}>
-                      <button
-                        type="button"
+                      {/* Not a <button> — DesignCard renders its own "view full
+                          size" button internally, and a button can't nest
+                          inside another button (invalid HTML, breaks click/
+                          focus behavior). role="button" + onKeyDown keeps it
+                          keyboard-accessible without the nesting. */}
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleSelectDesign(design.id)}
-                        className="block w-full rounded-xl text-left"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault()
+                            handleSelectDesign(design.id)
+                          }
+                        }}
+                        className="block w-full cursor-pointer rounded-xl text-left"
                       >
                         <DesignCard
                           design={design}
                           selected={selectedDesignId === design.id}
                           onExpand={(e) => handleExpandDesign(index, e)}
                         />
-                      </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleAcceptDesign(design.id)}
@@ -878,17 +1035,14 @@ export default function AiStudioSection({ customer }: Props) {
                       >
                         ✅ Use This Design
                       </button>
+                      <PromptReveal prompt={design.compiledPrompt} compact />
                     </div>
                   ))}
 
                   {/* Regenerating — keep existing cards visible, show the
                       new one arriving in the next slot instead of blanking
                       the whole grid. */}
-                  {generating && (
-                    <div className="flex h-48 animate-pulse items-center justify-center rounded-xl border border-dashed border-violet-200 bg-violet-50/40 text-xs font-semibold text-violet-400">
-                      Generating another design...
-                    </div>
-                  )}
+                  {generating && <CakeBuildingAnimation compact />}
                 </div>
 
                 {/* Action panel */}

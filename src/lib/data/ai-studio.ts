@@ -24,8 +24,10 @@ export interface GenerateRequest {
   /** Only send when the customer gave a real birthdate (not the seasonal fallback) */
   age?: number
   imageCount?: number
-  /** Which image model to use for this generation — the customer's own picker choice, not a server config setting */
-  imageProvider?: "replicate" | "openai" | "gemini"
+  /** Which provider/model to use for this generation — the customer's own picker choice (itself sourced from
+   * ai-cake-studio-config.json's aiImageModels list), validated server-side against provider-factory.ts's allowlist. */
+  imageProvider?: string
+  imageModel?: string
 }
 
 export interface DesignOutput {
@@ -34,6 +36,8 @@ export interface DesignOutput {
   title: string
   description: string
   style: string
+  /** Exact compiled prompt sent to the image provider — shown via "View AI Prompt" so it can be reused elsewhere */
+  compiledPrompt?: string
 }
 
 export interface GenerateResponse {
