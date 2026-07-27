@@ -15,7 +15,7 @@ import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
-import { generateCakeDesigns } from "@lib/data/ai-studio"
+import { generateCakeDesigns, uploadReferenceImage, type ReferencePurpose } from "@lib/data/ai-studio"
 
 const FREE_ATTEMPTS_LIMIT = 3
 
@@ -428,6 +428,18 @@ export default function AiStudioSection({ customer }: Props) {
 
   const [selectors, setSelectors] = useState<StudioSelectors>(FALLBACK_SELECTORS)
   const [prompt, setPrompt] = useState("")
+
+  // Reference image upload — optional, stands in for (or supplements) the
+  // typed prompt. Uploads immediately on file select; purpose is fixed on
+  // the upload itself, so changing it after a file's already picked
+  // re-uploads with the new purpose rather than letting the two disagree.
+  const [referenceFile, setReferenceFile] = useState<File | null>(null)
+  const [referencePreviewUrl, setReferencePreviewUrl] = useState<string | null>(null)
+  const [referencePurpose, setReferencePurpose] = useState<"theme_reference" | "recreate_cake" | "photo_cake">("theme_reference")
+  const [referenceUploadId, setReferenceUploadId] = useState<string | null>(null)
+  const [referenceUploading, setReferenceUploading] = useState(false)
+  const [referenceUploadError, setReferenceUploadError] = useState<string | null>(null)
+
   const [aiModelOptions, setAiModelOptions] = useState<AiModelOption[]>(FALLBACK_AI_MODEL_OPTIONS)
   const [aiModelId, setAiModelId] = useState<string>(() => pickDefaultModelId(FALLBACK_AI_MODEL_OPTIONS))
   const [sel, setSel] = useState<SelectorState>({
@@ -471,7 +483,12 @@ export default function AiStudioSection({ customer }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
   const hasAttempts = attemptsLeft > 0
-  const canGenerate = isLoggedIn && hasAttempts && prompt.trim().length > 0 && !generating
+  const canGenerate =
+    isLoggedIn &&
+    hasAttempts &&
+    (prompt.trim().length > 0 || Boolean(referenceUploadId)) &&
+    !generating &&
+    !referenceUploading
   const cfMessage = CF_OCCASION_MESSAGES[sel.occasion] ?? CF_OCCASION_MESSAGES["Special"]
 
   // Load selectors + AI model options from config
@@ -550,6 +567,46 @@ export default function AiStudioSection({ customer }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const doReferenceUpload = async (file: File, purpose: "theme_reference" | "recreate_cake" | "photo_cake") => {
+    setReferenceUploadError(null)
+    setReferenceUploadId(null)
+    setReferenceUploading(true)
+    const result = await uploadReferenceImage(file, purpose)
+    setReferenceUploading(false)
+
+    if (!result.success || !result.uploadId) {
+      setReferenceUploadError(result.error || "Upload failed. Please try again.")
+      return
+    }
+    setReferenceUploadId(result.uploadId)
+  }
+
+  const handleReferenceFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = "" // allow re-selecting the same file later
+    if (!file) return
+
+    if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl)
+    setReferenceFile(file)
+    setReferencePreviewUrl(URL.createObjectURL(file))
+    void doReferenceUpload(file, referencePurpose)
+  }
+
+  const handleReferencePurposeChange = (purpose: "theme_reference" | "recreate_cake" | "photo_cake") => {
+    setReferencePurpose(purpose)
+    // Purpose is fixed on the upload itself — if a file's already picked,
+    // re-upload under the new purpose rather than letting the two disagree.
+    if (referenceFile) void doReferenceUpload(referenceFile, purpose)
+  }
+
+  const handleRemoveReference = () => {
+    if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl)
+    setReferenceFile(null)
+    setReferencePreviewUrl(null)
+    setReferenceUploadId(null)
+    setReferenceUploadError(null)
+  }
+
   const handleGenerate = async () => {
     if (!canGenerate) return
     setGenerating(true)
@@ -591,6 +648,7 @@ export default function AiStudioSection({ customer }: Props) {
       age: age ?? undefined,
       imageProvider: selectedModel?.provider,
       imageModel: selectedModel?.model,
+      referenceUploadId: referenceUploadId ?? undefined,
     })
 
     setGenerating(false)
@@ -791,6 +849,114 @@ export default function AiStudioSection({ customer }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Reference image upload */}
+          <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-violet-50/20 p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+              📷 Reference photo (optional)
+            </p>
+
+            {!referenceFile ? (
+              <label
+                className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-3 text-center text-xs font-semibold text-violet-700 transition hover:bg-violet-50 ${
+                  generating ? "cursor-not-allowed opacity-60" : ""
+                }`}
+              >
+                + Add a photo — theme inspiration, or a cake to recreate
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleReferenceFileSelect}
+                  disabled={generating}
+                />
+              </label>
+            ) : (
+              <div className="flex items-start gap-3">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-violet-200 bg-white">
+                  {referencePreviewUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={referencePreviewUrl} alt="Reference" className="h-full w-full object-cover" />
+                  )}
+                  {referenceUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                      <svg className="h-5 w-5 animate-spin text-violet-500" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 11-8 8z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      disabled={referenceUploading}
+                      onClick={() => handleReferencePurposeChange("theme_reference")}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60 ${
+                        referencePurpose === "theme_reference"
+                          ? "bg-violet-600 text-white"
+                          : "border border-violet-200 bg-white text-violet-700"
+                      }`}
+                    >
+                      Theme inspiration
+                    </button>
+                    <button
+                      type="button"
+                      disabled={referenceUploading}
+                      onClick={() => handleReferencePurposeChange("recreate_cake")}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60 ${
+                        referencePurpose === "recreate_cake"
+                          ? "bg-violet-600 text-white"
+                          : "border border-violet-200 bg-white text-violet-700"
+                      }`}
+                    >
+                      Recreate this cake
+                    </button>
+                    <button
+                      type="button"
+                      disabled={referenceUploading}
+                      onClick={() => handleReferencePurposeChange("photo_cake")}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60 ${
+                        referencePurpose === "photo_cake"
+                          ? "bg-violet-600 text-white"
+                          : "border border-violet-200 bg-white text-violet-700"
+                      }`}
+                    >
+                      Photo cake
+                    </button>
+                  </div>
+
+                  {referencePurpose === "photo_cake" && (
+                    <p className="mt-1.5 text-[11px] italic text-slate-500">
+                      AI will create a cake design featuring this photo&apos;s subject — a stylized artistic
+                      depiction, not a literal photo print.
+                    </p>
+                  )}
+
+                  {referenceUploading && (
+                    <p className="mt-1.5 text-[11px] text-slate-500">Uploading...</p>
+                  )}
+                  {!referenceUploading && referenceUploadId && (
+                    <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">
+                      ✓ Ready — we&apos;ll use this alongside your description.
+                    </p>
+                  )}
+                  {!referenceUploading && referenceUploadError && (
+                    <p className="mt-1.5 text-[11px] font-semibold text-red-600">{referenceUploadError}</p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleRemoveReference}
+                    className="mt-1.5 text-[11px] font-semibold text-slate-400 transition hover:text-red-500"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Style */}

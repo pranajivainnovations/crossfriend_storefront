@@ -28,6 +28,18 @@ export interface GenerateRequest {
    * ai-cake-studio-config.json's aiImageModels list), validated server-side against provider-factory.ts's allowlist. */
   imageProvider?: string
   imageModel?: string
+  /** id returned by uploadReferenceImage() — ownership is verified server-side against the logged-in customer.
+   * Purpose isn't repeated here — it's already fixed on the upload itself, set at upload time. */
+  referenceUploadId?: string
+}
+
+export type ReferencePurpose = "theme_reference" | "recreate_cake" | "photo_cake"
+
+export interface UploadResponse {
+  success: boolean
+  uploadId?: string
+  error?: string
+  code?: string
 }
 
 export interface DesignOutput {
@@ -69,6 +81,37 @@ export async function generateCakeDesigns(
     return data
   } catch (error) {
     console.error("[AI Studio] Generation request failed:", error)
+    return {
+      success: false,
+      error: "Network error. Please check your connection and try again.",
+      code: "NETWORK_ERROR",
+    }
+  }
+}
+
+/**
+ * Uploads a personal reference image (theme inspiration / recreate-this-cake
+ * / photo-cake source). Stored privately, scoped to the logged-in customer —
+ * nothing is analyzed at upload time, only when a generation actually uses it.
+ */
+export async function uploadReferenceImage(
+  file: File,
+  purpose: ReferencePurpose
+): Promise<UploadResponse> {
+  try {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("purpose", purpose)
+
+    const response = await fetch("/api/ai-studio/uploads", {
+      method: "POST",
+      body: formData,
+    })
+
+    const data: UploadResponse = await response.json()
+    return data
+  } catch (error) {
+    console.error("[AI Studio] Upload failed:", error)
     return {
       success: false,
       error: "Network error. Please check your connection and try again.",
