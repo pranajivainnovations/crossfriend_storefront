@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
+import type { Customer } from "@medusajs/medusa"
 import DesignLightbox from "./design-lightbox"
+import LikeButton from "./like-button"
 import type { GeneratedDesign } from "../types"
 
 interface ShowcaseDesign {
@@ -16,7 +18,12 @@ interface ShowcaseDesign {
   likeCount: number
   commentCount: number
   viewCount: number
+  isLiked: boolean
   createdAt: string
+}
+
+interface Props {
+  customer: Omit<Customer, "password_hash"> | null
 }
 
 const OCCASION_FILTERS = [
@@ -29,7 +36,8 @@ const OCCASION_FILTERS = [
   { value: "Special", label: "🎁 Special" },
 ]
 
-export default function ShowcaseGallery() {
+export default function ShowcaseGallery({ customer }: Props) {
+  const isLoggedIn = Boolean(customer)
   const [designs, setDesigns] = useState<ShowcaseDesign[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("")
@@ -64,6 +72,26 @@ export default function ShowcaseGallery() {
     }
   }
 
+  // Skip the prompt entirely — adopt this exact generated cake and jump
+  // straight to picking weight/message/add-ons for it.
+  const handleUseCake = (design: ShowcaseDesign) => {
+    const studio = document.getElementById("ai-studio")
+    if (studio) {
+      window.dispatchEvent(
+        new CustomEvent("use-showcase-cake", {
+          detail: {
+            id: design.id,
+            imageUrl: design.imageUrl,
+            style: design.style,
+            occasion: design.occasion,
+            flavor: design.flavor,
+            prompt: design.prompt,
+          },
+        })
+      )
+    }
+  }
+
   // Convert to GeneratedDesign format for lightbox
   const lightboxDesigns: GeneratedDesign[] = designs.map((d) => ({
     id: d.id,
@@ -80,12 +108,12 @@ export default function ShowcaseGallery() {
 
   return (
     <section className="px-4 py-10 sm:px-6 lg:px-12">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
 
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">
+            <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">
               Community Creations
             </h2>
             <p className="mt-1 text-sm text-slate-500">
@@ -166,11 +194,12 @@ export default function ShowcaseGallery() {
 
                   {/* Engagement badges */}
                   <div className="absolute bottom-2 left-2 flex gap-1.5">
-                    {design.likeCount > 0 && (
-                      <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-rose-600 backdrop-blur-sm">
-                        ❤️ {design.likeCount}
-                      </span>
-                    )}
+                    <LikeButton
+                      designId={design.id}
+                      initialLiked={design.isLiked}
+                      initialCount={design.likeCount}
+                      isLoggedIn={isLoggedIn}
+                    />
                     {design.commentCount > 0 && (
                       <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-600 backdrop-blur-sm">
                         💬 {design.commentCount}
@@ -197,14 +226,26 @@ export default function ShowcaseGallery() {
                     {design.prompt}
                   </p>
 
-                  {/* Use prompt button */}
-                  <button
-                    type="button"
-                    onClick={() => handleUsePrompt(design.prompt)}
-                    className="mt-2 w-full rounded-xl border border-violet-200 bg-violet-50 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
-                  >
-                    ✨ Use this prompt
-                  </button>
+                  {/* Use this prompt / Use this cake — side by side on
+                      larger screens, compact icon+word pair on mobile */}
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleUsePrompt(design.prompt)}
+                      className="flex-1 rounded-xl border border-violet-200 bg-violet-50 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
+                    >
+                      <span className="hidden sm:inline">✨ Use this prompt</span>
+                      <span className="sm:hidden">✨ Prompt</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUseCake(design)}
+                      className="flex-1 rounded-xl border border-emerald-200 bg-emerald-50 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                    >
+                      <span className="hidden sm:inline">🎂 Use this cake</span>
+                      <span className="sm:hidden">🎂 Cake</span>
+                    </button>
+                  </div>
                 </div>
               </motion.article>
             ))}
@@ -230,6 +271,7 @@ export default function ShowcaseGallery() {
         onClose={() => setLightboxOpen(false)}
         designs={lightboxDesigns}
         startIndex={lightboxIndex}
+        isLoggedIn={isLoggedIn}
       />
     </section>
   )

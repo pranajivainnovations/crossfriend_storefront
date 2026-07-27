@@ -44,6 +44,10 @@ interface EstimatorSelections {
   flavor: string
   expressDelivery: boolean
   midnightDelivery: boolean
+  /** Moved here from the generation form — this is the one flow (typed prompt
+   * or an already-generated design) where a custom message is entered, since
+   * it doesn't require regenerating the image. */
+  message: string
 }
 
 // ─── Fallback config ─────────────────────────────────────────────────────────
@@ -161,6 +165,9 @@ function computePrice(
   if (sel.midnightDelivery) {
     breakdown.push({ label: "Midnight delivery", amount: pricing.options.midnightDelivery })
   }
+  if (sel.message.trim().length > 0) {
+    breakdown.push({ label: "Message on cake", amount: pricing.options.messageOnCake })
+  }
 
   const total = breakdown.reduce((sum, item) => sum + item.amount, 0)
   return { total, breakdown }
@@ -267,6 +274,14 @@ interface PriceEstimatorProps {
   initialTiers?: string
   initialFlavor?: string
   initialShape?: string
+  /** The message typed in the generation form, if any — seeded into this
+   * panel's own message field the moment a design is accepted (see the
+   * openSignal effect below), not synced continuously, so it won't clobber
+   * an edit made directly here afterward. */
+  initialCakeMessage?: string
+  /** Bump this (e.g. n => n + 1) to force the estimator open — used by the
+   * "Use This Design" CTA so picking a design opens billing in one click. */
+  openSignal?: number
 }
 
 export default function PriceEstimator({
@@ -276,8 +291,11 @@ export default function PriceEstimator({
   initialTiers,
   initialFlavor,
   initialShape,
+  initialCakeMessage,
+  openSignal,
 }: PriceEstimatorProps) {
   const [open, setOpen] = useState(false)
+
   const [pricing, setPricing] = useState<PricingConfig>(FALLBACK_PRICING)
   const [selectors, setSelectors] = useState<SelectorsConfig>(FALLBACK_SELECTORS)
   const [dbAddons, setDbAddons] = useState<Addon[] | null>(null)
@@ -291,6 +309,7 @@ export default function PriceEstimator({
     flavor: initialFlavor || "Chocolate",
     expressDelivery: false,
     midnightDelivery: false,
+    message: initialCakeMessage || "",
   })
 
   // Update selections when initial values change (e.g., user regenerates)
@@ -303,6 +322,19 @@ export default function PriceEstimator({
       weight: TIER_DEFAULT_WEIGHT[initialTiers || "1"] || prev.weight,
     }))
   }, [initialTiers, initialFlavor, initialShape])
+
+  // A parent-triggered "open me" signal (e.g. clicking "Use This Design")
+  // forces the estimator open AND, at that one moment, carries over whatever
+  // message was typed in the generation form — but never fires on initial
+  // mount (openSignal starts at 0/undefined), and never fires again just
+  // because the generation form's message changed, so it won't clobber an
+  // edit made directly in this panel afterward.
+  useEffect(() => {
+    if (!openSignal) return
+    setOpen(true)
+    setSel((prev) => ({ ...prev, message: initialCakeMessage || prev.message }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal])
 
   // Load config + live add-ons on first open
   useEffect(() => {
@@ -471,6 +503,27 @@ export default function PriceEstimator({
                   value={sel.flavor}
                   onChange={(v) => setSel((s) => ({ ...s, flavor: v }))}
                 />
+              </div>
+
+              {/* Message on cake — same field for every flow (generate,
+                  regenerate, or an already-picked design): it's added at
+                  bake time, so it doesn't need to be decided before the
+                  design does. */}
+              <div>
+                <SectionLabel>Message on Cake (optional)</SectionLabel>
+                <input
+                  type="text"
+                  placeholder="e.g. Happy Birthday Priya"
+                  value={sel.message}
+                  onChange={(e) => setSel((s) => ({ ...s, message: e.target.value.slice(0, 50) }))}
+                  className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none"
+                />
+                <div className="mt-1 flex items-center justify-between">
+                  {sel.message.trim().length > 0 ? (
+                    <span className="text-[11px] font-semibold text-violet-600">+₹{pricing.options.messageOnCake}</span>
+                  ) : <span />}
+                  <p className="text-[10px] text-slate-400">{sel.message.length}/50</p>
+                </div>
               </div>
 
               {/* Delivery options */}

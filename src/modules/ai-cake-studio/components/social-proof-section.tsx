@@ -33,10 +33,10 @@ export default function SocialProofSection() {
 
   return (
     <section className="px-4 py-10 sm:px-6 lg:px-12">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-6 text-center">
-          <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">
+          <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">
             Loved by cake enthusiasts
           </h2>
           <p className="mt-2 text-sm text-slate-500">

@@ -9,6 +9,8 @@ interface Props {
   onClose: () => void
   designs: GeneratedDesign[]
   startIndex: number
+  /** Enables Like/Comment/Report in the lightbox when true. Omit to hide them. */
+  isLoggedIn?: boolean
 }
 
 // Dynamically import lightbox to avoid webpack SSR bundling issues
@@ -16,7 +18,15 @@ const LightboxContent = dynamic(() => import("./design-lightbox-content"), {
   ssr: false,
 })
 
-export default function DesignLightbox({ open, onClose, designs, startIndex }: Props) {
+export default function DesignLightbox({ open, onClose, designs, startIndex, isLoggedIn = false }: Props) {
   if (!open) return null
-  return <LightboxContent open={open} onClose={onClose} designs={designs} startIndex={startIndex} />
+  return (
+    <LightboxContent
+      open={open}
+      onClose={onClose}
+      designs={designs}
+      startIndex={startIndex}
+      isLoggedIn={isLoggedIn}
+    />
+  )
 }

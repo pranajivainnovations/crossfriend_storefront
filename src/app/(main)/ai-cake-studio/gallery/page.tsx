@@ -1,5 +1,6 @@
 import { Metadata } from "next"
-import { Pool } from "pg"
+import { cookies } from "next/headers"
+import { getCustomer } from "@lib/data"
 import GalleryClient from "./gallery-client"
 
 export const dynamic = "force-dynamic"
@@ -22,17 +23,8 @@ export const metadata: Metadata = {
   },
 }
 
-// ─── Server-side data fetch (SEO) ────────────────────────────────────────────
-
-let pool: Pool | null = null
-
-function getPool(): Pool {
-  if (pool) return pool
-  const connectionString = process.env.DATABASE_URL
-  if (!connectionString) throw new Error("DATABASE_URL not set")
-  pool = new Pool({ connectionString, max: 5 })
-  return pool
-}
+const MEDUSA_BACKEND_URL =
+  process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
 
 interface ShowcaseDesign {
   id: string
@@ -42,41 +34,32 @@ interface ShowcaseDesign {
   occasion: string
   flavor: string
   likeCount: number
+  commentCount: number
   viewCount: number
+  isLiked: boolean
   createdAt: string
 }
 
+// ─── Server-side data fetch (SEO) ────────────────────────────────────────────
+// Goes through the Medusa backend, same as the /api/ai-cake-studio-showcase
+// proxy — this page used to connect to Postgres directly, which required
+// DATABASE_URL in the frontend env and duplicated the backend's query logic.
+
 async function fetchInitialDesigns(): Promise<{ designs: ShowcaseDesign[]; total: number }> {
   try {
-    const db = getPool()
+    const token = cookies().get("_medusa_jwt")?.value
+    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/ai-studio/showcase?limit=24`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: "no-store",
+    })
 
-    const countResult = await db.query(
-      `SELECT COUNT(*) as total FROM ai_studio.cake_designs
-       WHERE status = 'active' AND is_public = true AND image_url IS NOT NULL AND image_url != ''`
-    )
-    const total = parseInt(countResult.rows[0]?.total || "0", 10)
+    if (!res.ok) {
+      console.error(`[Gallery Page] Backend responded with ${res.status}`)
+      return { designs: [], total: 0 }
+    }
 
-    const result = await db.query(
-      `SELECT id, image_url, prompt, style, occasion, flavor, view_count, save_count, created_at
-       FROM ai_studio.cake_designs
-       WHERE status = 'active' AND is_public = true AND image_url IS NOT NULL AND image_url != ''
-       ORDER BY save_count DESC, view_count DESC, created_at DESC
-       LIMIT 24`
-    )
-
-    const designs: ShowcaseDesign[] = result.rows.map((row) => ({
-      id: row.id,
-      imageUrl: row.image_url,
-      prompt: row.prompt,
-      style: row.style,
-      occasion: row.occasion || "",
-      flavor: row.flavor || "",
-      likeCount: row.save_count || 0,
-      viewCount: row.view_count || 0,
-      createdAt: row.created_at,
-    }))
-
-    return { designs, total }
+    const data = await res.json()
+    return { designs: data.designs || [], total: data.pagination?.total || 0 }
   } catch (error) {
     console.error("[Gallery Page] Failed to fetch designs:", error)
     return { designs: [], total: 0 }
@@ -86,11 +69,14 @@ async function fetchInitialDesigns(): Promise<{ designs: ShowcaseDesign[]; total
 // ─── Page component ──────────────────────────────────────────────────────────
 
 export default async function GalleryPage() {
-  const { designs, total } = await fetchInitialDesigns()
+  const [{ designs, total }, customer] = await Promise.all([
+    fetchInitialDesigns(),
+    getCustomer().catch(() => null),
+  ])
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#f9f6ff] via-white to-[#fcfaff]">
-      <GalleryClient initialDesigns={designs} initialTotal={total} />
+      <GalleryClient initialDesigns={designs} initialTotal={total} customer={customer} />
     </main>
   )
 }

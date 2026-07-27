@@ -15,7 +15,7 @@ export default function InspirationCards() {
           transition={{ duration: 0.6 }}
           className="mb-4 flex items-center justify-between gap-4"
         >
-          <h2 className="font-heading text-2xl font-bold tracking-[-0.03em] text-slate-900 sm:text-3xl">
+          <h2 className="font-heading text-2xl font-bold tracking-[-0.03em] text-slate-900 sm:text-3xl lg:text-4xl">
             Need Inspiration? <span className="font-normal text-slate-600">Try these ideas</span>
           </h2>
           <button

@@ -37,7 +37,7 @@ export default async function AiCakeStudioPage() {
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#f9f6ff] via-white to-[#fcfaff]">
       <HeroSection />
       <AiStudioSection customer={customer} />
-      <ShowcaseGallery />
+      <ShowcaseGallery customer={customer} />
       <BottomCta />
     </main>
   )

@@ -16,7 +16,7 @@ export default function HowItWorks() {
           transition={{ duration: 0.6 }}
           className="mb-8 text-center"
         >
-          <h2 className="mt-2 font-heading text-3xl font-bold tracking-[-0.03em] text-slate-900 sm:text-4xl">
+          <h2 className="mt-2 font-heading text-3xl font-bold tracking-[-0.03em] text-slate-900 sm:text-4xl lg:text-5xl">
             How AI Cake Studio works
           </h2>
         </motion.div>

@@ -14,8 +14,25 @@ import {
 import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
+import { generateCakeDesigns } from "@lib/data/ai-studio"
 
 const FREE_ATTEMPTS_LIMIT = 3
+
+// Model picker shown next to the prompt textarea — the customer's own choice
+// per generation, not a fixed server setting. FLUX is faster/cheaper and
+// great for photorealistic bakery shots; Gemini tends to handle detailed,
+// multi-element scenes and on-cake text well; GPT Image is kept as a third
+// option for comparison.
+const AI_MODEL_OPTIONS: { value: "replicate" | "gemini" | "openai"; label: string; hint: string }[] = [
+  { value: "replicate", label: "FLUX", hint: "Fast, photorealistic bakery-style shots" },
+  { value: "gemini", label: "Gemini", hint: "Best for on-cake text & detailed, multi-element scenes" },
+  { value: "openai", label: "GPT Image", hint: "Alternative option for comparison" },
+]
+
+// Mock designs are only used when explicitly enabled (local dev) so that we
+// never hit the paid AI provider by accident. Unset/false in every deployed
+// environment calls the real Medusa backend via /api/ai-studio/generate.
+const USE_MOCK_AI_STUDIO = process.env.NEXT_PUBLIC_USE_MOCK_AI_STUDIO === "true"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -37,6 +54,19 @@ type SelectorState = {
   shape: string
   color: string
   cakeMessage: string
+}
+
+/** Handoff payload for "Use this cake" — from either the showcase gallery
+ * (cross-page, via sessionStorage) or the compact community section
+ * (same-page, via CustomEvent). Adopts an already-generated design directly,
+ * skipping the prompt/generate step entirely. */
+type UseCakePayload = {
+  id: string
+  imageUrl: string
+  style: string
+  occasion: string
+  flavor: string
+  prompt: string
 }
 
 type Props = {
@@ -77,6 +107,22 @@ function getZodiac(dob: string): ZodiacInfo | null {
   if ((m === 1 && day >= 20) || (m === 2 && day <= 18))
     return { sign: "Aquarius", emoji: "♒", suggestion: "Electric blues, abstract art, futuristic unique shapes" }
   return { sign: "Pisces", emoji: "♓", suggestion: "Dreamy pastels, ocean-inspired waves, ethereal shimmer" }
+}
+
+/** Age from an actual birthdate — only meaningful when the customer gave their own DOB. */
+function computeAge(dob: string): number | null {
+  if (!dob) return null
+  const birth = new Date(dob)
+  if (isNaN(birth.getTime())) return null
+
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const hasHadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+  if (!hasHadBirthdayThisYear) age--
+
+  return age >= 0 ? age : null
 }
 
 // ─── Fallback selectors ──────────────────────────────────────────────────
@@ -282,6 +328,7 @@ export default function AiStudioSection({ customer }: Props) {
 
   const [selectors, setSelectors] = useState<StudioSelectors>(FALLBACK_SELECTORS)
   const [prompt, setPrompt] = useState("")
+  const [aiModel, setAiModel] = useState<"replicate" | "gemini" | "openai">(AI_MODEL_OPTIONS[0].value)
   const [sel, setSel] = useState<SelectorState>({
     style: FALLBACK_SELECTORS.styles[0].value,
     occasion: FALLBACK_SELECTORS.occasions[0].value,
@@ -292,19 +339,31 @@ export default function AiStudioSection({ customer }: Props) {
     cakeMessage: "",
   })
 
-  // DOB + horoscope
+  // DOB + horoscope — always included in generation (no opt-in checkbox);
+  // falls back to today's seasonal sign when no birthday is given. Today's
+  // date is always valid, so the fallback getZodiac() call can never be null.
   const [dob, setDob] = useState("")
-  const [zodiacInfluence, setZodiacInfluence] = useState(false)
-  const zodiac = useMemo(() => getZodiac(dob), [dob])
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
+  const zodiac = useMemo(() => getZodiac(dob), [dob])
+  const effectiveZodiac = useMemo(() => zodiac ?? getZodiac(todayStr)!, [zodiac, todayStr])
+  // Only meaningful for a real birthdate — never derived from the fallback date.
+  const age = useMemo(() => computeAge(dob), [dob])
+  const [horoscopeQuote, setHoroscopeQuote] = useState<string | null>(null)
 
   // Generation state
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null)
   const [showUsePanel, setShowUsePanel] = useState(false)
-  const [designs, setDesigns] = useState<GeneratedDesign[]>(MOCK_GENERATED_DESIGNS)
+  // Starts empty — each successful generation APPENDS its design(s) here so a
+  // regenerate click adds a new card instead of replacing the previous one.
+  // (MOCK_GENERATED_DESIGNS is only ever added via the mock branch below.)
+  const [designs, setDesigns] = useState<GeneratedDesign[]>([])
   const [attemptsLeft, setAttemptsLeft] = useState(isLoggedIn ? FREE_ATTEMPTS_LIMIT : 0)
+  const [generationError, setGenerationError] = useState<string | null>(null)
+  // Bumped whenever "Use This Design" is clicked — PriceEstimator watches
+  // this to auto-expand itself instead of requiring a second manual click.
+  const [priceEstimatorOpenSignal, setPriceEstimatorOpenSignal] = useState(0)
 
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -334,7 +393,7 @@ export default function AiStudioSection({ customer }: Props) {
       .catch(() => {})
   }, [isLoggedIn])
 
-  // Listen for "Use this prompt" from showcase gallery
+  // Listen for "Use this prompt" / "Use this cake" from showcase gallery
   useEffect(() => {
     // Check if navigated from gallery page with a prompt
     const storedPrompt = sessionStorage.getItem("cf-use-prompt")
@@ -342,33 +401,156 @@ export default function AiStudioSection({ customer }: Props) {
       setPrompt(storedPrompt)
       sessionStorage.removeItem("cf-use-prompt")
     }
-    // Listen for same-page event from compact showcase
-    const handler = (e: Event) => {
+    // Check if navigated from gallery page with a specific cake — skips the
+    // prompt/generate step entirely, jumps straight to accepting that design.
+    const storedCake = sessionStorage.getItem("cf-use-cake")
+    if (storedCake) {
+      try {
+        adoptShowcaseDesign(JSON.parse(storedCake))
+      } catch {
+        // Malformed payload — ignore, nothing to recover
+      }
+      sessionStorage.removeItem("cf-use-cake")
+    }
+    // Listen for same-page events from the compact showcase section
+    const promptHandler = (e: Event) => {
       const detail = (e as CustomEvent<{ prompt: string }>).detail
       if (detail?.prompt) {
         setPrompt(detail.prompt)
       }
     }
-    window.addEventListener("use-showcase-prompt", handler)
-    return () => window.removeEventListener("use-showcase-prompt", handler)
+    const cakeHandler = (e: Event) => {
+      const detail = (e as CustomEvent<UseCakePayload>).detail
+      if (detail?.imageUrl) {
+        adoptShowcaseDesign(detail)
+      }
+    }
+    window.addEventListener("use-showcase-prompt", promptHandler)
+    window.addEventListener("use-showcase-cake", cakeHandler)
+    return () => {
+      window.removeEventListener("use-showcase-prompt", promptHandler)
+      window.removeEventListener("use-showcase-cake", cakeHandler)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleGenerate = async () => {
     if (!canGenerate) return
     setGenerating(true)
-    setGenerated(false)
+    setGenerationError(null)
     setSelectedDesignId(null)
     setShowUsePanel(false)
-    await new Promise((resolve) => setTimeout(resolve, 1800))
+    setHoroscopeQuote(null)
+
+    if (USE_MOCK_AI_STUDIO) {
+      await new Promise((resolve) => setTimeout(resolve, 1800))
+      // Append (with freshly-suffixed ids so React keys stay unique across
+      // repeated mock "generations") instead of replacing — same behavior
+      // as the real branch below.
+      setDesigns((prev) => [
+        ...prev,
+        ...MOCK_GENERATED_DESIGNS.map((d) => ({
+          ...d,
+          id: `${d.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        })),
+      ])
+      setGenerating(false)
+      setGenerated(true)
+      setAttemptsLeft((prev) => Math.max(0, prev - 1))
+      return
+    }
+
+    const result = await generateCakeDesigns({
+      prompt,
+      style: sel.style,
+      occasion: sel.occasion,
+      flavor: sel.flavor,
+      tiers: sel.tiers,
+      shape: sel.shape,
+      color: sel.color,
+      cakeMessage: sel.cakeMessage.trim() || undefined,
+      zodiacInfluence: { sign: effectiveZodiac.sign, suggestion: effectiveZodiac.suggestion },
+      age: age ?? undefined,
+      imageProvider: aiModel,
+    })
+
     setGenerating(false)
+
+    if (!result.success || !result.designs?.length) {
+      setGenerationError(result.error || "Something went wrong. Please try again.")
+      return
+    }
+
+    // Append new design(s) to whatever's already there — a regenerate click
+    // adds another card instead of replacing the previous one.
+    setDesigns((prev) => [
+      ...prev,
+      ...result.designs!.map((d) => ({
+        id: d.id,
+        title: d.title,
+        description: d.description,
+        style: d.style,
+        gradient: "from-violet-400 via-purple-300 to-indigo-400",
+        liked: false,
+        imageUrl: d.imageUrl,
+      })),
+    ])
     setGenerated(true)
-    setDesigns(MOCK_GENERATED_DESIGNS)
-    setAttemptsLeft((prev) => Math.max(0, prev - 1))
+    setHoroscopeQuote(result.horoscopeQuote || null)
+    setAttemptsLeft((prev) =>
+      result.creditsRemaining != null && result.creditsRemaining >= 0
+        ? result.creditsRemaining
+        : Math.max(0, prev - 1)
+    )
   }
 
   const handleSelectDesign = (id: string) => {
     setSelectedDesignId(id)
     setShowUsePanel(true)
+  }
+
+  /**
+   * Positive, one-click "accept this one" action — locks in the design and
+   * jumps straight to the price estimate instead of using the prompt again.
+   * Only attributes the price estimator itself exposes (weight, flavor,
+   * message, delivery, add-ons) remain editable from here on; the visual
+   * design itself is now fixed to this generated image.
+   */
+  const handleAcceptDesign = (id: string) => {
+    setSelectedDesignId(id)
+    setShowUsePanel(true)
+    setPriceEstimatorOpenSignal((n) => n + 1)
+    requestAnimationFrame(() => {
+      document.querySelector("[data-price-estimator]")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }
+
+  /**
+   * "Use this cake" — adopts an already-generated design (from the showcase
+   * gallery, same-page or cross-page) as a card here, carries over its known
+   * style/occasion/flavor into the selectors, and immediately accepts it —
+   * the customer never has to type a prompt for this cake at all.
+   */
+  const adoptShowcaseDesign = (payload: UseCakePayload) => {
+    const adopted: GeneratedDesign = {
+      id: `showcase-${payload.id}`,
+      title: `${payload.style}${payload.occasion ? " · " + payload.occasion : ""} Cake`,
+      description: payload.prompt,
+      gradient: "from-violet-400 via-purple-300 to-indigo-400",
+      style: payload.style,
+      liked: false,
+      imageUrl: payload.imageUrl,
+    }
+    setSel((c) => ({
+      ...c,
+      style: payload.style || c.style,
+      occasion: payload.occasion || c.occasion,
+      flavor: payload.flavor || c.flavor,
+    }))
+    setDesigns((prev) => [...prev, adopted])
+    document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })
+    // Wait a tick for the card to actually exist before selecting/scrolling to it.
+    setTimeout(() => handleAcceptDesign(adopted.id), 250)
   }
 
   const handleExpandDesign = (index: number, e: React.MouseEvent) => {
@@ -397,19 +579,45 @@ export default function AiStudioSection({ customer }: Props) {
 
   return (
     <section id="ai-studio" className="px-4 py-8 sm:px-6 lg:px-12">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         <div className="overflow-hidden rounded-[26px] border border-violet-100 bg-white p-5 shadow-[0_24px_60px_rgba(109,40,217,0.12)] sm:p-6">
 
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">Create Your Cake with AI</h3>
+            <h3 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">Create Your Cake with AI</h3>
             <p className="text-xs text-slate-500">Describe, choose style and let AI do the magic ✨</p>
           </div>
 
           {/* Prompt textarea */}
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Describe your cake idea...
-          </label>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <label className="block text-sm font-semibold text-slate-700">
+              Describe your cake idea...
+            </label>
+            <div
+              role="radiogroup"
+              aria-label="AI model"
+              className="flex items-center gap-1 rounded-full border border-violet-100 bg-violet-50/60 p-1"
+            >
+              {AI_MODEL_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={aiModel === opt.value}
+                  title={opt.hint}
+                  disabled={generating}
+                  onClick={() => setAiModel(opt.value)}
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    aiModel === opt.value
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-violet-500 hover:bg-violet-100"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value.slice(0, 320))}
@@ -509,6 +717,9 @@ export default function AiStudioSection({ customer }: Props) {
                   className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none disabled:opacity-60"
                 />
                 <p className="mt-1 text-right text-[10px] text-slate-400">{sel.cakeMessage.length}/50</p>
+                <p className="mt-1 text-[10px] italic text-slate-400">
+                  We'll try to show this on the AI preview — and you can add or change it again once you pick a design, in the price estimate section.
+                </p>
               </div>
               <div>
                 <p className="mb-2 text-[11px] font-medium text-slate-500">Color preference</p>
@@ -526,41 +737,29 @@ export default function AiStudioSection({ customer }: Props) {
           {/* Horoscope */}
           <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/20 p-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-              🔮 Horoscope influence (optional)
+              🔮 Horoscope influence
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <div>
-                <p className="mb-1 text-[11px] text-slate-400">Date of birth</p>
+                <p className="mb-1 text-[11px] text-slate-400">Date of birth (optional)</p>
                 <input
                   type="date"
                   value={dob}
-                  onChange={(e) => { setDob(e.target.value); setZodiacInfluence(false) }}
+                  onChange={(e) => setDob(e.target.value)}
                   max={todayStr}
-                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none"
+                  disabled={generating}
+                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none disabled:opacity-60"
                 />
               </div>
-              {zodiac && (
-                <div className="space-y-1.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-bold text-violet-700 ring-1 ring-violet-200">
-                    {zodiac.emoji} {zodiac.sign}
-                  </span>
-                  <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={zodiacInfluence}
-                      onChange={(e) => setZodiacInfluence(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-violet-600"
-                    />
-                    Add {zodiac.sign} influence to design
-                  </label>
-                </div>
-              )}
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-bold text-violet-700 ring-1 ring-violet-200">
+                {effectiveZodiac.emoji} {effectiveZodiac.sign}
+              </span>
             </div>
-            {zodiac && zodiacInfluence && (
-              <p className="mt-2 rounded-xl bg-violet-100/60 px-3 py-2 text-xs italic text-violet-700">
-                ✨ {zodiac.suggestion}
-              </p>
-            )}
+            <p className="mt-2 rounded-xl bg-violet-100/60 px-3 py-2 text-xs italic text-violet-700">
+              ✨ {dob
+                ? `We'll blend in a touch of ${effectiveZodiac.sign} energy, based on your birthday.`
+                : `We'll blend in this season's ${effectiveZodiac.sign} energy — add your birthday above to use your own sign instead.`}
+            </p>
           </div>
 
           {/* CTA area */}
@@ -605,19 +804,30 @@ export default function AiStudioSection({ customer }: Props) {
                 <AttemptsBadge attemptsLeft={attemptsLeft} />
               </div>
             )}
+
+            {generationError && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+              >
+                <p className="text-sm font-semibold text-red-700">Generation failed</p>
+                <p className="mt-1 text-xs text-red-600">{generationError}</p>
+              </motion.div>
+            )}
           </div>
         </div>
 
         {/* ── Results panel (below form) ── */}
         <div className="mt-6">
           <AnimatePresence mode="wait">
-            {!generated && !generating ? (
+            {!generating && designs.length === 0 ? (
               <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <EmptyCreationsPanel />
               </motion.div>
             ) : null}
 
-            {generating ? (
+            {generating && designs.length === 0 ? (
               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4 sm:grid-cols-3">
                 {[1, 2, 3].map((n) => (
                   <div key={n} className="h-48 animate-pulse rounded-xl bg-white border border-violet-100" />
@@ -625,7 +835,7 @@ export default function AiStudioSection({ customer }: Props) {
               </motion.div>
             ) : null}
 
-            {generated && !generating ? (
+            {designs.length > 0 ? (
               <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
 
                 {/* CrossFriend occasion message */}
@@ -636,22 +846,49 @@ export default function AiStudioSection({ customer }: Props) {
                   <p className="text-xs leading-relaxed text-slate-600 italic">{cfMessage}</p>
                 </div>
 
+                {/* Horoscope quote — only present when the real backend generated one */}
+                {horoscopeQuote && (
+                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-3">
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-500">
+                      🔮 Your {effectiveZodiac.sign} Year
+                    </p>
+                    <p className="text-xs leading-relaxed text-slate-600 italic">{horoscopeQuote}</p>
+                  </div>
+                )}
+
                 {/* Design cards — horizontal grid */}
                 <div className="grid gap-4 sm:grid-cols-3">
                   {designs.map((design, index) => (
-                    <button
-                      key={design.id}
-                      type="button"
-                      onClick={() => handleSelectDesign(design.id)}
-                      className="block w-full rounded-xl text-left"
-                    >
-                      <DesignCard
-                        design={design}
-                        selected={selectedDesignId === design.id}
-                        onExpand={(e) => handleExpandDesign(index, e)}
-                      />
-                    </button>
+                    <div key={design.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDesign(design.id)}
+                        className="block w-full rounded-xl text-left"
+                      >
+                        <DesignCard
+                          design={design}
+                          selected={selectedDesignId === design.id}
+                          onExpand={(e) => handleExpandDesign(index, e)}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptDesign(design.id)}
+                        className="mt-2 w-full rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700"
+                      >
+                        ✅ Use This Design
+                      </button>
+                    </div>
                   ))}
+
+                  {/* Regenerating — keep existing cards visible, show the
+                      new one arriving in the next slot instead of blanking
+                      the whole grid. */}
+                  {generating && (
+                    <div className="flex h-48 animate-pulse items-center justify-center rounded-xl border border-dashed border-violet-200 bg-violet-50/40 text-xs font-semibold text-violet-400">
+                      Generating another design...
+                    </div>
+                  )}
                 </div>
 
                 {/* Action panel */}
@@ -665,8 +902,20 @@ export default function AiStudioSection({ customer }: Props) {
                     >
                       <div className="space-y-2 rounded-2xl border border-violet-200 bg-white p-4">
                         <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                          What would you like to do?
+                          ✅ Great choice! What next?
                         </p>
+
+                        <button
+                          type="button"
+                          onClick={() => selectedDesignId && handleAcceptDesign(selectedDesignId)}
+                          className="flex w-full items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100"
+                        >
+                          <span className="mt-0.5 text-base">💰</span>
+                          <div>
+                            <p className="text-sm font-semibold text-emerald-800">Get a price for this cake</p>
+                            <p className="text-xs text-slate-500">Choose weight, add a message, pick add-ons and see an indicative price</p>
+                          </div>
+                        </button>
 
                         <button
                           type="button"
@@ -677,18 +926,6 @@ export default function AiStudioSection({ customer }: Props) {
                           <div>
                             <p className="text-sm font-semibold text-violet-800">Find a baker near me</p>
                             <p className="text-xs text-slate-500">Connect with a verified local baker to make this exact cake</p>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => document.querySelector("[data-price-estimator]")?.scrollIntoView({ behavior: "smooth" })}
-                          className="flex w-full items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-left transition hover:bg-violet-100"
-                        >
-                          <span className="mt-0.5 text-base">💰</span>
-                          <div>
-                            <p className="text-sm font-semibold text-violet-800">See price estimate</p>
-                            <p className="text-xs text-slate-500">Customise weight, add-ons and get an indicative price</p>
                           </div>
                         </button>
 
@@ -720,10 +957,12 @@ export default function AiStudioSection({ customer }: Props) {
           <PriceEstimator
           cakeStyle={sel.style}
           occasion={sel.occasion}
-          generated={generated}
+          generated={generated || designs.length > 0}
           initialTiers={sel.tiers}
           initialFlavor={sel.flavor}
           initialShape={sel.shape}
+          initialCakeMessage={sel.cakeMessage}
+          openSignal={priceEstimatorOpenSignal}
           />
         </div>
 
@@ -806,6 +1045,7 @@ export default function AiStudioSection({ customer }: Props) {
         onClose={() => setLightboxOpen(false)}
         designs={designs}
         startIndex={lightboxIndex}
+        isLoggedIn={isLoggedIn}
       />
     </section>
   )

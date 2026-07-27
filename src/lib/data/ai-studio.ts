@@ -14,13 +14,18 @@ export interface GenerateRequest {
   flavor: string
   weight?: string
   tiers?: string
+  shape?: string
   color?: string
   cakeMessage?: string
   zodiacInfluence?: {
     sign: string
     suggestion: string
   }
+  /** Only send when the customer gave a real birthdate (not the seasonal fallback) */
+  age?: number
   imageCount?: number
+  /** Which image model to use for this generation — the customer's own picker choice, not a server config setting */
+  imageProvider?: "replicate" | "openai" | "gemini"
 }
 
 export interface DesignOutput {
@@ -36,6 +41,8 @@ export interface GenerateResponse {
   generationId?: string
   designs?: DesignOutput[]
   creditsRemaining?: number
+  /** Positive, LLM-generated horoscope-style quote — present only when zodiac influence was sent */
+  horoscopeQuote?: string
   error?: string
   code?: string
 }

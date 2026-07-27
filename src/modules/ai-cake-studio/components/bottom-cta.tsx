@@ -32,7 +32,7 @@ export default function BottomCta() {
             />
           </div>
 
-          <h2 className="font-heading text-4xl font-bold tracking-[-0.03em] text-white sm:text-5xl">
+          <h2 className="font-heading text-4xl font-bold tracking-[-0.03em] text-white sm:text-5xl lg:text-6xl">
             Your dream cake is
             <br />
             <span className="text-yellow-300">one prompt away</span>

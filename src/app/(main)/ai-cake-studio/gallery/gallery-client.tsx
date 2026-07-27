@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
+import type { Customer } from "@medusajs/medusa"
 import DesignLightbox from "@modules/ai-cake-studio/components/design-lightbox"
+import LikeButton from "@modules/ai-cake-studio/components/like-button"
 import type { GeneratedDesign } from "@modules/ai-cake-studio/types"
 
 interface ShowcaseDesign {
@@ -14,13 +16,16 @@ interface ShowcaseDesign {
   occasion: string
   flavor: string
   likeCount: number
+  commentCount: number
   viewCount: number
+  isLiked: boolean
   createdAt: string
 }
 
 interface Props {
   initialDesigns: ShowcaseDesign[]
   initialTotal: number
+  customer: Omit<Customer, "password_hash"> | null
 }
 
 const OCCASION_FILTERS = [
@@ -50,7 +55,8 @@ const SORT_OPTIONS = [
   { value: "trending", label: "Trending" },
 ]
 
-export default function GalleryClient({ initialDesigns, initialTotal }: Props) {
+export default function GalleryClient({ initialDesigns, initialTotal, customer }: Props) {
+  const isLoggedIn = Boolean(customer)
   const [designs, setDesigns] = useState<ShowcaseDesign[]>(initialDesigns)
   const [total, setTotal] = useState(initialTotal)
   const [loading, setLoading] = useState(false)
@@ -120,6 +126,23 @@ export default function GalleryClient({ initialDesigns, initialTotal }: Props) {
     window.location.href = "/ai-cake-studio"
   }
 
+  // Use this cake — skip the prompt entirely, adopt this exact design and
+  // land straight on price estimation for it.
+  const handleUseCake = (design: ShowcaseDesign) => {
+    sessionStorage.setItem(
+      "cf-use-cake",
+      JSON.stringify({
+        id: design.id,
+        imageUrl: design.imageUrl,
+        style: design.style,
+        occasion: design.occasion,
+        flavor: design.flavor,
+        prompt: design.prompt,
+      })
+    )
+    window.location.href = "/ai-cake-studio"
+  }
+
   // Lightbox data
   const lightboxDesigns: GeneratedDesign[] = designs.map((d) => ({
     id: d.id,
@@ -133,7 +156,7 @@ export default function GalleryClient({ initialDesigns, initialTotal }: Props) {
 
   return (
     <div className="px-4 py-8 sm:px-6 lg:px-12">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
 
         {/* Header */}
         <div className="mb-8">
@@ -143,7 +166,7 @@ export default function GalleryClient({ initialDesigns, initialTotal }: Props) {
           >
             ← Back to AI Cake Studio
           </Link>
-          <h1 className="font-heading text-3xl font-bold text-slate-900 sm:text-4xl">
+          <h1 className="font-heading text-3xl font-bold text-slate-900 sm:text-4xl lg:text-5xl">
             Community Cake Gallery
           </h1>
           <p className="mt-2 text-base text-slate-500">
@@ -270,9 +293,15 @@ export default function GalleryClient({ initialDesigns, initialTotal }: Props) {
                   </div>
 
                   <div className="absolute bottom-2 left-2 flex gap-1.5">
-                    {design.likeCount > 0 && (
-                      <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-rose-600 backdrop-blur-sm">
-                        ❤️ {design.likeCount}
+                    <LikeButton
+                      designId={design.id}
+                      initialLiked={design.isLiked}
+                      initialCount={design.likeCount}
+                      isLoggedIn={isLoggedIn}
+                    />
+                    {design.commentCount > 0 && (
+                      <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-600 backdrop-blur-sm">
+                        💬 {design.commentCount}
                       </span>
                     )}
                   </div>
@@ -300,13 +329,26 @@ export default function GalleryClient({ initialDesigns, initialTotal }: Props) {
                     {design.prompt}
                   </p>
 
-                  <button
-                    type="button"
-                    onClick={() => handleUsePrompt(design.prompt)}
-                    className="mt-2 w-full rounded-xl border border-violet-200 bg-violet-50 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
-                  >
-                    ✨ Use this prompt
-                  </button>
+                  {/* Use this prompt / Use this cake — side by side on
+                      larger screens, compact icon+word pair on mobile */}
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleUsePrompt(design.prompt)}
+                      className="flex-1 rounded-xl border border-violet-200 bg-violet-50 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
+                    >
+                      <span className="hidden sm:inline">✨ Use this prompt</span>
+                      <span className="sm:hidden">✨ Prompt</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUseCake(design)}
+                      className="flex-1 rounded-xl border border-emerald-200 bg-emerald-50 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                    >
+                      <span className="hidden sm:inline">🎂 Use this cake</span>
+                      <span className="sm:hidden">🎂 Cake</span>
+                    </button>
+                  </div>
                 </div>
               </motion.article>
             ))}
@@ -356,6 +398,7 @@ export default function GalleryClient({ initialDesigns, initialTotal }: Props) {
         onClose={() => setLightboxOpen(false)}
         designs={lightboxDesigns}
         startIndex={lightboxIndex}
+        isLoggedIn={isLoggedIn}
       />
     </div>
   )

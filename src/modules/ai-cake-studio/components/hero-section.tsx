@@ -100,7 +100,7 @@ export default function HeroSection() {
           </motion.div>
 
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0.1}>
-            <h1 className="font-heading text-4xl font-semibold leading-[1.03] tracking-[-0.045em] text-slate-900 sm:text-5xl lg:text-[40px]">
+            <h1 className="font-heading text-4xl font-semibold leading-[1.03] tracking-[-0.045em] text-slate-900 sm:text-5xl xl:text-6xl">
               <span className="bg-gradient-to-r from-violet-700 via-purple-600 to-fuchsia-500 bg-clip-text text-transparent">
                 Design Your Dream Cake
               </span>
@@ -114,7 +114,7 @@ export default function HeroSection() {
             initial="hidden"
             animate="visible"
             custom={0.2}
-            className="text-lg font-medium leading-7 text-slate-700 sm:text-xl"
+            className="text-lg font-medium leading-7 text-slate-700 sm:text-xl xl:text-2xl"
           >
             Powered by AI + Local Bakers near you
           </motion.p>

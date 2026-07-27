@@ -10,7 +10,7 @@ export default function DesignToRealSection() {
         <div className="overflow-hidden rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_24px_60px_rgba(109,40,217,0.12)] sm:p-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_1.05fr] lg:items-center">
             <div>
-              <h3 className="font-heading text-3xl font-bold tracking-[-0.03em] text-violet-700 sm:text-4xl">
+              <h3 className="font-heading text-3xl font-bold tracking-[-0.03em] text-violet-700 sm:text-4xl lg:text-5xl">
                 Turn Your Design
                 <br />
                 into <span className="text-purple-600">a Real Cake</span>
