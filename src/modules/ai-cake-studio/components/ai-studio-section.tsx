@@ -718,7 +718,7 @@ export default function AiStudioSection({ customer }: Props) {
                 />
                 <p className="mt-1 text-right text-[10px] text-slate-400">{sel.cakeMessage.length}/50</p>
                 <p className="mt-1 text-[10px] italic text-slate-400">
-                  We'll try to show this on the AI preview — and you can add or change it again once you pick a design, in the price estimate section.
+                  We&apos;ll try to show this on the AI preview — and you can add or change it again once you pick a design, in the price estimate section.
                 </p>
               </div>
               <div>
