@@ -1,0 +1,169 @@
+# Today's Session Context — 25 July 2026
+
+---
+
+## Session Summary
+
+Started by verifying what was lost in a Git error. Found that **all backend files survived** but **frontend UI changes were lost**. Rebuilt the UI and added new features.
+
+---
+
+## What We Verified (All Intact on Backend)
+
+| # | File | Status |
+|---|------|--------|
+| 1 | `src/services/ai-image/types.ts` | ✅ |
+| 2 | `src/services/ai-image/provider-factory.ts` | ✅ |
+| 3 | `src/services/ai-image/s3-uploader.ts` | ✅ |
+| 4 | `src/services/ai-image/prompt-builder.ts` | ✅ |
+| 5 | `src/services/ai-image/providers/replicate-provider.ts` | ✅ |
+| 6 | `src/services/ai-image/tag-extractor.ts` | ✅ |
+| 7 | `src/services/ai-image/ai-generation-service.ts` | ✅ |
+| 8 | `src/migrations/CreateAiStudioSchema1720450000000.ts` | ✅ |
+| 9 | `src/api/store/ai-studio/generate/route.ts` | ✅ |
+
+---
+
+## What We Built/Rebuilt Today (Frontend)
+
+### 1. Image Lightbox (YARL)
+- Installed `yet-another-react-lightbox`
+- Created `design-lightbox.tsx` (wrapper with `dynamic()` + `ssr: false`)
+- Created `design-lightbox-content.tsx` (actual lightbox with Zoom + Download)
+- Updated `DesignCard` with expand button (Option B: click card = select, expand icon = lightbox)
+- Added mock image URLs (Unsplash) to `MOCK_GENERATED_DESIGNS` for testing
+
+### 2. Page Layout Rebuild (matching live site)
+- Updated `page.tsx` — simplified to: Hero → Studio → Showcase → CTA (removed Inspiration, HowItWorks, DesignToReal)
+- Rebuilt `ai-studio-section.tsx` — single-column layout, all pill selectors, `max-w-5xl`
+
+### 3. Generation Form Cleanup
+- Removed **Weight** from generation form (moved to Price Estimator)
+- Added **Shape** pills (Round, Square, Heart, Oval) to generation form
+- Changed **Occasion** and **Flavor** from dropdowns to pill buttons
+- Added **Tiers** as standalone section
+- Kept: Prompt, Templates, Style, Occasion, Flavor, Tiers, Shape, Color, Message, Horoscope
+
+### 4. Price Estimator Rewrite
+- New pricing model: `baseByWeight × tierMultiplier + adjustments` (realistic Indian market pricing)
+- Accepts `initialTiers`, `initialFlavor`, `initialShape` from generation form (pre-fills)
+- Removed Eggless option (all cakes are eggless by default)
+- Added price breakdown display
+- Added configurable disclaimer
+- Updated `ai-cake-studio-config.json` with new pricing structure
+
+### 5. Showcase Gallery (Community Creations)
+- Created `src/app/api/ai-cake-studio-showcase/route.ts` — needs to be a **proxy to Medusa backend** (not direct DB)
+- Replaced `showcase-gallery.tsx` — real data from API, occasion filters, lightbox, "Use this prompt"
+- Created `gallery-client.tsx` — full gallery page with pagination, filters, sort
+- Created `src/app/[countryCode]/(main)/ai-cake-studio/gallery/page.tsx` — SSR gallery page
+- Added "Use this prompt" event listener in `ai-studio-section.tsx`
+
+---
+
+## Architecture Decision Made Today
+
+**Frontend should NEVER connect to PostgreSQL directly.**
+
+```
+Frontend (Next.js :8000) → Medusa Backend (:9001) → PostgreSQL (:5432)
+```
+
+- Public reads (showcase) → Next.js API route **proxies** to Medusa backend
+- Authenticated writes (generate, like) → Next.js calls Medusa backend with credentials
+- DB credentials only exist on Medusa backend
+
+---
+
+## What's NOT Working Yet (Needs Next Session)
+
+### 1. Showcase Backend Route
+Need to create on Medusa backend:
+```
+src/api/store/ai-studio/showcase/route.ts
+```
+(I provided the code — needs to be placed on the Medusa server, not Next.js)
+
+### 2. Frontend Showcase Proxy
+`src/app/api/ai-cake-studio-showcase/route.ts` needs to proxy to Medusa (code provided, needs Medusa route first)
+
+### 3. Real `handleGenerate` (Frontend → Backend)
+The real generation call was lost. There was a **proxy route** between frontend and Medusa backend. Need to:
+- Identify/recreate the proxy route (likely `src/app/api/ai-cake-studio-generate/route.ts` or similar)
+- Update `handleGenerate` to call the proxy
+- The proxy forwards to `http://localhost:9001/store/ai-studio/generate`
+
+### 4. Medusa Backend Route 404
+`http://localhost:9001/store/ai-studio/generate` returns 404 — either:
+- Medusa backend isn't running
+- The route file exists but Medusa hasn't loaded it (needs restart)
+- Route path mismatch
+
+---
+
+## Files Created/Modified Today
+
+### NEW Files
+| File | Location |
+|------|----------|
+| `src/modules/ai-cake-studio/components/design-lightbox.tsx` | Frontend |
+| `src/modules/ai-cake-studio/components/design-lightbox-content.tsx` | Frontend |
+| `src/app/api/ai-cake-studio-showcase/route.ts` | Frontend (proxy, needs backend first) |
+| `src/app/[countryCode]/(main)/ai-cake-studio/gallery/page.tsx` | Frontend |
+| `src/app/[countryCode]/(main)/ai-cake-studio/gallery/gallery-client.tsx` | Frontend |
+| `src/api/store/ai-studio/showcase/route.ts` | Backend (provided, not yet created) |
+
+### MODIFIED Files
+| File | Changes |
+|------|---------|
+| `src/app/[countryCode]/(main)/ai-cake-studio/page.tsx` | Simplified sections |
+| `src/modules/ai-cake-studio/components/ai-studio-section.tsx` | Full rebuild: single-column, pills, shape, lightbox, usePrompt listener |
+| `src/modules/ai-cake-studio/components/showcase-gallery.tsx` | Full replace: real data from API |
+| `src/modules/ai-cake-studio/components/price-estimator.tsx` | Full rewrite: new pricing model |
+| `src/modules/ai-cake-studio/config/ai-cake-studio-config.json` | New pricing structure |
+| `src/modules/ai-cake-studio/data/mock-data.ts` | Added `imageUrl` to MOCK_GENERATED_DESIGNS |
+| `src/modules/ai-cake-studio/types/index.ts` | Confirmed `imageUrl?: string` exists |
+
+### TO DELETE
+| File | Reason |
+|------|--------|
+| `src/app/api/ai-cake-studio-debug/route.ts` | Temporary debug file |
+
+---
+
+## Key Decisions Made
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 1 | YARL for lightbox with `dynamic(ssr: false)` | Avoids webpack SSR bundling issues with Next.js 14.0.4 |
+| 2 | Single-column layout for studio | Cleaner, mobile-first, less overwhelming |
+| 3 | Only visual factors in generation form | Weight/eggless don't change the image — moved to Price Estimator |
+| 4 | Shape added to generation form | Heart vs Round is visually different |
+| 5 | Price model: baseByWeight × tierMultiplier | More realistic than flat base + additive |
+| 6 | All cakes eggless by default | No extra charge, removed toggle |
+| 7 | Showcase = community gallery with real DB data | Social proof + inspiration + "Use this prompt" |
+| 8 | Frontend never connects to DB directly | Industry standard — always through backend |
+| 9 | Proxy pattern for frontend → backend | Hides backend URL, consistent with existing architecture |
+| 10 | Public by default for generated designs | Showcase fills naturally, opt-out later |
+
+---
+
+## Next Session Priority
+
+1. **Verify Medusa backend is running** and routes are loaded
+2. **Create showcase route on Medusa backend** (`/store/ai-studio/showcase`)
+3. **Restore real `handleGenerate`** — find/recreate the proxy route
+4. **Test end-to-end**: Generate → S3 → DB → Showcase displays it
+5. **Full gallery page** testing
+
+---
+
+## How to Resume
+
+Paste the main context document + Appendix C + this session context, then say:
+
+> "Continue from today's session. Medusa backend is running on port 9001. Let's verify the generation route and create the showcase route."
+
+---
+
+*End of session context — 25 July 2026*

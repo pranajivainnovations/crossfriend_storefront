@@ -1,0 +1,246 @@
+# Like & Comment Features — Full Summary
+
+---
+
+## Functional Overview
+
+### Like (❤️)
+
+| Aspect | Detail |
+|--------|--------|
+| Who can like | Logged-in users only (OTP authenticated) |
+| What can be liked | Any public cake design in the gallery |
+| Behavior | Toggle — tap to like, tap again to unlike |
+| One per user per design | Can't like same design twice |
+| Display | Heart icon + count on design card |
+| No login? | Show heart but prompt login on tap |
+| Business value | Identifies popular designs per occasion/style |
+
+### Comment (💬)
+
+| Aspect | Detail |
+|--------|--------|
+| Who can comment | Logged-in users only |
+| What can be commented on | Any public cake design |
+| Moderation | Auto-publish + "Report" button (no pre-approval) |
+| Max length | 500 characters |
+| Edit/Delete | User can delete their own comment |
+| Display | Comment count on card, full list in expanded/detail view |
+| Business value | User sentiment, engagement, community feel |
+
+---
+
+## Technical Architecture
+
+### Database (on Medusa backend — `ai_studio` schema)
+
+**New table: `ai_studio.design_likes`**
+```sql
+CREATE TABLE ai_studio.design_likes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  design_id UUID NOT NULL REFERENCES ai_studio.cake_designs(id) ON DELETE CASCADE,
+  customer_id VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(design_id, customer_id)
+);
+
+CREATE INDEX idx_likes_design ON ai_studio.design_likes(design_id);
+CREATE INDEX idx_likes_customer ON ai_studio.design_likes(customer_id);
+```
+
+**New table: `ai_studio.design_comments`**
+```sql
+CREATE TABLE ai_studio.design_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  design_id UUID NOT NULL REFERENCES ai_studio.cake_designs(id) ON DELETE CASCADE,
+  customer_id VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  status VARCHAR(20) DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_comments_design ON ai_studio.design_comments(design_id);
+CREATE INDEX idx_comments_customer ON ai_studio.design_comments(customer_id);
+CREATE INDEX idx_comments_created ON ai_studio.design_comments(created_at DESC);
+```
+
+**Alter existing table:**
+```sql
+ALTER TABLE ai_studio.cake_designs ADD COLUMN like_count INT DEFAULT 0;
+ALTER TABLE ai_studio.cake_designs ADD COLUMN comment_count INT DEFAULT 0;
+```
+
+---
+
+### API Endpoints (Medusa Backend)
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/store/ai-studio/designs/:id/like` | POST | ✅ Required | Toggle like (like/unlike) |
+| `/store/ai-studio/designs/:id/comments` | GET | ❌ Public | Fetch comments for a design |
+| `/store/ai-studio/designs/:id/comments` | POST | ✅ Required | Add a comment |
+| `/store/ai-studio/designs/:id/comments/:commentId` | DELETE | ✅ Required (own only) | Delete own comment |
+| `/store/ai-studio/designs/:id/report` | POST | ✅ Required | Report a design or comment |
+
+---
+
+### API Request/Response Shapes
+
+**Like Toggle:**
+```ts
+// POST /store/ai-studio/designs/:id/like
+// Headers: Authorization (JWT)
+// No body needed
+
+// Response
+{
+  liked: true,        // or false if unliked
+  likeCount: 48       // updated count
+}
+```
+
+**Get Comments:**
+```ts
+// GET /store/ai-studio/designs/:id/comments?page=1&limit=20
+
+// Response
+{
+  comments: [
+    {
+      id: "uuid",
+      content: "This is beautiful! Would love this for my wedding",
+      customerId: "cus_xxx",
+      customerName: "Priya",  // first_name from Medusa customer
+      createdAt: "2026-07-25T...",
+      isOwn: true             // true if current user's comment
+    }
+  ],
+  pagination: { page: 1, limit: 20, total: 5, hasMore: false }
+}
+```
+
+**Add Comment:**
+```ts
+// POST /store/ai-studio/designs/:id/comments
+// Headers: Authorization (JWT)
+// Body
+{ "content": "Love this design! Perfect for my daughter's birthday" }
+
+// Response
+{
+  comment: {
+    id: "uuid",
+    content: "Love this design!...",
+    customerName: "Priya",
+    createdAt: "2026-07-25T...",
+    isOwn: true
+  },
+  commentCount: 6  // updated count on design
+}
+```
+
+---
+
+### Frontend Proxy Routes (Next.js)
+
+| Frontend Route | Proxies To |
+|----------------|-----------|
+| `POST /api/ai-cake-studio/designs/:id/like` | `POST /store/ai-studio/designs/:id/like` |
+| `GET /api/ai-cake-studio/designs/:id/comments` | `GET /store/ai-studio/designs/:id/comments` |
+| `POST /api/ai-cake-studio/designs/:id/comments` | `POST /store/ai-studio/designs/:id/comments` |
+| `DELETE /api/ai-cake-studio/designs/:id/comments/:commentId` | `DELETE /store/ai-studio/designs/:id/comments/:commentId` |
+
+---
+
+### Frontend Components
+
+| Component | What It Does |
+|-----------|-------------|
+| **LikeButton** | Heart icon, shows count, toggles on click, prompts login if not authenticated |
+| **CommentSection** | Expandable list of comments below a design (in gallery detail or lightbox) |
+| **CommentInput** | Text input + submit button (shown only to logged-in users) |
+| **ReportButton** | Small flag icon, opens confirmation, sends report |
+
+---
+
+### Like Flow (End-to-End)
+
+```
+User taps ❤️ on design card
+  → Is logged in?
+    → NO: Show "Login to like" prompt
+    → YES: 
+      → POST /api/ai-cake-studio/designs/:id/like (with JWT cookie)
+        → Proxy → Medusa backend
+          → Check if like exists in design_likes
+            → EXISTS: DELETE it (unlike), decrement like_count
+            → NOT EXISTS: INSERT it (like), increment like_count
+          → Return { liked: true/false, likeCount: N }
+        → Frontend updates UI optimistically
+```
+
+---
+
+### Comment Flow (End-to-End)
+
+```
+User types comment + clicks Submit
+  → Is logged in?
+    → NO: Show "Login to comment" prompt
+    → YES:
+      → POST /api/ai-cake-studio/designs/:id/comments (with JWT cookie)
+        → Proxy → Medusa backend
+          → Validate content (not empty, max 500 chars)
+          → INSERT into design_comments
+          → INCREMENT comment_count on cake_designs
+          → Return { comment, commentCount }
+        → Frontend adds comment to list immediately
+```
+
+---
+
+### Counter Update Strategy
+
+| Approach | How |
+|----------|-----|
+| **Optimistic UI** | Update count immediately on frontend before API responds |
+| **Denormalized counts** | `like_count` and `comment_count` on `cake_designs` table (avoid COUNT queries) |
+| **Increment/Decrement** | Backend uses `UPDATE ... SET like_count = like_count + 1` (atomic, no race conditions) |
+
+---
+
+### Abuse Prevention
+
+| Protection | Implementation |
+|------------|---------------|
+| One like per user per design | `UNIQUE(design_id, customer_id)` constraint |
+| Rate limit comments | Max 5 comments per user per minute (Redis counter) |
+| Content length | Max 500 characters |
+| Report system | Flag for admin review, auto-hide after 3 reports |
+| Spam detection (future) | Basic keyword filter |
+
+---
+
+## Implementation Phases
+
+| Phase | What | Effort |
+|-------|------|--------|
+| **Phase 2a** | Migration (tables + columns) | 15 min |
+| **Phase 2b** | Like backend route + frontend button | 2 hrs |
+| **Phase 2c** | Comment backend routes + frontend UI | 3 hrs |
+| **Phase 2d** | Report functionality | 1 hr |
+
+---
+
+## Summary
+
+- **Like** = simple toggle, one DB insert/delete, atomic counter update
+- **Comment** = text input, auto-published, user can delete own, report button for others
+- **All through Medusa backend** — frontend never touches DB
+- **Proxy pattern** — frontend API routes forward to Medusa with auth cookies
+- **Optimistic UI** — instant feedback, backend confirms
+
+---
+
+Want me to save this as an appendix for your context document?
