@@ -35,6 +35,10 @@ export interface GenerateRequest {
 
 export type ReferencePurpose = "theme_reference" | "recreate_cake" | "photo_cake"
 
+/** Keep in sync with the backend's upload-validation.ts MAX_UPLOAD_BYTES. */
+export const MAX_UPLOAD_MB = 8
+export const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+
 export interface UploadResponse {
   success: boolean
   uploadId?: string
@@ -107,6 +111,27 @@ export async function uploadReferenceImage(
       method: "POST",
       body: formData,
     })
+
+    // A request this large can be rejected by the webserver/proxy in front of
+    // the app before it ever reaches our route handler — that response is an
+    // HTML error page, not JSON, so it must be caught before response.json()
+    // (which would otherwise throw and surface as a generic "network error").
+    if (response.status === 413) {
+      return {
+        success: false,
+        error: `That photo is too large to upload. Please choose one under ${MAX_UPLOAD_MB}MB.`,
+        code: "FILE_TOO_LARGE",
+      }
+    }
+
+    const contentType = response.headers.get("content-type") || ""
+    if (!contentType.includes("application/json")) {
+      return {
+        success: false,
+        error: "Upload failed. Please try a smaller photo, or try again in a moment.",
+        code: "UPLOAD_FAILED",
+      }
+    }
 
     const data: UploadResponse = await response.json()
     return data

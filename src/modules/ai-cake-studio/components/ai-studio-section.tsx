@@ -15,7 +15,13 @@ import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
-import { generateCakeDesigns, uploadReferenceImage, type ReferencePurpose } from "@lib/data/ai-studio"
+import {
+  generateCakeDesigns,
+  uploadReferenceImage,
+  MAX_UPLOAD_MB,
+  MAX_UPLOAD_BYTES,
+  type ReferencePurpose,
+} from "@lib/data/ai-studio"
 
 const FREE_ATTEMPTS_LIMIT = 3
 
@@ -589,6 +595,18 @@ export default function AiStudioSection({ customer }: Props) {
     if (referencePreviewUrl) URL.revokeObjectURL(referencePreviewUrl)
     setReferenceFile(file)
     setReferencePreviewUrl(URL.createObjectURL(file))
+
+    // Checked client-side first so an oversized photo fails instantly with a
+    // clear message, instead of round-tripping to the server (or a proxy in
+    // front of it) just to get rejected there.
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setReferenceUploadId(null)
+      setReferenceUploadError(
+        `That photo is ${(file.size / (1024 * 1024)).toFixed(1)}MB — please choose one under ${MAX_UPLOAD_MB}MB.`
+      )
+      return
+    }
+
     void doReferenceUpload(file, referencePurpose)
   }
 
@@ -857,22 +875,28 @@ export default function AiStudioSection({ customer }: Props) {
               📷 Reference photo (optional)
             </p>
 
-            {!referenceFile ? (
-              <label
-                className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-3 text-center text-xs font-semibold text-violet-700 transition hover:bg-violet-50 ${
-                  generating ? "cursor-not-allowed opacity-60" : ""
-                }`}
-              >
-                + Add a photo — theme inspiration, or a cake to recreate
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={handleReferenceFileSelect}
-                  disabled={generating}
-                />
-              </label>
-            ) : (
+            {!referenceFile && (
+              <>
+                <label
+                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-3 text-center text-xs font-semibold text-violet-700 transition hover:bg-violet-50 ${
+                    generating ? "cursor-not-allowed opacity-60" : ""
+                  }`}
+                >
+                  + Add a photo — theme inspiration, or a cake to recreate
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleReferenceFileSelect}
+                    disabled={generating}
+                  />
+                </label>
+                <p className="mt-1.5 text-center text-[11px] text-slate-400">
+                  JPEG, PNG or WEBP · up to {MAX_UPLOAD_MB}MB
+                </p>
+              </>
+            )}
+            {referenceFile && (
               <div className="flex items-start gap-3">
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-violet-200 bg-white">
                   {referencePreviewUrl && (

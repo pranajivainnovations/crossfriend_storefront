@@ -70,15 +70,22 @@ export interface Baker {
 export interface BakerProfile {
   id: string
   name: string
-  avatar: string
-  rating: number
-  reviewCount: number
-  specialty: string
-  minPrice: number
-  deliveryRadius: string
-  distance: string
-  turnaround: string
+  /** All fields below this point are genuinely optional — a real baker row may not have
+   *  every field filled in yet (no distance figure exists at all: we don't geocode
+   *  pincodes, so it's never sent rather than faked). */
+  avatar?: string
+  rating?: number
+  reviewCount?: number
+  specialty?: string
+  minPrice?: number
+  deliveryRadius?: string
+  /** City/state, e.g. "Sector 62, Noida" — replaces the old fabricated "2.3 km" distance figure. */
+  location?: string
+  turnaround?: string
+  /** Formally affiliated with CrossFriend (Flow A/B eligible) — the "Trust Badge." */
   verified: boolean
+  /** Has their own public store page with their own products — the "Blue Tick." */
+  blueTick?: boolean
   whatsapp?: string
 }
 

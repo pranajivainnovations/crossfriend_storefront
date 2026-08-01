@@ -22,7 +22,7 @@ function BakerCard({ baker, index }: { baker: BakerProfile; index: number }) {
     >
       {/* Avatar */}
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
-        {baker.avatar}
+        {baker.avatar || "🎂"}
       </div>
 
       {/* Info */}
@@ -31,16 +31,25 @@ function BakerCard({ baker, index }: { baker: BakerProfile; index: number }) {
           <p className="text-sm font-bold text-slate-900">{baker.name}</p>
           {baker.verified && (
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
-              ✓ Verified
+              ✓ Trusted Partner
+            </span>
+          )}
+          {baker.blueTick && (
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+              🔵 Blue Tick
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-[11px] text-slate-500">{baker.specialty}</p>
+        {baker.specialty && <p className="mt-0.5 text-[11px] text-slate-500">{baker.specialty}</p>}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-          <span>⭐ {baker.rating} ({baker.reviewCount} reviews)</span>
-          <span>📍 {baker.distance}</span>
-          <span>⏱ {baker.turnaround}</span>
-          <span className="font-semibold text-orange-700">from ₹{baker.minPrice.toLocaleString("en-IN")}</span>
+          {baker.rating != null && (
+            <span>⭐ {baker.rating}{baker.reviewCount != null ? ` (${baker.reviewCount} reviews)` : ""}</span>
+          )}
+          {baker.location && <span>📍 {baker.location}</span>}
+          {baker.turnaround && <span>⏱ {baker.turnaround}</span>}
+          {baker.minPrice != null && (
+            <span className="font-semibold text-orange-700">from ₹{baker.minPrice.toLocaleString("en-IN")}</span>
+          )}
         </div>
       </div>
 
@@ -74,11 +83,15 @@ interface Props {
   generated: boolean
 }
 
+type ServiceStatus = "enabled" | "coming_soon" | "unknown"
+
 export default function BakerFinder({ generated }: Props) {
   const [open, setOpen] = useState(false)
   const [pincode, setPincode] = useState("")
   const [loading, setLoading] = useState(false)
   const [bakers, setBakers] = useState<BakerProfile[] | null>(null)
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null)
+  const [matchType, setMatchType] = useState<"exact" | "nearby" | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
 
   const handleSearch = async () => {
@@ -89,11 +102,20 @@ export default function BakerFinder({ generated }: Props) {
     setLoading(true)
     setError(null)
     setBakers(null)
+    setServiceStatus(null)
+    setMatchType(undefined)
     try {
       const res = await fetch(`/api/bakers?pincode=${pincode}`)
-      const data: { bakers?: BakerProfile[]; error?: string } = await res.json()
+      const data: {
+        bakers?: BakerProfile[]
+        serviceStatus?: ServiceStatus
+        matchType?: "exact" | "nearby"
+        error?: string
+      } = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Failed to fetch bakers")
       setBakers(data.bakers ?? [])
+      setServiceStatus(data.serviceStatus ?? "enabled")
+      setMatchType(data.matchType)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong")
     } finally {
@@ -125,9 +147,13 @@ export default function BakerFinder({ generated }: Props) {
             <p className="text-sm font-bold text-slate-900">Find a Baker Near You</p>
             <p className="text-xs text-slate-500">
               {bakers != null
-                ? bakers.length > 0
-                  ? `${bakers.length} verified baker${bakers.length !== 1 ? "s" : ""} found`
-                  : "No bakers in this area yet"
+                ? serviceStatus === "coming_soon"
+                  ? "Not in this area yet — coming soon"
+                  : serviceStatus === "unknown"
+                    ? "Pincode not recognized"
+                    : bakers.length > 0
+                      ? `${bakers.length} verified baker${bakers.length !== 1 ? "s" : ""} found`
+                      : "No bakers in this area yet"
                 : "Enter your pincode to discover local bakers"}
             </p>
           </div>
@@ -203,9 +229,21 @@ export default function BakerFinder({ generated }: Props) {
                 </div>
               )}
 
-              {/* Baker cards */}
+              {/* Results */}
               {!loading && bakers != null && (
-                bakers.length === 0 ? (
+                serviceStatus === "unknown" ? (
+                  <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
+                    <p className="text-2xl">🤔</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">Pincode not recognized</p>
+                    <p className="mt-1 text-xs text-slate-500">Double check the 6 digits and try again.</p>
+                  </div>
+                ) : serviceStatus === "coming_soon" ? (
+                  <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
+                    <p className="text-2xl">🚧</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">Not in this area yet</p>
+                    <p className="mt-1 text-xs text-slate-500">We&apos;re expanding fast — check back soon!</p>
+                  </div>
+                ) : bakers.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
                     <p className="text-2xl">🌱</p>
                     <p className="mt-2 text-sm font-semibold text-slate-700">No bakers found in this area</p>
@@ -213,6 +251,11 @@ export default function BakerFinder({ generated }: Props) {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {matchType === "nearby" && (
+                      <p className="rounded-xl bg-orange-50 px-3 py-2 text-center text-[11px] font-medium text-orange-700">
+                        No bakers exactly in this pincode — showing bakers from nearby areas
+                      </p>
+                    )}
                     {bakers.map((baker, i) => (
                       <BakerCard key={baker.id} baker={baker} index={i} />
                     ))}
