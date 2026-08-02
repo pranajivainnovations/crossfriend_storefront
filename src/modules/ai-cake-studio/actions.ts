@@ -21,6 +21,10 @@ export interface CakeSelections {
   pincode: string
   designImageUrl?: string
   compiledPrompt?: string
+  /** ai_studio.cake_designs id — lets the backend dedupe against an already-created product for this
+   * customer + design, even if this browser's React state was lost (page reload, re-picking the same
+   * design from the gallery in a new session). See GeneratedDesign.designId. */
+  designId?: string
 }
 
 export interface SavedAiCakeProduct {
@@ -28,6 +32,53 @@ export interface SavedAiCakeProduct {
   variantId: string
   total: number
   breakdown: { label: string; amount: number }[]
+}
+
+export interface PriceEstimateInput {
+  weight: string
+  tiers?: string
+  shape?: string
+  style?: string
+  flavor?: string
+  expressDelivery?: boolean
+  midnightDelivery?: boolean
+  messageOnCake?: boolean
+}
+
+export interface PriceEstimateResult {
+  total: number
+  breakdown: { label: string; amount: number }[]
+}
+
+/**
+ * Live-estimator pricing — calls the same authoritative backend route saveAiCakeProduct's price came
+ * from (and the same one the OPS Simulator calls), so the number shown while adjusting options is
+ * never out of sync with what Find Baker will actually charge. No pincode here: the estimator panel
+ * runs before the customer has entered one, so this always resolves default/region-less pricing —
+ * region-specific overrides only kick in at Find Baker once a pincode exists.
+ */
+export async function estimateAiCakePrice(
+  input: PriceEstimateInput
+): Promise<PriceEstimateResult | { error: string }> {
+  let backendRes: Response
+  try {
+    backendRes = await fetch(`${MEDUSA_BACKEND_URL}/store/ai-studio/price`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    })
+  } catch (error) {
+    console.error("[ai-cake-studio] Failed to reach pricing service", error)
+    return { error: "Could not reach pricing service." }
+  }
+
+  const data = await backendRes.json().catch(() => ({}))
+  if (!backendRes.ok) {
+    return { error: data.error || "Could not calculate price." }
+  }
+
+  return { total: data.total, breakdown: data.breakdown }
 }
 
 /**

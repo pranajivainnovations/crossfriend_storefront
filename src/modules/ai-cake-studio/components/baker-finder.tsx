@@ -1,42 +1,43 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import type { BakerProfile, GeneratedDesign } from "../types"
 import type { EstimatorSelections } from "./price-estimator"
-import { orderAiCake, saveAiCakeProduct, type SavedAiCakeProduct } from "../actions"
+import { orderAiCake, saveAiCakeProduct } from "../actions"
+
+type OrderPhase = "finalizing" | "placing"
 
 // ─── Baker Card ──────────────────────────────────────────────────────────────
 
 function BakerCard({
   baker,
   index,
-  savedProduct,
+  canOrder,
+  isOrderingThis,
+  orderPhase,
+  anyOrderInFlight,
+  onOrder,
 }: {
   baker: BakerProfile
   index: number
-  savedProduct: SavedAiCakeProduct | null
+  canOrder: boolean
+  isOrderingThis: boolean
+  orderPhase: OrderPhase | null
+  anyOrderInFlight: boolean
+  onOrder: (bakerId: string) => void
 }) {
-  const [isPending, startTransition] = useTransition()
-  const [orderError, setOrderError] = useState<string | null>(null)
-
   const waLink = baker.whatsapp
     ? `https://wa.me/91${baker.whatsapp}?text=${encodeURIComponent(
         `Hi! I found your bakery on CrossFriend and would like to discuss a custom cake order.`
       )}`
     : null
 
-  const canOrder = savedProduct != null
-
-  const handleOrder = () => {
-    if (!savedProduct) return
-    setOrderError(null)
-    startTransition(async () => {
-      const result = await orderAiCake(savedProduct.variantId, baker.id)
-      // A successful order redirects server-side (never returns here) — only a failure returns a value.
-      if (result?.error) setOrderError(result.error)
-    })
-  }
+  const label = isOrderingThis
+    ? orderPhase === "finalizing"
+      ? "Finalizing your cake…"
+      : "🎂 Cake finalized! Placing order…"
+    : "🛒 Order Now"
 
   return (
     <motion.div
@@ -82,12 +83,12 @@ function BakerCard({
       <div className="flex shrink-0 flex-col items-end gap-2">
         <button
           type="button"
-          onClick={handleOrder}
-          disabled={!canOrder || isPending}
+          onClick={() => onOrder(baker.id)}
+          disabled={!canOrder || anyOrderInFlight}
           title={canOrder ? undefined : "Open the price estimator and pick your cake options first"}
           className="rounded-xl bg-orange-500 px-4 py-2 text-center text-xs font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isPending ? "Placing order…" : "🛒 Order Now"}
+          {label}
         </button>
         {waLink && (
           <a
@@ -98,9 +99,6 @@ function BakerCard({
           >
             💬 WhatsApp
           </a>
-        )}
-        {orderError && (
-          <p className="max-w-[140px] text-right text-[10px] font-medium text-red-500">{orderError}</p>
         )}
       </div>
     </motion.div>
@@ -128,18 +126,18 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
   const [matchType, setMatchType] = useState<"exact" | "nearby" | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
 
-  // The real Medusa product for this design — created (or updated, if selections changed since the
-  // last search) right before the actual baker search fires, since every price-determining selection
-  // is final by then. See ai-cake-studio/actions.ts for why this point in the flow.
-  const [savedProduct, setSavedProduct] = useState<SavedAiCakeProduct | null>(null)
+  // The real Medusa product for this design — created (or updated in place, if this customer already
+  // has one) the moment "Order Now" is clicked, never before. This is the single place in the whole
+  // flow that creates a product: there's no earlier, silent creation step for the customer to be
+  // unsure about, and clicking any baker's "Order Now" runs the exact same code path.
+  const [savedProductId, setSavedProductId] = useState<{ productId: string; variantId: string } | null>(null)
+  const [orderingBakerId, setOrderingBakerId] = useState<string | null>(null)
+  const [orderPhase, setOrderPhase] = useState<OrderPhase | null>(null)
+  const [orderError, setOrderError] = useState<string | null>(null)
 
   const handleSearch = async () => {
     if (!/^\d{6}$/.test(pincode)) {
       setError("Please enter a valid 6-digit pincode")
-      return
-    }
-    if (!estimatorSelections) {
-      setError("Open the price estimator and pick your cake options first")
       return
     }
     setLoading(true)
@@ -147,30 +145,6 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
     setBakers(null)
     setServiceStatus(null)
     setMatchType(undefined)
-
-    const productResult = await saveAiCakeProduct(
-      {
-        weight: estimatorSelections.weight,
-        tiers: estimatorSelections.tiers,
-        shape: estimatorSelections.shape,
-        style: cakeStyle,
-        flavor: estimatorSelections.flavor,
-        occasion,
-        expressDelivery: estimatorSelections.expressDelivery,
-        midnightDelivery: estimatorSelections.midnightDelivery,
-        cakeMessage: estimatorSelections.message,
-        pincode,
-        designImageUrl: selectedDesign?.imageUrl,
-        compiledPrompt: selectedDesign?.compiledPrompt,
-      },
-      savedProduct ? { productId: savedProduct.productId, variantId: savedProduct.variantId } : undefined
-    )
-    if ("error" in productResult) {
-      setError(productResult.error)
-      setLoading(false)
-      return
-    }
-    setSavedProduct(productResult)
 
     try {
       const res = await fetch(`/api/bakers?pincode=${pincode}`)
@@ -188,6 +162,59 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
       setError(e instanceof Error ? e.message : "Something went wrong")
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * The one and only place the real Medusa product gets created — finalizes the design (creating it,
+   * or updating the customer's existing one in place if they've already got one for this exact
+   * design, so a retry or a second baker's button never creates a duplicate) and then places the
+   * order with the chosen baker in a single click.
+   */
+  const handleOrder = async (bakerId: string) => {
+    if (!estimatorSelections) {
+      setOrderError("Open the price estimator and pick your cake options first")
+      return
+    }
+    if (orderingBakerId) return // one finalize/order in flight at a time — no double-submission race
+
+    setOrderError(null)
+    setOrderingBakerId(bakerId)
+    setOrderPhase("finalizing")
+
+    const productResult = await saveAiCakeProduct(
+      {
+        weight: estimatorSelections.weight,
+        tiers: estimatorSelections.tiers,
+        shape: estimatorSelections.shape,
+        style: cakeStyle,
+        flavor: estimatorSelections.flavor,
+        occasion,
+        expressDelivery: estimatorSelections.expressDelivery,
+        midnightDelivery: estimatorSelections.midnightDelivery,
+        cakeMessage: estimatorSelections.message,
+        pincode,
+        designImageUrl: selectedDesign?.imageUrl,
+        compiledPrompt: selectedDesign?.compiledPrompt,
+        designId: selectedDesign?.designId,
+      },
+      savedProductId ?? undefined
+    )
+    if ("error" in productResult) {
+      setOrderError(productResult.error)
+      setOrderingBakerId(null)
+      setOrderPhase(null)
+      return
+    }
+    setSavedProductId({ productId: productResult.productId, variantId: productResult.variantId })
+    setOrderPhase("placing")
+
+    const result = await orderAiCake(productResult.variantId, bakerId)
+    // A successful order redirects server-side (never returns here) — only a failure returns a value.
+    if (result?.error) {
+      setOrderError(result.error)
+      setOrderingBakerId(null)
+      setOrderPhase(null)
     }
   }
 
@@ -324,8 +351,27 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
                         No bakers exactly in this pincode — showing bakers from nearby areas
                       </p>
                     )}
+                    {savedProductId && (
+                      <p className="rounded-xl bg-green-50 px-3 py-2 text-center text-[11px] font-semibold text-green-700 ring-1 ring-green-200">
+                        🎂 Your cake design is finalized — pick a baker below to place your order.
+                      </p>
+                    )}
+                    {orderError && (
+                      <p className="rounded-xl bg-red-50 px-3 py-2 text-center text-[11px] font-medium text-red-600 ring-1 ring-red-200">
+                        {orderError}
+                      </p>
+                    )}
                     {bakers.map((baker, i) => (
-                      <BakerCard key={baker.id} baker={baker} index={i} savedProduct={savedProduct} />
+                      <BakerCard
+                        key={baker.id}
+                        baker={baker}
+                        index={i}
+                        canOrder={estimatorSelections != null}
+                        isOrderingThis={orderingBakerId === baker.id}
+                        orderPhase={orderingBakerId === baker.id ? orderPhase : null}
+                        anyOrderInFlight={orderingBakerId != null}
+                        onOrder={handleOrder}
+                      />
                     ))}
                     <p className="text-center text-[11px] text-slate-400">
                       Showing bakers within delivery range · More bakers join CrossFriend every week

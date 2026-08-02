@@ -38,6 +38,11 @@ export interface GeneratedDesign {
   imageUrl?: string  // ← needs this
   /** Exact compiled prompt sent to the image provider — shown via "View AI Prompt" so it can be reused elsewhere */
   compiledPrompt?: string
+  /** The underlying ai_studio.cake_designs id — always the raw backend id, unlike `id` above (which
+   * gets a "showcase-" prefix for gallery-adopted designs to keep React keys unique). Sent to
+   * /store/ai-studio/product so the backend can look up whether this customer already has a product
+   * for this exact design, instead of only trusting frontend state that a page reload would lose. */
+  designId?: string
 }
 
 export interface AiAnalysis {

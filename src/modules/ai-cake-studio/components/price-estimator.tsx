@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
 import type { Addon } from "../types"
+import { estimateAiCakePrice } from "../actions"
 
 // ─── Pricing types (matches new config structure) ────────────────────────────
 
@@ -374,15 +375,49 @@ export default function PriceEstimator({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel])
 
+  // Real backend price — debounced so it doesn't fire the pricing engine on every keystroke/pill
+  // click. The instant local `computePrice()` estimate below still renders immediately so the panel
+  // never feels laggy; this overwrites it ~500ms after the last change with the true, OPS-configured
+  // number (the same one Find Baker will actually charge), so nothing here can drift from the order
+  // price the way the old static-config-only estimator could.
+  const [realPricing, setRealPricing] = useState<{ total: number; breakdown: { label: string; amount: number }[] } | null>(null)
+  const [, startPricingTransition] = useTransition()
+
+  useEffect(() => {
+    if (!generated) return
+    const timer = setTimeout(() => {
+      startPricingTransition(async () => {
+        const res = await estimateAiCakePrice({
+          weight: sel.weight,
+          tiers: sel.tiers,
+          shape: sel.shape,
+          style: cakeStyle,
+          flavor: sel.flavor,
+          expressDelivery: sel.expressDelivery,
+          midnightDelivery: sel.midnightDelivery,
+          messageOnCake: sel.message.trim().length > 0,
+        })
+        if (!("error" in res)) {
+          setRealPricing(res)
+        }
+        // On error, silently keep showing the local estimate — the existing "Indicative price
+        // only" disclaimer already covers this, and Find Baker re-derives the real price anyway.
+      })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [generated, sel.weight, sel.tiers, sel.shape, sel.flavor, sel.expressDelivery, sel.midnightDelivery, sel.message, cakeStyle])
+
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
 
   const activeAddons: Addon[] = dbAddons ?? FALLBACK_ADDONS
 
-  // Compute price
-  const { total: cakeTotal, breakdown } = useMemo(
+  // Compute price — instant local estimate as a placeholder, real backend number (once loaded) wins.
+  const localEstimate = useMemo(
     () => computePrice(sel, cakeStyle, pricing),
     [sel, cakeStyle, pricing]
   )
+  const cakeTotal = realPricing?.total ?? localEstimate.total
+  const breakdown = realPricing?.breakdown ?? localEstimate.breakdown
 
   // Addons
   const suggested = useMemo(

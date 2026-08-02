@@ -686,6 +686,7 @@ export default function AiStudioSection({ customer }: Props) {
       ...prev,
       ...result.designs!.map((d) => ({
         id: d.id,
+        designId: d.id,
         title: d.title,
         description: d.description,
         style: d.style,
@@ -734,6 +735,7 @@ export default function AiStudioSection({ customer }: Props) {
   const adoptShowcaseDesign = (payload: UseCakePayload) => {
     const adopted: GeneratedDesign = {
       id: `showcase-${payload.id}`,
+      designId: payload.id,
       title: `${payload.style}${payload.occasion ? " · " + payload.occasion : ""} Cake`,
       description: payload.prompt,
       gradient: "from-violet-400 via-purple-300 to-indigo-400",
