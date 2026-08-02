@@ -16,8 +16,12 @@ const LineItemUnitPrice = ({
   region,
   style = "default",
 }: LineItemUnitPriceProps) => {
-  const originalPrice = (item.variant as CalculatedVariant).original_price
-  const hasReducedPrice = (originalPrice * item.quantity || 0) > item.total!
+  // Variant-less items (e.g. AI Cake Studio's custom-priced line items) have no "original price" to
+  // compare against — there's never a discount to show for them.
+  const originalPrice = item.variant
+    ? (item.variant as CalculatedVariant).original_price
+    : item.unit_price
+  const hasReducedPrice = item.variant && (originalPrice * item.quantity || 0) > item.total!
   const reducedPrice = (item.total || 0) / item.quantity!
 
   return (

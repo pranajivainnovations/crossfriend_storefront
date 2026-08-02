@@ -103,6 +103,23 @@ const Payment = ({
     setError(null)
   }, [isOpen])
 
+  // Auto-select Cash on Delivery as the default payment method — it's the one CrossFriend actually
+  // ships with today (Razorpay is available but not the primary path yet), so pre-selecting it saves
+  // a click without taking the choice away: the radio group stays fully interactive, the customer can
+  // still switch to Razorpay themselves.
+  useEffect(() => {
+    if (
+      !paidByGiftcard &&
+      cart?.payment_sessions?.length &&
+      !cart?.payment_session &&
+      !isLoading
+    ) {
+      const codSession = cart.payment_sessions.find((s) => s.provider_id === "manual")
+      if (codSession) set(codSession.provider_id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart?.payment_sessions, cart?.payment_session, paidByGiftcard])
+
   return (
     <div className="bg-white">
       <div className="flex flex-row items-center justify-between mb-6">

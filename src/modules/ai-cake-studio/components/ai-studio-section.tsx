@@ -12,6 +12,7 @@ import {
   CF_OCCASION_MESSAGES,
 } from "../data/mock-data"
 import PriceEstimator from "./price-estimator"
+import type { EstimatorSelections } from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
@@ -483,6 +484,9 @@ export default function AiStudioSection({ customer }: Props) {
   // Bumped whenever "Use This Design" is clicked — PriceEstimator watches
   // this to auto-expand itself instead of requiring a second manual click.
   const [priceEstimatorOpenSignal, setPriceEstimatorOpenSignal] = useState(0)
+  // Mirrors PriceEstimator's own selection state (it's the only owner of weight/delivery-options) so
+  // BakerFinder's "Order Now" has everything it needs without lifting the whole panel.
+  const [estimatorSelections, setEstimatorSelections] = useState<EstimatorSelections | null>(null)
 
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -1307,12 +1311,18 @@ export default function AiStudioSection({ customer }: Props) {
           initialShape={sel.shape}
           initialCakeMessage={sel.cakeMessage}
           openSignal={priceEstimatorOpenSignal}
+          onSelectionsChange={setEstimatorSelections}
           />
         </div>
 
         {/* Baker Finder */}
         <div id="baker-section" className="mt-4">
-          <BakerFinder generated={generated} />
+          <BakerFinder
+            generated={generated || designs.length > 0}
+            cakeStyle={sel.style}
+            estimatorSelections={estimatorSelections}
+            selectedDesign={designs.find((d) => d.id === selectedDesignId) ?? null}
+          />
         </div>
       </div>
 

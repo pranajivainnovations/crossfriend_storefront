@@ -74,22 +74,81 @@ export async function createCart(data = {}) {
 export async function updateCart(cartId: string, data: StorePostCartsCartReq) {
   const headers = getMedusaHeaders(["cart"])
 
-  return medusaClient.carts
+  const cart = await medusaClient.carts
     .update(cartId, data, headers)
     .then(({ cart }) => cart)
     .catch((error) => medusaError(error))
+
+  // This is the actual source of the AI Cake Studio price corruption, not just the final checkout
+  // step: any update that includes region_id or customer_id makes Medusa re-derive every line item's
+  // price from its variant (confirmed in cart.js's updateUnitPrices_) — and the checkout's address
+  // step does exactly this. Repairing only right before completeCart() left every screen in between
+  // (cart page, mini-cart, delivery, payment, review) showing the wrong price until the very end.
+  // Repairing right here, at the one place every mutation flows through, keeps every screen correct
+  // the whole way through, not just the final total. Re-fetching afterward matters: the `cart` object
+  // above is the response from *before* the repair ran, so returning it as-is would still hand the
+  // caller the corrupted price even though the DB is already fixed.
+  if ("region_id" in data || "customer_id" in data) {
+    try {
+      const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
+      await fetch(`${backendUrl}/store/ai-studio/cart/repair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartId }),
+        cache: "no-store",
+      })
+      return await medusaClient.carts
+        .retrieve(cartId, headers)
+        .then(({ cart }) => cart)
+        .catch(() => cart)
+    } catch (error) {
+      console.error("[updateCart] AI cake price repair check failed", error)
+    }
+  }
+
+  return cart
 }
 
 export const getCart = cache(async function (cartId: string) {
   const headers = getMedusaHeaders(["cart"])
 
-  return medusaClient.carts
+  const cart = await medusaClient.carts
     .retrieve(cartId, headers)
     .then(({ cart }) => cart)
     .catch((err) => {
       console.log(err)
       return null
     })
+
+  if (!cart) return cart
+
+  // Self-heals on every read, rather than chasing every possible write that could have caused the
+  // drift — Medusa's cartService.update() re-derives a line item's price from its variant whenever
+  // region_id/customer_id appears in *any* update call anywhere in the checkout flow (address step,
+  // region sync, etc.), and enumerating every call site individually kept missing one. Checking here
+  // means every screen that shows the cart (cart page, mini-cart, checkout) is guaranteed correct
+  // regardless of which write caused the mismatch or whether that call site was covered.
+  const needsRepair = cart.items?.some(
+    (item) => typeof item.metadata?.correctUnitPrice === "number" && item.unit_price !== item.metadata.correctUnitPrice
+  )
+  if (!needsRepair) return cart
+
+  try {
+    const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
+    await fetch(`${backendUrl}/store/ai-studio/cart/repair`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cartId }),
+      cache: "no-store",
+    })
+    return await medusaClient.carts
+      .retrieve(cartId, headers)
+      .then(({ cart }) => cart)
+      .catch(() => cart)
+  } catch (error) {
+    console.error("[getCart] AI cake price repair check failed", error)
+    return cart
+  }
 })
 
 export async function addItem({
@@ -190,6 +249,24 @@ export async function setPaymentSession({
 
 export async function completeCart(cartId: string) {
   const headers = getMedusaHeaders(["cart"])
+
+  // Belt-and-suspenders against a real Medusa v1 behavior: cartService.update() re-derives every line
+  // item's price from its variant whenever region_id/customer_id is present in the update call — the
+  // standard checkout's address step does exactly that, which can silently corrupt an AI Cake Studio
+  // item's custom price earlier in the flow. There's an async cart.updated subscriber that repairs this
+  // too, but it depends on the event bus (Redis) actually delivering the event — this synchronous call
+  // guarantees correctness right at the moment that matters, regardless of that.
+  try {
+    const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
+    await fetch(`${backendUrl}/store/ai-studio/cart/repair`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cartId }),
+      cache: "no-store",
+    })
+  } catch (error) {
+    console.error("[completeCart] AI cake price repair check failed", error)
+  }
 
   return medusaClient.carts
     .complete(cartId, headers)

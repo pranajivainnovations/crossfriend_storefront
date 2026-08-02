@@ -25,7 +25,9 @@ const Item = ({ item, region, type = "full" }: ItemProps) => {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { handle } = item.variant.product
+  // AI Cake Studio items are deliberately variant-less (custom per-order pricing) — there's no
+  // product page to link to for one of these.
+  const handle = item.variant?.product.handle
 
   const changeQuantity = async (quantity: number) => {
     setError(null)
@@ -48,15 +50,26 @@ const Item = ({ item, region, type = "full" }: ItemProps) => {
   return (
     <Table.Row className="w-full" data-testid="product-row">
       <Table.Cell className="!pl-0 p-4 w-24">
-        <LocalizedClientLink
-          href={`/products/${handle}`}
-          className={clx("flex", {
-            "w-16": type === "preview",
-            "small:w-24 w-12": type === "full",
-          })}
-        >
-          <Thumbnail thumbnail={item.thumbnail} size="square" />
-        </LocalizedClientLink>
+        {handle ? (
+          <LocalizedClientLink
+            href={`/products/${handle}`}
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail thumbnail={item.thumbnail} size="square" />
+          </LocalizedClientLink>
+        ) : (
+          <div
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail thumbnail={item.thumbnail} size="square" />
+          </div>
+        )}
       </Table.Cell>
 
       <Table.Cell className="text-left">
@@ -76,8 +89,9 @@ const Item = ({ item, region, type = "full" }: ItemProps) => {
             >
               {Array.from(
                 {
+                  // Variant-less items (made-to-order, no real inventory to check) always offer up to 10.
                   length: Math.min(
-                    item.variant.inventory_quantity > 0
+                    item.variant && item.variant.inventory_quantity > 0
                       ? item.variant.inventory_quantity
                       : 10,
                     10

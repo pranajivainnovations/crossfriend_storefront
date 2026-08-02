@@ -1,17 +1,55 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import type { BakerProfile } from "../types"
+import type { BakerProfile, GeneratedDesign } from "../types"
+import type { EstimatorSelections } from "./price-estimator"
+import { orderAiCake } from "../actions"
 
 // ─── Baker Card ──────────────────────────────────────────────────────────────
 
-function BakerCard({ baker, index }: { baker: BakerProfile; index: number }) {
+interface OrderContext {
+  cakeStyle: string
+  estimatorSelections: EstimatorSelections | null
+  selectedDesign: GeneratedDesign | null
+  pincode: string
+}
+
+function BakerCard({ baker, index, orderContext }: { baker: BakerProfile; index: number; orderContext: OrderContext }) {
+  const [isPending, startTransition] = useTransition()
+  const [orderError, setOrderError] = useState<string | null>(null)
+
   const waLink = baker.whatsapp
     ? `https://wa.me/91${baker.whatsapp}?text=${encodeURIComponent(
         `Hi! I found your bakery on CrossFriend and would like to discuss a custom cake order.`
       )}`
     : null
+
+  const canOrder = orderContext.estimatorSelections != null
+
+  const handleOrder = () => {
+    if (!orderContext.estimatorSelections) return
+    setOrderError(null)
+    const sel = orderContext.estimatorSelections
+    startTransition(async () => {
+      const result = await orderAiCake({
+        weight: sel.weight,
+        tiers: sel.tiers,
+        shape: sel.shape,
+        style: orderContext.cakeStyle,
+        flavor: sel.flavor,
+        expressDelivery: sel.expressDelivery,
+        midnightDelivery: sel.midnightDelivery,
+        cakeMessage: sel.message,
+        pincode: orderContext.pincode,
+        bakerId: baker.id,
+        designImageUrl: orderContext.selectedDesign?.imageUrl,
+        compiledPrompt: orderContext.selectedDesign?.compiledPrompt,
+      })
+      // A successful order redirects server-side (never returns here) — only a failure returns a value.
+      if (result?.error) setOrderError(result.error)
+    })
+  }
 
   return (
     <motion.div
@@ -54,8 +92,17 @@ function BakerCard({ baker, index }: { baker: BakerProfile; index: number }) {
       </div>
 
       {/* CTA */}
-      <div className="flex shrink-0 flex-col gap-2">
-        {waLink ? (
+      <div className="flex shrink-0 flex-col items-end gap-2">
+        <button
+          type="button"
+          onClick={handleOrder}
+          disabled={!canOrder || isPending}
+          title={canOrder ? undefined : "Open the price estimator and pick your cake options first"}
+          className="rounded-xl bg-orange-500 px-4 py-2 text-center text-xs font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isPending ? "Placing order…" : "🛒 Order Now"}
+        </button>
+        {waLink && (
           <a
             href={waLink}
             target="_blank"
@@ -64,13 +111,9 @@ function BakerCard({ baker, index }: { baker: BakerProfile; index: number }) {
           >
             💬 WhatsApp
           </a>
-        ) : (
-          <button
-            type="button"
-            className="rounded-xl border border-orange-300 bg-white px-3 py-2 text-xs font-bold text-orange-600 transition hover:bg-orange-50"
-          >
-            Request<br />Quote
-          </button>
+        )}
+        {orderError && (
+          <p className="max-w-[140px] text-right text-[10px] font-medium text-red-500">{orderError}</p>
         )}
       </div>
     </motion.div>
@@ -81,11 +124,14 @@ function BakerCard({ baker, index }: { baker: BakerProfile; index: number }) {
 
 interface Props {
   generated: boolean
+  cakeStyle: string
+  estimatorSelections: EstimatorSelections | null
+  selectedDesign: GeneratedDesign | null
 }
 
 type ServiceStatus = "enabled" | "coming_soon" | "unknown"
 
-export default function BakerFinder({ generated }: Props) {
+export default function BakerFinder({ generated, cakeStyle, estimatorSelections, selectedDesign }: Props) {
   const [open, setOpen] = useState(false)
   const [pincode, setPincode] = useState("")
   const [loading, setLoading] = useState(false)
@@ -257,7 +303,12 @@ export default function BakerFinder({ generated }: Props) {
                       </p>
                     )}
                     {bakers.map((baker, i) => (
-                      <BakerCard key={baker.id} baker={baker} index={i} />
+                      <BakerCard
+                        key={baker.id}
+                        baker={baker}
+                        index={i}
+                        orderContext={{ cakeStyle, estimatorSelections, selectedDesign, pincode }}
+                      />
                     ))}
                     <p className="text-center text-[11px] text-slate-400">
                       Showing bakers within delivery range · More bakers join CrossFriend every week

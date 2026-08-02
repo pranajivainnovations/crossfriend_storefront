@@ -282,7 +282,14 @@ interface PriceEstimatorProps {
   /** Bump this (e.g. n => n + 1) to force the estimator open — used by the
    * "Use This Design" CTA so picking a design opens billing in one click. */
   openSignal?: number
+  /** Reports the live weight/tiers/shape/flavor/delivery-option selections up to the parent whenever
+   * they change — the parent needs these to hand off to BakerFinder's "Order Now," since this panel
+   * owns the only copy of them. Not used for pricing math here; the actual order price is always
+   * recomputed authoritatively by the backend at order time, never trusted from this snapshot. */
+  onSelectionsChange?: (selections: EstimatorSelections) => void
 }
+
+export type { EstimatorSelections }
 
 export default function PriceEstimator({
   cakeStyle,
@@ -293,6 +300,7 @@ export default function PriceEstimator({
   initialShape,
   initialCakeMessage,
   openSignal,
+  onSelectionsChange,
 }: PriceEstimatorProps) {
   const [open, setOpen] = useState(false)
 
@@ -358,6 +366,13 @@ export default function PriceEstimator({
       })
       .catch(() => {})
   }, [open, configLoaded])
+
+  // Report the live selections up to the parent — BakerFinder's "Order Now" needs them, and this
+  // panel is the only place that owns them.
+  useEffect(() => {
+    onSelectionsChange?.(sel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel])
 
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
 

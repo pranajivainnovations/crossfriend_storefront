@@ -63,6 +63,19 @@ const Shipping: React.FC<ShippingProps> = ({
     setError(null)
   }, [isOpen])
 
+  // Auto-select when there's only one real choice to make — currently exactly one shipping option
+  // exists, so there's nothing for the customer to actually decide here; requiring a manual click
+  // just adds a step. Deliberately only fires when there's exactly one option, not "always pick the
+  // first" — if a second real shipping option is ever added, that becomes a genuine choice again and
+  // should require an explicit click.
+  useEffect(() => {
+    const onlyOption = availableShippingMethods?.length === 1 ? availableShippingMethods[0] : undefined
+    if (onlyOption?.id && !cart.shipping_methods[0] && !isLoading) {
+      set(onlyOption.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableShippingMethods, cart.shipping_methods])
+
   return (
     <div className="bg-white">
       <div className="flex flex-row items-center justify-between mb-6">

@@ -158,23 +158,30 @@ export async function enrichLineItems(
   | Omit<LineItem, "beforeInsert" | "beforeUpdate" | "afterUpdateOrLoad">[]
   | undefined
 > {
-  // Prepare query parameters
+  // Prepare query parameters — AI Cake Studio items are deliberately variant-less (custom per-order
+  // pricing, see the backend's ai-studio/cart route), so they're excluded from this lookup entirely
+  // rather than crashing on `lineItem.variant.product_id`.
   const queryParams = {
-    ids: lineItems.map((lineItem) => lineItem.variant.product_id),
+    ids: lineItems.filter((lineItem) => lineItem.variant).map((lineItem) => lineItem.variant.product_id),
     regionId: regionId,
   }
 
   // Fetch products by their IDs
   const products = await getProductsById(queryParams)
 
-  // If there are no line items or products, return an empty array
-  if (!lineItems?.length || !products) {
+  // If there are no line items or products, return the line items as-is (still valid for variant-less items)
+  if (!lineItems?.length) {
     return []
+  }
+  if (!products) {
+    return lineItems
   }
 
   // Enrich line items with product and variant information
 
   const enrichedItems = lineItems.map((item) => {
+    if (!item.variant) return item
+
     const product = products.find((p) => p.id === item.variant.product_id)
     const variant = product?.variants.find((v) => v.id === item.variant_id)
 
