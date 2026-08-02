@@ -4,18 +4,19 @@ import { useState, useTransition } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import type { BakerProfile, GeneratedDesign } from "../types"
 import type { EstimatorSelections } from "./price-estimator"
-import { orderAiCake } from "../actions"
+import { orderAiCake, saveAiCakeProduct, type SavedAiCakeProduct } from "../actions"
 
 // ─── Baker Card ──────────────────────────────────────────────────────────────
 
-interface OrderContext {
-  cakeStyle: string
-  estimatorSelections: EstimatorSelections | null
-  selectedDesign: GeneratedDesign | null
-  pincode: string
-}
-
-function BakerCard({ baker, index, orderContext }: { baker: BakerProfile; index: number; orderContext: OrderContext }) {
+function BakerCard({
+  baker,
+  index,
+  savedProduct,
+}: {
+  baker: BakerProfile
+  index: number
+  savedProduct: SavedAiCakeProduct | null
+}) {
   const [isPending, startTransition] = useTransition()
   const [orderError, setOrderError] = useState<string | null>(null)
 
@@ -25,27 +26,13 @@ function BakerCard({ baker, index, orderContext }: { baker: BakerProfile; index:
       )}`
     : null
 
-  const canOrder = orderContext.estimatorSelections != null
+  const canOrder = savedProduct != null
 
   const handleOrder = () => {
-    if (!orderContext.estimatorSelections) return
+    if (!savedProduct) return
     setOrderError(null)
-    const sel = orderContext.estimatorSelections
     startTransition(async () => {
-      const result = await orderAiCake({
-        weight: sel.weight,
-        tiers: sel.tiers,
-        shape: sel.shape,
-        style: orderContext.cakeStyle,
-        flavor: sel.flavor,
-        expressDelivery: sel.expressDelivery,
-        midnightDelivery: sel.midnightDelivery,
-        cakeMessage: sel.message,
-        pincode: orderContext.pincode,
-        bakerId: baker.id,
-        designImageUrl: orderContext.selectedDesign?.imageUrl,
-        compiledPrompt: orderContext.selectedDesign?.compiledPrompt,
-      })
+      const result = await orderAiCake(savedProduct.variantId, baker.id)
       // A successful order redirects server-side (never returns here) — only a failure returns a value.
       if (result?.error) setOrderError(result.error)
     })
@@ -125,13 +112,14 @@ function BakerCard({ baker, index, orderContext }: { baker: BakerProfile; index:
 interface Props {
   generated: boolean
   cakeStyle: string
+  occasion?: string
   estimatorSelections: EstimatorSelections | null
   selectedDesign: GeneratedDesign | null
 }
 
 type ServiceStatus = "enabled" | "coming_soon" | "unknown"
 
-export default function BakerFinder({ generated, cakeStyle, estimatorSelections, selectedDesign }: Props) {
+export default function BakerFinder({ generated, cakeStyle, occasion, estimatorSelections, selectedDesign }: Props) {
   const [open, setOpen] = useState(false)
   const [pincode, setPincode] = useState("")
   const [loading, setLoading] = useState(false)
@@ -140,9 +128,18 @@ export default function BakerFinder({ generated, cakeStyle, estimatorSelections,
   const [matchType, setMatchType] = useState<"exact" | "nearby" | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
 
+  // The real Medusa product for this design — created (or updated, if selections changed since the
+  // last search) right before the actual baker search fires, since every price-determining selection
+  // is final by then. See ai-cake-studio/actions.ts for why this point in the flow.
+  const [savedProduct, setSavedProduct] = useState<SavedAiCakeProduct | null>(null)
+
   const handleSearch = async () => {
     if (!/^\d{6}$/.test(pincode)) {
       setError("Please enter a valid 6-digit pincode")
+      return
+    }
+    if (!estimatorSelections) {
+      setError("Open the price estimator and pick your cake options first")
       return
     }
     setLoading(true)
@@ -150,6 +147,31 @@ export default function BakerFinder({ generated, cakeStyle, estimatorSelections,
     setBakers(null)
     setServiceStatus(null)
     setMatchType(undefined)
+
+    const productResult = await saveAiCakeProduct(
+      {
+        weight: estimatorSelections.weight,
+        tiers: estimatorSelections.tiers,
+        shape: estimatorSelections.shape,
+        style: cakeStyle,
+        flavor: estimatorSelections.flavor,
+        occasion,
+        expressDelivery: estimatorSelections.expressDelivery,
+        midnightDelivery: estimatorSelections.midnightDelivery,
+        cakeMessage: estimatorSelections.message,
+        pincode,
+        designImageUrl: selectedDesign?.imageUrl,
+        compiledPrompt: selectedDesign?.compiledPrompt,
+      },
+      savedProduct ? { productId: savedProduct.productId, variantId: savedProduct.variantId } : undefined
+    )
+    if ("error" in productResult) {
+      setError(productResult.error)
+      setLoading(false)
+      return
+    }
+    setSavedProduct(productResult)
+
     try {
       const res = await fetch(`/api/bakers?pincode=${pincode}`)
       const data: {
@@ -303,12 +325,7 @@ export default function BakerFinder({ generated, cakeStyle, estimatorSelections,
                       </p>
                     )}
                     {bakers.map((baker, i) => (
-                      <BakerCard
-                        key={baker.id}
-                        baker={baker}
-                        index={i}
-                        orderContext={{ cakeStyle, estimatorSelections, selectedDesign, pincode }}
-                      />
+                      <BakerCard key={baker.id} baker={baker} index={i} savedProduct={savedProduct} />
                     ))}
                     <p className="text-center text-[11px] text-slate-400">
                       Showing bakers within delivery range · More bakers join CrossFriend every week

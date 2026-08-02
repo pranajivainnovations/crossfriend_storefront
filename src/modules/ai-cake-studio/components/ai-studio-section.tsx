@@ -1320,6 +1320,7 @@ export default function AiStudioSection({ customer }: Props) {
           <BakerFinder
             generated={generated || designs.length > 0}
             cakeStyle={sel.style}
+            occasion={sel.occasion}
             estimatorSelections={estimatorSelections}
             selectedDesign={designs.find((d) => d.id === selectedDesignId) ?? null}
           />
