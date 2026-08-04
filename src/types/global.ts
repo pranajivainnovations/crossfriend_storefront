@@ -46,7 +46,7 @@ export type CartWithCheckoutStep = Omit<
   Cart,
   "beforeInsert" | "beforeUpdate" | "afterUpdateOrLoad"
 > & {
-  checkout_step: "address" | "delivery" | "payment"
+  checkout_step: "address" | "review"
 }
 
 export type ProductCategoryWithChildren = Omit<

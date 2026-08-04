@@ -12,10 +12,10 @@ import {
   CF_OCCASION_MESSAGES,
 } from "../data/mock-data"
 import PriceEstimator from "./price-estimator"
-import type { EstimatorSelections } from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
+import type { SavedAiCakeProduct } from "../actions"
 import {
   generateCakeDesigns,
   uploadReferenceImage,
@@ -484,9 +484,11 @@ export default function AiStudioSection({ customer }: Props) {
   // Bumped whenever "Use This Design" is clicked — PriceEstimator watches
   // this to auto-expand itself instead of requiring a second manual click.
   const [priceEstimatorOpenSignal, setPriceEstimatorOpenSignal] = useState(0)
-  // Mirrors PriceEstimator's own selection state (it's the only owner of weight/delivery-options) so
-  // BakerFinder's "Order Now" has everything it needs without lifting the whole panel.
-  const [estimatorSelections, setEstimatorSelections] = useState<EstimatorSelections | null>(null)
+  // The real Medusa product + the confirmed delivery pincode — both owned and set by PriceEstimator
+  // (pincode gates its pricing, "Save This Cake" creates the product), and both needed by BakerFinder,
+  // which no longer collects or creates either of these itself.
+  const [savedProduct, setSavedProduct] = useState<SavedAiCakeProduct | null>(null)
+  const [confirmedPincode, setConfirmedPincode] = useState<string | null>(null)
 
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -1269,18 +1271,6 @@ export default function AiStudioSection({ customer }: Props) {
 
                         <button
                           type="button"
-                          onClick={() => document.getElementById("baker-section")?.scrollIntoView({ behavior: "smooth" })}
-                          className="flex w-full items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-left transition hover:bg-violet-100"
-                        >
-                          <span className="mt-0.5 text-base">📍</span>
-                          <div>
-                            <p className="text-sm font-semibold text-violet-800">Find a baker near me</p>
-                            <p className="text-xs text-slate-500">Connect with a verified local baker to make this exact cake</p>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
                           onClick={() => {
                             const d = designs.find((x) => x.id === selectedDesignId)
                             if (d) handleShare(d)
@@ -1313,7 +1303,9 @@ export default function AiStudioSection({ customer }: Props) {
           initialShape={sel.shape}
           initialCakeMessage={sel.cakeMessage}
           openSignal={priceEstimatorOpenSignal}
-          onSelectionsChange={setEstimatorSelections}
+          selectedDesign={designs.find((d) => d.id === selectedDesignId) ?? null}
+          onCakeSaved={setSavedProduct}
+          onPincodeChange={setConfirmedPincode}
           />
         </div>
 
@@ -1321,10 +1313,8 @@ export default function AiStudioSection({ customer }: Props) {
         <div id="baker-section" className="mt-4">
           <BakerFinder
             generated={generated || designs.length > 0}
-            cakeStyle={sel.style}
-            occasion={sel.occasion}
-            estimatorSelections={estimatorSelections}
-            selectedDesign={designs.find((d) => d.id === selectedDesignId) ?? null}
+            savedProduct={savedProduct}
+            pincode={confirmedPincode}
           />
         </div>
       </div>

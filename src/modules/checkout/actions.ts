@@ -10,8 +10,10 @@ import {
   updateCart,
 } from "@lib/data"
 import { GiftCard, StorePostCartsCartReq } from "@medusajs/medusa"
-import { revalidateTag } from "next/cache"
+import { revalidateTag, revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+
+const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
 
 export async function cartUpdate(data: StorePostCartsCartReq) {
   const cartId = cookies().get("_medusa_cart_id")?.value
@@ -104,6 +106,13 @@ export async function submitDiscountForm(
   }
 }
 
+/**
+ * Replaces the old setAddresses → setShippingMethod → setPaymentMethod chain (3 separate round
+ * trips) with one call to the backend's checkout orchestrator (POST /store/checkout/initialize),
+ * which resolves shipping and payment itself — the customer never chose between options that only
+ * ever had one answer. On success the cart already has address + shipping + payment fully resolved,
+ * so this goes straight to review instead of a "delivery" step that no longer has anything to show.
+ */
 export async function setAddresses(currentState: unknown, formData: FormData) {
   if (!formData) return "No form data received"
 
@@ -145,14 +154,34 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
       phone: formData.get("billing_address.phone"),
     } as StorePostCartsCartReq
 
+  const token = cookies().get("_medusa_jwt")?.value
+
   try {
-    await updateCart(cartId, data)
+    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/checkout/initialize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        cartId,
+        shipping_address: data.shipping_address,
+        billing_address: data.billing_address,
+        email: data.email,
+      }),
+      cache: "no-store",
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return json.error || "Something went wrong preparing checkout. Please try again."
+    }
     revalidateTag("cart")
+    revalidatePath("/checkout")
   } catch (error: any) {
     return error.toString()
   }
 
-  redirect(`/checkout?step=delivery`)
+  redirect(`/checkout?step=review`)
 }
 
 export async function setShippingMethod(shippingMethodId: string) {
@@ -192,6 +221,7 @@ export async function placeOrder() {
   try {
     cart = await completeCart(cartId)
     revalidateTag("cart")
+    revalidatePath("/cart")
   } catch (error: any) {
     throw error
   }

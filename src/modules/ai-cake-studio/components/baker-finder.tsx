@@ -1,30 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import type { BakerProfile, GeneratedDesign } from "../types"
-import type { EstimatorSelections } from "./price-estimator"
-import { orderAiCake, saveAiCakeProduct } from "../actions"
+import type { BakerProfile } from "../types"
+import { orderAiCake, type SavedAiCakeProduct } from "../actions"
 
-type OrderPhase = "finalizing" | "placing"
+type OrderKey = "automatch" | string
 
 // ─── Baker Card ──────────────────────────────────────────────────────────────
 
 function BakerCard({
   baker,
   index,
-  canOrder,
-  isOrderingThis,
-  orderPhase,
-  anyOrderInFlight,
+  orderingKey,
   onOrder,
 }: {
   baker: BakerProfile
   index: number
-  canOrder: boolean
-  isOrderingThis: boolean
-  orderPhase: OrderPhase | null
-  anyOrderInFlight: boolean
+  orderingKey: OrderKey | null
   onOrder: (bakerId: string) => void
 }) {
   const waLink = baker.whatsapp
@@ -33,18 +26,17 @@ function BakerCard({
       )}`
     : null
 
-  const label = isOrderingThis
-    ? orderPhase === "finalizing"
-      ? "Finalizing your cake…"
-      : "🎂 Cake finalized! Placing order…"
-    : "🛒 Order Now"
+  const isOrderingThis = orderingKey === baker.id
+  const anyOrderInFlight = orderingKey != null
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.07, ease: "easeOut" }}
-      className="flex items-start gap-4 rounded-2xl border border-orange-100 bg-orange-50/40 p-4"
+      className={`flex items-start gap-4 rounded-2xl border p-4 ${
+        baker.verified ? "border-orange-100 bg-orange-50/40" : "border-slate-200 bg-slate-50/60"
+      }`}
     >
       {/* Avatar */}
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
@@ -55,9 +47,13 @@ function BakerCard({
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-bold text-slate-900">{baker.name}</p>
-          {baker.verified && (
+          {baker.verified ? (
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
-              ✓ Trusted Partner
+              ✓ CrossFriend Partner
+            </span>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium italic text-slate-400">
+              Not yet a partner
             </span>
           )}
           {baker.blueTick && (
@@ -79,26 +75,28 @@ function BakerCard({
         </div>
       </div>
 
-      {/* CTA */}
+      {/* CTA — partners get a direct order button, everyone else only gets Contact */}
       <div className="flex shrink-0 flex-col items-end gap-2">
-        <button
-          type="button"
-          onClick={() => onOrder(baker.id)}
-          disabled={!canOrder || anyOrderInFlight}
-          title={canOrder ? undefined : "Open the price estimator and pick your cake options first"}
-          className="rounded-xl bg-orange-500 px-4 py-2 text-center text-xs font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {label}
-        </button>
-        {waLink && (
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-xl bg-green-500 px-3 py-2 text-center text-xs font-bold text-white transition hover:bg-green-600"
+        {baker.verified ? (
+          <button
+            type="button"
+            onClick={() => onOrder(baker.id)}
+            disabled={anyOrderInFlight}
+            className="rounded-xl bg-orange-500 px-4 py-2 text-center text-xs font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            💬 WhatsApp
-          </a>
+            {isOrderingThis ? "Placing order…" : "Order with Them"}
+          </button>
+        ) : (
+          waLink && (
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-center text-xs font-bold text-slate-700 transition hover:border-slate-300"
+            >
+              💬 Contact
+            </a>
+          )
         )}
       </div>
     </motion.div>
@@ -109,112 +107,76 @@ function BakerCard({
 
 interface Props {
   generated: boolean
-  cakeStyle: string
-  occasion?: string
-  estimatorSelections: EstimatorSelections | null
-  selectedDesign: GeneratedDesign | null
+  /** Set by PriceEstimator once "Save This Cake" succeeds — this panel does nothing until then, and
+   * has no way to create or update it itself anymore. */
+  savedProduct: SavedAiCakeProduct | null
+  /** Confirmed by PriceEstimator before pricing even shows — this panel just uses it, it no longer
+   * collects its own pincode. */
+  pincode: string | null
 }
 
 type ServiceStatus = "enabled" | "coming_soon" | "unknown"
 
-export default function BakerFinder({ generated, cakeStyle, occasion, estimatorSelections, selectedDesign }: Props) {
+export default function BakerFinder({ generated, savedProduct, pincode }: Props) {
   const [open, setOpen] = useState(false)
-  const [pincode, setPincode] = useState("")
   const [loading, setLoading] = useState(false)
   const [bakers, setBakers] = useState<BakerProfile[] | null>(null)
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null)
   const [matchType, setMatchType] = useState<"exact" | "nearby" | undefined>(undefined)
-  const [error, setError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
-  // The real Medusa product for this design — created (or updated in place, if this customer already
-  // has one) the moment "Order Now" is clicked, never before. This is the single place in the whole
-  // flow that creates a product: there's no earlier, silent creation step for the customer to be
-  // unsure about, and clicking any baker's "Order Now" runs the exact same code path.
-  const [savedProductId, setSavedProductId] = useState<{ productId: string; variantId: string } | null>(null)
-  const [orderingBakerId, setOrderingBakerId] = useState<string | null>(null)
-  const [orderPhase, setOrderPhase] = useState<OrderPhase | null>(null)
+  const [orderingKey, setOrderingKey] = useState<OrderKey | null>(null)
   const [orderError, setOrderError] = useState<string | null>(null)
 
-  const handleSearch = async () => {
-    if (!/^\d{6}$/.test(pincode)) {
-      setError("Please enter a valid 6-digit pincode")
-      return
-    }
+  // Bakers load automatically the moment the cake is saved — pincode is already known by then (it was
+  // confirmed before pricing even showed), so there's nothing left for the customer to enter here.
+  useEffect(() => {
+    if (!savedProduct || !pincode) return
+    let cancelled = false
     setLoading(true)
-    setError(null)
-    setBakers(null)
-    setServiceStatus(null)
-    setMatchType(undefined)
+    setFetchError(null)
 
-    try {
-      const res = await fetch(`/api/bakers?pincode=${pincode}`)
-      const data: {
-        bakers?: BakerProfile[]
-        serviceStatus?: ServiceStatus
-        matchType?: "exact" | "nearby"
-        error?: string
-      } = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Failed to fetch bakers")
-      setBakers(data.bakers ?? [])
-      setServiceStatus(data.serviceStatus ?? "enabled")
-      setMatchType(data.matchType)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong")
-    } finally {
-      setLoading(false)
+    fetch(`/api/bakers?pincode=${pincode}`)
+      .then(async (res) => {
+        const data: {
+          bakers?: BakerProfile[]
+          serviceStatus?: ServiceStatus
+          matchType?: "exact" | "nearby"
+          error?: string
+        } = await res.json()
+        if (!res.ok) throw new Error(data.error ?? "Failed to fetch bakers")
+        if (cancelled) return
+        setBakers(data.bakers ?? [])
+        setServiceStatus(data.serviceStatus ?? "enabled")
+        setMatchType(data.matchType)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setFetchError(e instanceof Error ? e.message : "Something went wrong")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
     }
-  }
+  }, [savedProduct, pincode])
 
   /**
-   * The one and only place the real Medusa product gets created — finalizes the design (creating it,
-   * or updating the customer's existing one in place if they've already got one for this exact
-   * design, so a retry or a second baker's button never creates a duplicate) and then places the
-   * order with the chosen baker in a single click.
+   * Places the order — `bakerId` null means "Order via CrossFriend" (auto-match, flagged for OPS to
+   * assign); a real id means a specific CrossFriend partner. Either way this is just a cart-add now —
+   * the product was already created back when the cake was saved, so there's nothing slow left here.
    */
-  const handleOrder = async (bakerId: string) => {
-    if (!estimatorSelections) {
-      setOrderError("Open the price estimator and pick your cake options first")
-      return
-    }
-    if (orderingBakerId) return // one finalize/order in flight at a time — no double-submission race
-
+  const handleOrder = async (bakerId: string | null) => {
+    if (!savedProduct || orderingKey) return
     setOrderError(null)
-    setOrderingBakerId(bakerId)
-    setOrderPhase("finalizing")
+    setOrderingKey(bakerId ?? "automatch")
 
-    const productResult = await saveAiCakeProduct(
-      {
-        weight: estimatorSelections.weight,
-        tiers: estimatorSelections.tiers,
-        shape: estimatorSelections.shape,
-        style: cakeStyle,
-        flavor: estimatorSelections.flavor,
-        occasion,
-        expressDelivery: estimatorSelections.expressDelivery,
-        midnightDelivery: estimatorSelections.midnightDelivery,
-        cakeMessage: estimatorSelections.message,
-        pincode,
-        designImageUrl: selectedDesign?.imageUrl,
-        compiledPrompt: selectedDesign?.compiledPrompt,
-        designId: selectedDesign?.designId,
-      },
-      savedProductId ?? undefined
-    )
-    if ("error" in productResult) {
-      setOrderError(productResult.error)
-      setOrderingBakerId(null)
-      setOrderPhase(null)
-      return
-    }
-    setSavedProductId({ productId: productResult.productId, variantId: productResult.variantId })
-    setOrderPhase("placing")
-
-    const result = await orderAiCake(productResult.variantId, bakerId)
+    const result = await orderAiCake(savedProduct.variantId, bakerId)
     // A successful order redirects server-side (never returns here) — only a failure returns a value.
     if (result?.error) {
       setOrderError(result.error)
-      setOrderingBakerId(null)
-      setOrderPhase(null)
+      setOrderingKey(null)
     }
   }
 
@@ -239,17 +201,21 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
             🏪
           </span>
           <div className="text-left">
-            <p className="text-sm font-bold text-slate-900">Find a Baker Near You</p>
+            <p className="text-sm font-bold text-slate-900">Choose How to Order</p>
             <p className="text-xs text-slate-500">
-              {bakers != null
-                ? serviceStatus === "coming_soon"
-                  ? "Not in this area yet — coming soon"
-                  : serviceStatus === "unknown"
-                    ? "Pincode not recognized"
-                    : bakers.length > 0
-                      ? `${bakers.length} verified baker${bakers.length !== 1 ? "s" : ""} found`
-                      : "No bakers in this area yet"
-                : "Enter your pincode to discover local bakers"}
+              {!savedProduct
+                ? "Save your cake above to unlock this"
+                : loading
+                  ? "Finding bakers near you…"
+                  : bakers != null
+                    ? serviceStatus === "coming_soon"
+                      ? "Not in this area yet — coming soon"
+                      : serviceStatus === "unknown"
+                        ? "Pincode not recognized"
+                        : bakers.length > 0
+                          ? `${bakers.length} baker${bakers.length !== 1 ? "s" : ""} found`
+                          : "No bakers in this area yet"
+                    : "Preparing your options…"}
             </p>
           </div>
         </div>
@@ -275,48 +241,15 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
           >
             <div className="border-t border-orange-100 px-5 pb-5 pt-4 space-y-4">
 
-              {/* Pincode input */}
-              <div>
-                <p className="mb-2 text-xs font-semibold text-slate-600">
-                  🔍 Search bakers by pincode
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="e.g. 400001"
-                    value={pincode}
-                    onChange={(e) => {
-                      setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                      setError(null)
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="flex-1 rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSearch}
-                    disabled={loading || pincode.length !== 6}
-                    className="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-600 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 11-8 8z" />
-                      </svg>
-                    ) : (
-                      "Search"
-                    )}
-                  </button>
+              {!savedProduct && (
+                <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
+                  <p className="text-2xl">🔒</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">Save your cake first</p>
+                  <p className="mt-1 text-xs text-slate-500">Open the price estimator above and click &quot;Save This Cake&quot; to unlock ordering.</p>
                 </div>
-                {error && (
-                  <p className="mt-1.5 text-xs font-medium text-red-500">{error}</p>
-                )}
-              </div>
+              )}
 
-              {/* Loading skeleton */}
-              {loading && (
+              {savedProduct && loading && (
                 <div className="space-y-3">
                   {[1, 2, 3].map((n) => (
                     <div key={n} className="h-24 animate-pulse rounded-2xl bg-orange-50" />
@@ -324,13 +257,15 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
                 </div>
               )}
 
-              {/* Results */}
-              {!loading && bakers != null && (
+              {savedProduct && fetchError && (
+                <p className="text-xs font-medium text-red-500">{fetchError}</p>
+              )}
+
+              {savedProduct && !loading && bakers != null && (
                 serviceStatus === "unknown" ? (
                   <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
                     <p className="text-2xl">🤔</p>
                     <p className="mt-2 text-sm font-semibold text-slate-700">Pincode not recognized</p>
-                    <p className="mt-1 text-xs text-slate-500">Double check the 6 digits and try again.</p>
                   </div>
                 ) : serviceStatus === "coming_soon" ? (
                   <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
@@ -351,25 +286,41 @@ export default function BakerFinder({ generated, cakeStyle, occasion, estimatorS
                         No bakers exactly in this pincode — showing bakers from nearby areas
                       </p>
                     )}
-                    {savedProductId && (
-                      <p className="rounded-xl bg-green-50 px-3 py-2 text-center text-[11px] font-semibold text-green-700 ring-1 ring-green-200">
-                        🎂 Your cake design is finalized — pick a baker below to place your order.
-                      </p>
-                    )}
+
                     {orderError && (
                       <p className="rounded-xl bg-red-50 px-3 py-2 text-center text-[11px] font-medium text-red-600 ring-1 ring-red-200">
                         {orderError}
                       </p>
                     )}
+
+                    {/* Auto-match — let CrossFriend pick a partner baker instead of choosing yourself */}
+                    <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 p-4 text-white">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-extrabold">🚀 Order via CrossFriend</p>
+                        <p className="mt-0.5 text-[11px] text-orange-100">We&apos;ll match the best available partner baker for this cake</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOrder(null)}
+                        disabled={orderingKey != null}
+                        className="shrink-0 rounded-xl bg-white px-4 py-2 text-xs font-extrabold text-orange-600 transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {orderingKey === "automatch" ? "Placing order…" : "Order"}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                      <span className="h-px flex-1 bg-slate-200" />
+                      or pick a baker yourself
+                      <span className="h-px flex-1 bg-slate-200" />
+                    </div>
+
                     {bakers.map((baker, i) => (
                       <BakerCard
                         key={baker.id}
                         baker={baker}
                         index={i}
-                        canOrder={estimatorSelections != null}
-                        isOrderingThis={orderingBakerId === baker.id}
-                        orderPhase={orderingBakerId === baker.id ? orderPhase : null}
-                        anyOrderInFlight={orderingBakerId != null}
+                        orderingKey={orderingKey}
                         onOrder={handleOrder}
                       />
                     ))}

@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
-import type { Addon } from "../types"
-import { estimateAiCakePrice } from "../actions"
+import type { Addon, GeneratedDesign } from "../types"
+import { estimateAiCakePrice, saveAiCakeProduct, type SavedAiCakeProduct } from "../actions"
 
 // ─── Pricing types (matches new config structure) ────────────────────────────
 
@@ -283,11 +283,16 @@ interface PriceEstimatorProps {
   /** Bump this (e.g. n => n + 1) to force the estimator open — used by the
    * "Use This Design" CTA so picking a design opens billing in one click. */
   openSignal?: number
-  /** Reports the live weight/tiers/shape/flavor/delivery-option selections up to the parent whenever
-   * they change — the parent needs these to hand off to BakerFinder's "Order Now," since this panel
-   * owns the only copy of them. Not used for pricing math here; the actual order price is always
-   * recomputed authoritatively by the backend at order time, never trusted from this snapshot. */
-  onSelectionsChange?: (selections: EstimatorSelections) => void
+  /** The currently accepted design — this panel needs its image/prompt/id to save the real Medusa
+   * product when "Save This Cake" is clicked, and to know when a *different* design has been
+   * accepted so it can drop any previous save/lock (see the openSignal effect below). */
+  selectedDesign: GeneratedDesign | null
+  /** Fires whenever the saved product changes — set once "Save This Cake" succeeds, and back to null
+   * whenever a new design is accepted. BakerFinder needs this; this panel is the only place it's created. */
+  onCakeSaved?: (product: SavedAiCakeProduct | null) => void
+  /** The confirmed delivery pincode, or null while unconfirmed — BakerFinder needs this for its own
+   * baker search now that pincode is only ever entered here, before pricing, not down in that panel. */
+  onPincodeChange?: (pincode: string | null) => void
 }
 
 export type { EstimatorSelections }
@@ -301,9 +306,26 @@ export default function PriceEstimator({
   initialShape,
   initialCakeMessage,
   openSignal,
-  onSelectionsChange,
+  selectedDesign,
+  onCakeSaved,
+  onPincodeChange,
 }: PriceEstimatorProps) {
   const [open, setOpen] = useState(false)
+
+  // Pincode comes first — price genuinely depends on it (regional overrides), so nothing below is
+  // shown or interactive until it's confirmed. Once "Save This Cake" locks the design, it can't be
+  // changed either (changing delivery area after locking a price would be exactly the kind of
+  // after-the-fact price drift this whole flow exists to prevent).
+  const [pincode, setPincode] = useState("")
+  const [pincodeConfirmed, setPincodeConfirmed] = useState(false)
+
+  // Once true, every field below is frozen — "Save This Cake" is the one moment the real Medusa
+  // product gets created, and nothing about this design can change afterward. Starting a different
+  // design (see the openSignal effect below) is the only way out, by design.
+  const [locked, setLocked] = useState(false)
+  const [savedProduct, setSavedProduct] = useState<SavedAiCakeProduct | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const [pricing, setPricing] = useState<PricingConfig>(FALLBACK_PRICING)
   const [selectors, setSelectors] = useState<SelectorsConfig>(FALLBACK_SELECTORS)
@@ -342,6 +364,12 @@ export default function PriceEstimator({
     if (!openSignal) return
     setOpen(true)
     setSel((prev) => ({ ...prev, message: initialCakeMessage || prev.message }))
+    // A (possibly different) design was just accepted — any previous save/lock belonged to whatever
+    // was accepted before, and no longer applies here.
+    setLocked(false)
+    setSavedProduct(null)
+    setSaveError(null)
+    onCakeSaved?.(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSignal])
 
@@ -368,23 +396,18 @@ export default function PriceEstimator({
       .catch(() => {})
   }, [open, configLoaded])
 
-  // Report the live selections up to the parent — BakerFinder's "Order Now" needs them, and this
-  // panel is the only place that owns them.
-  useEffect(() => {
-    onSelectionsChange?.(sel)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel])
-
   // Real backend price — debounced so it doesn't fire the pricing engine on every keystroke/pill
   // click. The instant local `computePrice()` estimate below still renders immediately so the panel
   // never feels laggy; this overwrites it ~500ms after the last change with the true, OPS-configured
-  // number (the same one Find Baker will actually charge), so nothing here can drift from the order
-  // price the way the old static-config-only estimator could.
+  // number (the same one Save This Cake will actually charge), so nothing here can drift from the
+  // order price the way the old static-config-only estimator could. Requires a confirmed pincode now
+  // — price genuinely varies by region, so there's no honest number to show before that, and it stops
+  // altogether once locked since nothing can change anyway.
   const [realPricing, setRealPricing] = useState<{ total: number; breakdown: { label: string; amount: number }[] } | null>(null)
   const [, startPricingTransition] = useTransition()
 
   useEffect(() => {
-    if (!generated) return
+    if (!generated || !pincodeConfirmed || locked) return
     const timer = setTimeout(() => {
       startPricingTransition(async () => {
         const res = await estimateAiCakePrice({
@@ -396,16 +419,64 @@ export default function PriceEstimator({
           expressDelivery: sel.expressDelivery,
           midnightDelivery: sel.midnightDelivery,
           messageOnCake: sel.message.trim().length > 0,
+          pincode,
         })
         if (!("error" in res)) {
           setRealPricing(res)
         }
         // On error, silently keep showing the local estimate — the existing "Indicative price
-        // only" disclaimer already covers this, and Find Baker re-derives the real price anyway.
+        // only" disclaimer already covers this, and Save This Cake re-derives the real price anyway.
       })
     }, 500)
     return () => clearTimeout(timer)
-  }, [generated, sel.weight, sel.tiers, sel.shape, sel.flavor, sel.expressDelivery, sel.midnightDelivery, sel.message, cakeStyle])
+  }, [generated, pincodeConfirmed, locked, pincode, sel.weight, sel.tiers, sel.shape, sel.flavor, sel.expressDelivery, sel.midnightDelivery, sel.message, cakeStyle])
+
+  const handleConfirmPincode = () => {
+    if (!/^\d{6}$/.test(pincode)) return
+    setPincodeConfirmed(true)
+    onPincodeChange?.(pincode)
+  }
+
+  const handleChangePincode = () => {
+    if (locked) return
+    setPincodeConfirmed(false)
+    setRealPricing(null)
+    onPincodeChange?.(null)
+  }
+
+  const handleSaveThisCake = async () => {
+    if (!pincodeConfirmed || locked || saving) return
+    setSaving(true)
+    setSaveError(null)
+
+    const result = await saveAiCakeProduct(
+      {
+        weight: sel.weight,
+        tiers: sel.tiers,
+        shape: sel.shape,
+        style: cakeStyle,
+        flavor: sel.flavor,
+        occasion,
+        expressDelivery: sel.expressDelivery,
+        midnightDelivery: sel.midnightDelivery,
+        cakeMessage: sel.message,
+        pincode,
+        designImageUrl: selectedDesign?.imageUrl,
+        compiledPrompt: selectedDesign?.compiledPrompt,
+        designId: selectedDesign?.designId,
+      },
+      savedProduct ? { productId: savedProduct.productId, variantId: savedProduct.variantId } : undefined
+    )
+
+    setSaving(false)
+    if ("error" in result) {
+      setSaveError(result.error)
+      return
+    }
+    setSavedProduct(result)
+    setLocked(true)
+    onCakeSaved?.(result)
+  }
 
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
 
@@ -467,12 +538,16 @@ export default function PriceEstimator({
           <div className="text-left">
             <p className="text-sm font-bold text-slate-900">Price Estimate</p>
             <p className="text-xs text-slate-500">
-              {open ? "Adjust options to see price change" : `Starting from ₹${grandTotal.toLocaleString("en-IN")}`}
+              {!pincodeConfirmed
+                ? "Enter your delivery pincode to see pricing"
+                : open
+                  ? "Adjust options to see price change"
+                  : `Starting from ₹${grandTotal.toLocaleString("en-IN")}`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {!open && (
+          {!open && pincodeConfirmed && (
             <span className="rounded-xl bg-violet-600 px-3 py-1 text-sm font-bold text-white">
               ₹{grandTotal.toLocaleString("en-IN")}
             </span>
@@ -495,6 +570,60 @@ export default function PriceEstimator({
             className="overflow-hidden"
           >
             <div className="border-t border-violet-100 px-5 pb-5 pt-4 space-y-5">
+
+              {locked && (
+                <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
+                  <span className="text-base">✅</span>
+                  <div>
+                    <p className="font-bold">Cake saved — this configuration is locked in</p>
+                    <p className="mt-0.5 text-emerald-600/80">It won&apos;t change now. Design a different cake to change anything.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Pincode — comes first, since price genuinely depends on it. Nothing below is shown
+                  or interactive until this is confirmed. */}
+              <div className={`rounded-2xl border px-4 py-3 ${pincodeConfirmed ? "border-emerald-200 bg-emerald-50" : "border-violet-200 bg-violet-50/50"}`}>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">📍 Delivery Pincode</p>
+                {!pincodeConfirmed ? (
+                  <>
+                    <p className="mb-2 text-[11px] text-slate-500">
+                      Prices vary a little by area — we need this first to show you a real number, not a placeholder.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="e.g. 201016"
+                        value={pincode}
+                        onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        onKeyDown={(e) => e.key === "Enter" && handleConfirmPincode()}
+                        className="flex-1 rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleConfirmPincode}
+                        disabled={pincode.length !== 6}
+                        className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-violet-700 disabled:opacity-50"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-700">📍 Pricing for {pincode}</span>
+                    {!locked && (
+                      <button type="button" onClick={handleChangePincode} className="text-[11px] font-bold text-violet-600 hover:text-violet-700">
+                        Change
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+            <div className={pincodeConfirmed && !locked ? "space-y-5" : "space-y-5 pointer-events-none opacity-40"}>
 
               {/* Live price banner */}
               <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 p-4 text-white">
@@ -677,15 +806,29 @@ export default function PriceEstimator({
                   {pricing.disclaimer}
                 </p>
               </div>
+            </div>
 
-              {/* CTA */}
-              <button
-                type="button"
-                className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 py-3 text-sm font-bold text-white shadow-md shadow-violet-200 transition hover:from-violet-700 hover:to-purple-700"
-                onClick={() => document.getElementById("baker-section")?.scrollIntoView({ behavior: "smooth" })}
-              >
-                Find a Baker for This Price →
-              </button>
+            <button
+              type="button"
+              onClick={handleSaveThisCake}
+              disabled={!pincodeConfirmed || locked || saving}
+              className={`w-full rounded-2xl py-3 text-sm font-bold text-white shadow-md transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                locked
+                  ? "bg-emerald-600 shadow-none"
+                  : "bg-gradient-to-r from-violet-600 to-purple-600 shadow-violet-200 hover:from-violet-700 hover:to-purple-700"
+              }`}
+            >
+              {locked
+                ? "✅ Cake Saved"
+                : saving
+                  ? "Saving…"
+                  : !pincodeConfirmed
+                    ? "📍 Confirm pincode to continue"
+                    : "🔒 Save This Cake"}
+            </button>
+            {saveError && (
+              <p className="text-center text-xs font-medium text-red-500">{saveError}</p>
+            )}
             </div>
           </motion.div>
         )}

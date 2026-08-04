@@ -43,6 +43,7 @@ export interface PriceEstimateInput {
   expressDelivery?: boolean
   midnightDelivery?: boolean
   messageOnCake?: boolean
+  pincode?: string
 }
 
 export interface PriceEstimateResult {
@@ -53,9 +54,8 @@ export interface PriceEstimateResult {
 /**
  * Live-estimator pricing — calls the same authoritative backend route saveAiCakeProduct's price came
  * from (and the same one the OPS Simulator calls), so the number shown while adjusting options is
- * never out of sync with what Find Baker will actually charge. No pincode here: the estimator panel
- * runs before the customer has entered one, so this always resolves default/region-less pricing —
- * region-specific overrides only kick in at Find Baker once a pincode exists.
+ * never out of sync with what Save This Cake will actually charge. The estimator now collects pincode
+ * before showing any price at all (region affects the real total), so it's always passed through here.
  */
 export async function estimateAiCakePrice(
   input: PriceEstimateInput
@@ -130,10 +130,14 @@ export async function saveAiCakeProduct(
  * the rest of the storefront's cart/checkout pages already read) via the completely standard Medusa
  * add-line-item flow — the product already carries its own correct, real price by this point, so
  * there's nothing custom left to do here. On success, redirects into the existing checkout flow.
+ *
+ * `bakerId` is null for "Order via CrossFriend" (auto-match) — the order still goes through normally,
+ * it just carries `needsBakerAssignment: true` so OPS's assignment queue picks it up. Everything else
+ * about the order (price, product, checkout) is identical either way; only who fulfills it differs.
  */
 export async function orderAiCake(
   variantId: string,
-  bakerId: string
+  bakerId: string | null
 ): Promise<{ error: string } | undefined> {
   const cart = await getOrSetCart()
   if (!cart) {
@@ -144,7 +148,7 @@ export async function orderAiCake(
     cartId: cart.id,
     variantId,
     quantity: 1,
-    metadata: { bakerId },
+    metadata: { bakerId, needsBakerAssignment: bakerId == null },
   })
 
   if (!cartOrError) {
