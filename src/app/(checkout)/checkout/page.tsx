@@ -33,7 +33,11 @@ const fetchCart = async () => {
   return cart
 }
 
-export default async function Checkout() {
+export default async function Checkout({
+  searchParams,
+}: {
+  searchParams?: { step?: string }
+}) {
   const cart = await fetchCart()
 
   if (!cart) {
@@ -51,7 +55,7 @@ export default async function Checkout() {
   return (
     <div className="grid grid-cols-1 small:grid-cols-[1fr_416px] content-container gap-x-40 py-12">
       <Wrapper cart={cart}>
-        <CheckoutForm />
+        <CheckoutForm requestedStep={searchParams?.step} />
       </Wrapper>
       <CheckoutSummary />
     </div>

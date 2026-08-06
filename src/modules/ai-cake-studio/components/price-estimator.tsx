@@ -275,6 +275,9 @@ interface PriceEstimatorProps {
   initialTiers?: string
   initialFlavor?: string
   initialShape?: string
+  /** The weight already picked in the generator step, if any — takes priority over the tiers-derived
+   * default below so an explicit choice up there is never silently overridden here. */
+  initialWeight?: string
   /** The message typed in the generation form, if any — seeded into this
    * panel's own message field the moment a design is accepted (see the
    * openSignal effect below), not synced continuously, so it won't clobber
@@ -304,6 +307,7 @@ export default function PriceEstimator({
   initialTiers,
   initialFlavor,
   initialShape,
+  initialWeight,
   initialCakeMessage,
   openSignal,
   selectedDesign,
@@ -334,7 +338,7 @@ export default function PriceEstimator({
 
   // Initialize selections with values from generation form
   const [sel, setSel] = useState<EstimatorSelections>({
-    weight: TIER_DEFAULT_WEIGHT[initialTiers || "1"] || "1",
+    weight: initialWeight || TIER_DEFAULT_WEIGHT[initialTiers || "1"] || "1",
     tiers: initialTiers || "1",
     shape: initialShape || "Round",
     flavor: initialFlavor || "Chocolate",
@@ -343,16 +347,17 @@ export default function PriceEstimator({
     message: initialCakeMessage || "",
   })
 
-  // Update selections when initial values change (e.g., user regenerates)
+  // Update selections when initial values change (e.g., user regenerates). An explicit initialWeight
+  // (the generator step now has its own weight picker) always wins over the tiers-derived guess.
   useEffect(() => {
     setSel((prev) => ({
       ...prev,
       tiers: initialTiers || prev.tiers,
       shape: initialShape || prev.shape,
       flavor: initialFlavor || prev.flavor,
-      weight: TIER_DEFAULT_WEIGHT[initialTiers || "1"] || prev.weight,
+      weight: initialWeight || TIER_DEFAULT_WEIGHT[initialTiers || "1"] || prev.weight,
     }))
-  }, [initialTiers, initialFlavor, initialShape])
+  }, [initialTiers, initialFlavor, initialShape, initialWeight])
 
   // A parent-triggered "open me" signal (e.g. clicking "Use This Design")
   // forces the estimator open AND, at that one moment, carries over whatever

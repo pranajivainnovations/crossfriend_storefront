@@ -164,23 +164,35 @@ export async function enrichLineItems(
   | Omit<LineItem, "beforeInsert" | "beforeUpdate" | "afterUpdateOrLoad">[]
   | undefined
 > {
+  // A line item's variant can come back null from the backend if the underlying variant was deleted
+  // after the item was added to the cart — every renderer downstream of this (cart page, cart
+  // dropdown) reads item.variant.* unguarded, so drop those instead of letting one bad reference take
+  // the whole cart page down. This orphans the item from the customer's view; the cart's totals still
+  // reflect it until it's removed, which is an existing checkout-page concern, not something to paper
+  // over here.
+  const validLineItems = lineItems.filter((lineItem) => lineItem.variant != null)
+
   // Prepare query parameters
   const queryParams = {
-    ids: lineItems.map((lineItem) => lineItem.variant.product_id),
+    ids: validLineItems.map((lineItem) => lineItem.variant.product_id),
     regionId: regionId,
+  }
+
+  // If there are no valid line items, return an empty array
+  if (!validLineItems.length) {
+    return []
   }
 
   // Fetch products by their IDs
   const products = await getProductsById(queryParams)
 
-  // If there are no line items or products, return an empty array
-  if (!lineItems?.length || !products) {
+  if (!products) {
     return []
   }
 
   // Enrich line items with product and variant information
 
-  const enrichedItems = lineItems.map((item) => {
+  const enrichedItems = validLineItems.map((item) => {
     const product = products.find((p) => p.id === item.variant.product_id)
     const variant = product?.variants.find((v) => v.id === item.variant_id)
 

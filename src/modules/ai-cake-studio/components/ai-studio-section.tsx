@@ -84,6 +84,11 @@ type SelectorState = {
   shape: string
   color: string
   cakeMessage: string
+  /** Doesn't affect the AI-generated image — only carried along as the Price Estimator's starting
+   * weight once a design is accepted (see initialWeight on PriceEstimator), same handoff pattern as
+   * tiers/shape/flavor. Kept here (rather than only in the Price Estimator) because it's one of the
+   * few fields that determines the actual size of the cake, so customers expect to set it early. */
+  weight: string
 }
 
 /** Handoff payload for "Use this cake" — from either the showcase gallery
@@ -195,14 +200,18 @@ const FALLBACK_SELECTORS: StudioSelectors = {
     { value: "Wedding", label: "Wedding", emoji: "💍" },
     { value: "Kids", label: "Kids", emoji: "🎠" },
   ],
+  // Values match the Price Estimator's weight options exactly (no "kg" suffix — these are the same
+  // keys pricing.baseByWeight is looked up by) since this selection is carried straight into that
+  // panel's initial weight.
   weights: [
-    { value: "0.5kg", label: "0.5 kg", serves: "2-4" },
-    { value: "1kg", label: "1 kg", serves: "6-8" },
-    { value: "1.5kg", label: "1.5 kg", serves: "10-12" },
-    { value: "2kg", label: "2 kg", serves: "15-20" },
-    { value: "3kg", label: "3 kg", serves: "25-30" },
-    { value: "4kg", label: "4 kg", serves: "35-40" },
-    { value: "5kg", label: "5 kg", serves: "50+" },
+    { value: "0.5", label: "0.5 kg", serves: "4-6" },
+    { value: "1", label: "1 kg", serves: "8-10" },
+    { value: "1.5", label: "1.5 kg", serves: "12-15" },
+    { value: "2", label: "2 kg", serves: "16-20" },
+    { value: "2.5", label: "2.5 kg", serves: "20-25" },
+    { value: "3", label: "3 kg", serves: "25-30" },
+    { value: "4", label: "4 kg", serves: "30-40" },
+    { value: "5", label: "5 kg", serves: "40-50" },
   ],
   tiers: [
     { value: "1", label: "Single", emoji: "1️⃣" },
@@ -457,7 +466,14 @@ export default function AiStudioSection({ customer }: Props) {
     shape: "Round",
     color: "No preference",
     cakeMessage: "",
+    weight: "1",
   })
+
+  // Progressive disclosure — Weight/Tiers/Shape/Message stay visible (the fields that matter most,
+  // or that most people actually want to change), everything else collapses under its own toggle so
+  // the form doesn't open as one long scroll of pill rows.
+  const [showMore, setShowMore] = useState(false)
+  const [showExtras, setShowExtras] = useState(false)
 
   // DOB + horoscope — always included in generation (no opt-in checkbox);
   // falls back to today's seasonal sign when no birthday is given. Today's
@@ -522,6 +538,7 @@ export default function AiStudioSection({ customer }: Props) {
             style: data.selectors!.styles?.[0]?.value ?? prev.style,
             occasion: data.selectors!.occasions?.[0]?.value ?? prev.occasion,
             flavor: data.selectors!.flavors?.[0]?.value ?? prev.flavor,
+            weight: data.selectors!.weights?.[0]?.value ?? prev.weight,
           }))
         }
         const fetchedOptions = data.aiImageModels?.options
@@ -991,120 +1008,180 @@ export default function AiStudioSection({ customer }: Props) {
             )}
           </div>
 
-          {/* Style */}
-          <div className="mt-5">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Style</p>
-            <PillSelector
-              options={selectors.styles}
-              value={sel.style}
-              onChange={(v) => setSel((c) => ({ ...c, style: v }))}
-              disabled={generating}
-            />
-          </div>
+          {/* ── Primary — the fields that decide size/shape/price, always visible ── */}
+          <div className="mt-5 space-y-4 rounded-2xl border-2 border-violet-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">1</span>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-700">Core details</p>
+            </div>
 
-          {/* Occasion */}
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Occasion</p>
-            <PillSelector
-              options={selectors.occasions}
-              value={sel.occasion}
-              onChange={(v) => setSel((c) => ({ ...c, occasion: v }))}
-              disabled={generating}
-            />
-          </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Weight</p>
+              <PillSelector
+                options={selectors.weights || FALLBACK_SELECTORS.weights!}
+                value={sel.weight}
+                onChange={(v) => setSel((c) => ({ ...c, weight: v }))}
+                disabled={generating}
+              />
+            </div>
 
-          {/* Flavor */}
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Flavor</p>
-            <PillSelector
-              options={selectors.flavors}
-              value={sel.flavor}
-              onChange={(v) => setSel((c) => ({ ...c, flavor: v }))}
-              disabled={generating}
-            />
-          </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Tiers</p>
+              <PillSelector
+                options={selectors.tiers || FALLBACK_SELECTORS.tiers!}
+                value={sel.tiers}
+                onChange={(v) => setSel((c) => ({ ...c, tiers: v }))}
+                disabled={generating}
+              />
+            </div>
 
-          {/* Tiers */}
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Tiers</p>
-            <PillSelector
-              options={selectors.tiers || FALLBACK_SELECTORS.tiers!}
-              value={sel.tiers}
-              onChange={(v) => setSel((c) => ({ ...c, tiers: v }))}
-              disabled={generating}
-            />
-          </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Shape</p>
+              <PillSelector
+                options={SHAPE_OPTIONS}
+                value={sel.shape}
+                onChange={(v) => setSel((c) => ({ ...c, shape: v }))}
+                disabled={generating}
+              />
+            </div>
 
-          {/* Shape */}
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Shape</p>
-            <PillSelector
-              options={SHAPE_OPTIONS}
-              value={sel.shape}
-              onChange={(v) => setSel((c) => ({ ...c, shape: v }))}
-              disabled={generating}
-            />
-          </div>
-          
-
-          {/* Personalize */}
-          <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/20 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">✍️ Personalize</p>
-            <div className="space-y-3">
-              <div>
-                <p className="mb-1 text-[11px] font-medium text-slate-500">Message on cake (optional)</p>
-                <input
-                  type="text"
-                  placeholder="e.g. Happy Birthday Priya"
-                  value={sel.cakeMessage}
-                  onChange={(e) => setSel((c) => ({ ...c, cakeMessage: e.target.value.slice(0, 50) }))}
-                  disabled={generating}
-                  className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none disabled:opacity-60"
-                />
-                <p className="mt-1 text-right text-[10px] text-slate-400">{sel.cakeMessage.length}/50</p>
-                <p className="mt-1 text-[10px] italic text-slate-400">
-                  We&apos;ll try to show this on the AI preview — and you can add or change it again once you pick a design, in the price estimate section.
-                </p>
-              </div>
-              <div>
-                <p className="mb-2 text-[11px] font-medium text-slate-500">Color preference</p>
-                <PillSelector
-                  options={COLOR_OPTIONS}
-                  value={sel.color}
-                  onChange={(v) => setSel((c) => ({ ...c, color: v }))}
-                  disabled={generating}
-                  size="small"
-                />
-              </div>
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Message on cake (optional)</p>
+              <input
+                type="text"
+                placeholder="e.g. Happy Birthday Priya"
+                value={sel.cakeMessage}
+                onChange={(e) => setSel((c) => ({ ...c, cakeMessage: e.target.value.slice(0, 50) }))}
+                disabled={generating}
+                className="w-full rounded-xl border border-violet-200 bg-violet-50/30 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none disabled:opacity-60"
+              />
+              <p className="mt-1 text-right text-[10px] text-slate-400">{sel.cakeMessage.length}/50</p>
+              <p className="mt-1 text-[10px] italic text-slate-400">
+                We&apos;ll try to show this on the AI preview — and you can add or change it again once you pick a design, in the price estimate section.
+              </p>
             </div>
           </div>
 
-          {/* Horoscope */}
-          <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/20 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-              🔮 Horoscope influence
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <p className="mb-1 text-[11px] text-slate-400">Date of birth (optional)</p>
-                <input
-                  type="date"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  max={todayStr}
-                  disabled={generating}
-                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none disabled:opacity-60"
-                />
-              </div>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-bold text-violet-700 ring-1 ring-violet-200">
-                {effectiveZodiac.emoji} {effectiveZodiac.sign}
+          {/* ── Secondary — collapsed by default, the fields most people leave at their default ── */}
+          <div className="mt-4 overflow-hidden rounded-2xl border-l-4 border-indigo-300 bg-indigo-50/50">
+            <button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+            >
+              <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-700">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-bold text-white">2</span>
+                Style, occasion, flavor &amp; color
               </span>
-            </div>
-            <p className="mt-2 rounded-xl bg-violet-100/60 px-3 py-2 text-xs italic text-violet-700">
-              ✨ {dob
-                ? `We'll blend in a touch of ${effectiveZodiac.sign} energy, based on your birthday.`
-                : `We'll blend in this season's ${effectiveZodiac.sign} energy — add your birthday above to use your own sign instead.`}
-            </p>
+              <motion.span animate={{ rotate: showMore ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-indigo-400">
+                ▼
+              </motion.span>
+            </button>
+            <AnimatePresence initial={false}>
+              {showMore && (
+                <motion.div
+                  key="more"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-4 px-4 pb-4">
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Style</p>
+                      <PillSelector
+                        options={selectors.styles}
+                        value={sel.style}
+                        onChange={(v) => setSel((c) => ({ ...c, style: v }))}
+                        disabled={generating}
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Occasion</p>
+                      <PillSelector
+                        options={selectors.occasions}
+                        value={sel.occasion}
+                        onChange={(v) => setSel((c) => ({ ...c, occasion: v }))}
+                        disabled={generating}
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Flavor</p>
+                      <PillSelector
+                        options={selectors.flavors}
+                        value={sel.flavor}
+                        onChange={(v) => setSel((c) => ({ ...c, flavor: v }))}
+                        disabled={generating}
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Color preference</p>
+                      <PillSelector
+                        options={COLOR_OPTIONS}
+                        value={sel.color}
+                        onChange={(v) => setSel((c) => ({ ...c, color: v }))}
+                        disabled={generating}
+                        size="small"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ── Tertiary — collapsed by default, the fun-but-optional extra ── */}
+          <div className="mt-4 overflow-hidden rounded-2xl border-l-4 border-fuchsia-300 bg-fuchsia-50/50">
+            <button
+              type="button"
+              onClick={() => setShowExtras((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+            >
+              <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-fuchsia-700">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-fuchsia-500 text-[10px] font-bold text-white">3</span>
+                🔮 Horoscope influence (optional)
+              </span>
+              <motion.span animate={{ rotate: showExtras ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-fuchsia-400">
+                ▼
+              </motion.span>
+            </button>
+            <AnimatePresence initial={false}>
+              {showExtras && (
+                <motion.div
+                  key="extras"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 pb-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div>
+                        <p className="mb-1 text-[11px] text-slate-400">Date of birth (optional)</p>
+                        <input
+                          type="date"
+                          value={dob}
+                          onChange={(e) => setDob(e.target.value)}
+                          max={todayStr}
+                          disabled={generating}
+                          className="rounded-xl border border-fuchsia-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-fuchsia-400 focus:outline-none disabled:opacity-60"
+                        />
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-bold text-fuchsia-700 ring-1 ring-fuchsia-200">
+                        {effectiveZodiac.emoji} {effectiveZodiac.sign}
+                      </span>
+                    </div>
+                    <p className="mt-2 rounded-xl bg-fuchsia-100/60 px-3 py-2 text-xs italic text-fuchsia-700">
+                      ✨ {dob
+                        ? `We'll blend in a touch of ${effectiveZodiac.sign} energy, based on your birthday.`
+                        : `We'll blend in this season's ${effectiveZodiac.sign} energy — add your birthday above to use your own sign instead.`}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* CTA area */}
@@ -1301,6 +1378,7 @@ export default function AiStudioSection({ customer }: Props) {
           initialTiers={sel.tiers}
           initialFlavor={sel.flavor}
           initialShape={sel.shape}
+          initialWeight={sel.weight}
           initialCakeMessage={sel.cakeMessage}
           openSignal={priceEstimatorOpenSignal}
           selectedDesign={designs.find((d) => d.id === selectedDesignId) ?? null}

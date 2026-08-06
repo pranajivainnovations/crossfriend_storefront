@@ -82,16 +82,23 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
   }
 
   return (
+    // A gradient-ring wrapper (2px padding of gradient, white inner card) so this reads as the most
+    // important thing on the page — it's easy to lose at the bottom of a long list of pill selectors
+    // if it looks like just another card among them.
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mt-4 rounded-2xl border border-violet-200 bg-violet-50/40 p-4"
+      className="mt-4 rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 p-[2px] shadow-lg shadow-violet-200/70"
     >
-      <div className="mb-3">
-        <p className="text-sm font-bold text-slate-800">🔐 Quick sign-in to generate</p>
-        <p className="mt-0.5 text-xs text-slate-500">
-          {attemptsLimit} free designs on sign up · No password · No email needed
-        </p>
+    <div className="rounded-[14px] bg-white p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-slate-800">🔐 Sign in to generate your cake</p>
+          <p className="mt-0.5 text-xs text-slate-500">No password · No email needed</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-2.5 py-1 text-[10px] font-bold text-white">
+          🎁 {attemptsLimit} free
+        </span>
       </div>
 
       <AnimatePresence mode="wait">
@@ -222,6 +229,7 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
     </motion.div>
   )
 }
