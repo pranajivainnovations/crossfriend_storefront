@@ -23,6 +23,7 @@ export async function cartUpdate(data: StorePostCartsCartReq) {
   try {
     await updateCart(cartId, data)
     revalidateTag("cart")
+    revalidatePath("/", "layout")
   } catch (error: any) {
     return error.toString()
   }
@@ -176,7 +177,7 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
       return json.error || "Something went wrong preparing checkout. Please try again."
     }
     revalidateTag("cart")
-    revalidatePath("/checkout")
+    revalidatePath("/", "layout")
   } catch (error: any) {
     return error.toString()
   }
@@ -221,7 +222,7 @@ export async function placeOrder() {
   try {
     cart = await completeCart(cartId)
     revalidateTag("cart")
-    revalidatePath("/cart")
+    revalidatePath("/", "layout")
   } catch (error: any) {
     throw error
   }

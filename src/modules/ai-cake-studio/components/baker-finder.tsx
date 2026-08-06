@@ -168,11 +168,11 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
    * the product was already created back when the cake was saved, so there's nothing slow left here.
    */
   const handleOrder = async (bakerId: string | null) => {
-    if (!savedProduct || orderingKey) return
+    if (!savedProduct || orderingKey || !pincode) return
     setOrderError(null)
     setOrderingKey(bakerId ?? "automatch")
 
-    const result = await orderAiCake(savedProduct.variantId, bakerId)
+    const result = await orderAiCake(savedProduct.variantId, bakerId, pincode)
     // A successful order redirects server-side (never returns here) — only a failure returns a value.
     if (result?.error) {
       setOrderError(result.error)

@@ -1,7 +1,7 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { revalidateTag } from "next/cache"
+import { revalidateTag, revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getOrSetCart } from "@modules/cart/actions"
 import { addItem } from "@lib/data"
@@ -134,10 +134,15 @@ export async function saveAiCakeProduct(
  * `bakerId` is null for "Order via CrossFriend" (auto-match) — the order still goes through normally,
  * it just carries `needsBakerAssignment: true` so OPS's assignment queue picks it up. Everything else
  * about the order (price, product, checkout) is identical either way; only who fulfills it differs.
+ *
+ * `pincode` is carried on the line item too — the price the customer just saw was calculated for this
+ * pincode, so the checkout address step reads it back off the cart to lock the postal code field
+ * instead of letting the customer quietly change it after the fact and invalidate the price.
  */
 export async function orderAiCake(
   variantId: string,
-  bakerId: string | null
+  bakerId: string | null,
+  pincode: string
 ): Promise<{ error: string } | undefined> {
   const cart = await getOrSetCart()
   if (!cart) {
@@ -148,7 +153,7 @@ export async function orderAiCake(
     cartId: cart.id,
     variantId,
     quantity: 1,
-    metadata: { bakerId, needsBakerAssignment: bakerId == null },
+    metadata: { bakerId, needsBakerAssignment: bakerId == null, pincode },
   })
 
   if (!cartOrError) {
@@ -156,5 +161,6 @@ export async function orderAiCake(
   }
 
   revalidateTag("cart")
+  revalidatePath("/", "layout")
   redirect("/cart")
 }

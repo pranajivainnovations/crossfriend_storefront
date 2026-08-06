@@ -19,20 +19,6 @@ const ShippingAddress = ({
   onChange: () => void
   countryCode: string
 }) => {
-  const [formData, setFormData] = useState({
-    "shipping_address.first_name": cart?.shipping_address?.first_name || "",
-    "shipping_address.last_name": cart?.shipping_address?.last_name || "",
-    "shipping_address.address_1": cart?.shipping_address?.address_1 || "",
-    "shipping_address.company": cart?.shipping_address?.company || "",
-    "shipping_address.postal_code": cart?.shipping_address?.postal_code || "",
-    "shipping_address.city": cart?.shipping_address?.city || "",
-    "shipping_address.country_code":
-      cart?.shipping_address?.country_code || countryCode || "",
-    "shipping_address.province": cart?.shipping_address?.province || "",
-    email: cart?.email || "",
-    "shipping_address.phone": cart?.shipping_address?.phone || "",
-  })
-
   const countriesInRegion = useMemo(
     () => cart?.region.countries.map((c) => c.iso_2),
     [cart?.region]
@@ -47,21 +33,58 @@ const ShippingAddress = ({
     [customer?.shipping_addresses, countriesInRegion]
   )
 
+  // Returning customers shouldn't have to re-type an address they've already used — if the cart
+  // doesn't have one yet, prefill from their most recently saved one instead of showing blank fields
+  // and making them pick it from the dropdown below.
+  const mostRecentAddress = useMemo(() => {
+    if (!addressesInRegion?.length) return null
+    return [...addressesInRegion].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0]
+  }, [addressesInRegion])
+
+  const defaultAddress = cart?.shipping_address?.address_1
+    ? cart.shipping_address
+    : mostRecentAddress
+
+  // The AI Cake Studio price was calculated against the pincode the customer entered before designing
+  // — it's stashed on the line item's metadata when the order is placed. If present, the postal code
+  // here must match it exactly, so the field is locked instead of left editable.
+  const lockedPincode = cart?.items?.find(
+    (item: any) => item?.metadata?.pincode
+  )?.metadata?.pincode as string | undefined
+
+  const [formData, setFormData] = useState({
+    "shipping_address.first_name": defaultAddress?.first_name || "",
+    "shipping_address.last_name": defaultAddress?.last_name || "",
+    "shipping_address.address_1": defaultAddress?.address_1 || "",
+    "shipping_address.company": defaultAddress?.company || "",
+    "shipping_address.postal_code":
+      lockedPincode || defaultAddress?.postal_code || "",
+    "shipping_address.city": defaultAddress?.city || "",
+    "shipping_address.country_code":
+      defaultAddress?.country_code || countryCode || "",
+    "shipping_address.province": defaultAddress?.province || "",
+    email: cart?.email || customer?.email || "",
+    "shipping_address.phone": defaultAddress?.phone || "",
+  })
+
   useEffect(() => {
     setFormData({
-      "shipping_address.first_name": cart?.shipping_address?.first_name || "",
-      "shipping_address.last_name": cart?.shipping_address?.last_name || "",
-      "shipping_address.address_1": cart?.shipping_address?.address_1 || "",
-      "shipping_address.company": cart?.shipping_address?.company || "",
-      "shipping_address.postal_code": cart?.shipping_address?.postal_code || "",
-      "shipping_address.city": cart?.shipping_address?.city || "",
-      "shipping_address.country_code":
-        cart?.shipping_address?.country_code || "",
-      "shipping_address.province": cart?.shipping_address?.province || "",
-      email: cart?.email || "",
-      "shipping_address.phone": cart?.shipping_address?.phone || "",
+      "shipping_address.first_name": defaultAddress?.first_name || "",
+      "shipping_address.last_name": defaultAddress?.last_name || "",
+      "shipping_address.address_1": defaultAddress?.address_1 || "",
+      "shipping_address.company": defaultAddress?.company || "",
+      "shipping_address.postal_code":
+        lockedPincode || defaultAddress?.postal_code || "",
+      "shipping_address.city": defaultAddress?.city || "",
+      "shipping_address.country_code": defaultAddress?.country_code || "",
+      "shipping_address.province": defaultAddress?.province || "",
+      email: cart?.email || customer?.email || "",
+      "shipping_address.phone": defaultAddress?.phone || "",
     })
-  }, [cart?.shipping_address, cart?.email])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart?.shipping_address, cart?.email, mostRecentAddress, lockedPincode])
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -120,15 +143,29 @@ const ShippingAddress = ({
           autoComplete="organization"
           data-testid="shipping-company-input"
         />
-        <Input
-          label="Postal code"
-          name="shipping_address.postal_code"
-          autoComplete="postal-code"
-          value={formData["shipping_address.postal_code"]}
-          onChange={handleChange}
-          required
-          data-testid="shipping-postal-code-input"
-        />
+        <div className="flex flex-col">
+          <Input
+            label="Postal code"
+            name="shipping_address.postal_code"
+            autoComplete="postal-code"
+            value={formData["shipping_address.postal_code"]}
+            onChange={handleChange}
+            required
+            readOnly={!!lockedPincode}
+            style={lockedPincode ? { cursor: "not-allowed", opacity: 0.7 } : undefined}
+            title={
+              lockedPincode
+                ? "This pincode was used to price your cake and can't be changed here."
+                : undefined
+            }
+            data-testid="shipping-postal-code-input"
+          />
+          {lockedPincode && (
+            <span className="text-ui-fg-subtle txt-small mt-1">
+              Locked — your cake&apos;s price and delivery were calculated for this pincode.
+            </span>
+          )}
+        </div>
         <Input
           label="City"
           name="shipping_address.city"

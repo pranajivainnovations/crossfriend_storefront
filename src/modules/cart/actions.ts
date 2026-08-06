@@ -2,7 +2,7 @@
 
 import { LineItem } from "@medusajs/medusa"
 import { omit } from "lodash"
-import { revalidateTag } from "next/cache"
+import { revalidateTag, revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 
 import {
@@ -94,6 +94,10 @@ export async function addToCart({
   try {
     await addItem({ cartId: cart.id, variantId, quantity, metadata })
     revalidateTag("cart")
+    // revalidateTag alone doesn't reliably bust the Router Cache for the nav's cart icon (it lives in
+    // the root layout, outside this route segment) — without this, users see a stale "empty" cart until
+    // a manual refresh even though the item was added successfully.
+    revalidatePath("/", "layout")
   } catch (e) {
     return "Error adding item to cart"
   }
@@ -123,6 +127,7 @@ export async function updateLineItem({
   try {
     await updateItem({ cartId, lineId, quantity })
     revalidateTag("cart")
+    revalidatePath("/", "layout")
   } catch (e: any) {
     return e.toString()
   }
@@ -146,6 +151,7 @@ export async function deleteLineItem(lineId: string) {
   try {
     await removeItem({ cartId, lineId })
     revalidateTag("cart")
+    revalidatePath("/", "layout")
   } catch (e) {
     return "Error deleting line item"
   }
