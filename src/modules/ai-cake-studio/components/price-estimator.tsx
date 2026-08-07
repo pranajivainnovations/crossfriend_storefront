@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
 import type { Addon, GeneratedDesign } from "../types"
-import { estimateAiCakePrice, saveAiCakeProduct, type SavedAiCakeProduct } from "../actions"
+import { TIER_DEFAULT_WEIGHT } from "../data/mock-data"
+import {
+  estimateAiCakePrice,
+  saveAiCakeProduct,
+  type ConstraintState,
+  type SavedAiCakeProduct,
+} from "../actions"
 
 // ─── Pricing types (matches new config structure) ────────────────────────────
 
@@ -113,14 +119,6 @@ const FALLBACK_ADDONS: Addon[] = [
   { id: "knife-set", label: "Cake Knife & Server Set", description: "Premium stainless steel with ribbon", price: 299, emoji: "🍴", suggestFor: ["Wedding", "Anniversary"] },
 ]
 
-// Default weight suggestion based on tiers
-const TIER_DEFAULT_WEIGHT: Record<string, string> = {
-  "1": "1",
-  "2": "2",
-  "3": "3",
-  "4": "4",
-}
-
 // ─── Price calculation ───────────────────────────────────────────────────────
 
 function computePrice(
@@ -191,31 +189,58 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * `constraints` maps a value token to why it can't be picked, from the backend constraints engine.
+ * A disabled option stays visible and keeps its label — hiding it would leave the customer wondering
+ * where the 1kg option went — but it's greyed out, unclickable, and carries the OPS-authored reason
+ * as its tooltip. The currently-selected value is never disabled here even if a rule forbids it: that
+ * case surfaces as a violation banner instead, so the panel can't end up with nothing selected.
+ */
 function PillGroup({
   options,
   value,
   onChange,
+  constraints,
 }: {
   options: SelectorOption[]
   value: string
   onChange: (v: string) => void
+  constraints?: Map<string, { enabled: boolean; recommended: boolean; reason?: string }>
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-            value === o.value
-              ? "bg-violet-600 text-white"
-              : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
-          }`}
-        >
-          {o.emoji && <>{o.emoji} </>}{o.label}
-        </button>
-      ))}
+      {options.map((o) => {
+        const state = constraints?.get(o.value)
+        const isSelected = value === o.value
+        const disabled = state ? !state.enabled && !isSelected : false
+        const recommended = state?.recommended ?? false
+
+        return (
+          <button
+            key={o.value}
+            type="button"
+            disabled={disabled}
+            title={disabled ? state?.reason : recommended ? state?.reason : undefined}
+            onClick={() => !disabled && onChange(o.value)}
+            className={`relative rounded-full px-3 py-1 text-xs font-semibold transition ${
+              disabled
+                ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 line-through"
+                : isSelected
+                  ? "bg-violet-600 text-white"
+                  : recommended
+                    ? "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-emerald-400"
+                    : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
+            }`}
+          >
+            {o.emoji && <>{o.emoji} </>}{o.label}
+            {recommended && !isSelected && !disabled && (
+              <span className="ml-1 text-[10px]" aria-hidden="true">
+                ★
+              </span>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -409,6 +434,9 @@ export default function PriceEstimator({
   // — price genuinely varies by region, so there's no honest number to show before that, and it stops
   // altogether once locked since nothing can change anyway.
   const [realPricing, setRealPricing] = useState<{ total: number; breakdown: { label: string; amount: number }[] } | null>(null)
+  // Which option values the OPS-authored constraint rules currently allow. Arrives on the same
+  // response as the price, so it costs no extra round trip.
+  const [constraints, setConstraints] = useState<ConstraintState | null>(null)
   const [, startPricingTransition] = useTransition()
 
   useEffect(() => {
@@ -428,6 +456,7 @@ export default function PriceEstimator({
         })
         if (!("error" in res)) {
           setRealPricing(res)
+          setConstraints(res.constraints ?? null)
         }
         // On error, silently keep showing the local estimate — the existing "Indicative price
         // only" disclaimer already covers this, and Save This Cake re-derives the real price anyway.
@@ -435,6 +464,25 @@ export default function PriceEstimator({
     }, 500)
     return () => clearTimeout(timer)
   }, [generated, pincodeConfirmed, locked, pincode, sel.weight, sel.tiers, sel.shape, sel.flavor, sel.expressDelivery, sel.midnightDelivery, sel.message, cakeStyle])
+
+  // attributeKey -> (value token -> its validity), so each PillGroup can look up its own options.
+  const constraintsByAttribute = useMemo(() => {
+    const byAttr = new Map<string, Map<string, { enabled: boolean; recommended: boolean; reason?: string }>>()
+    for (const option of constraints?.options ?? []) {
+      byAttr.set(
+        option.attributeKey,
+        new Map(
+          option.values.map((v) => [
+            v.value,
+            { enabled: v.enabled, recommended: v.recommended, reason: v.reason },
+          ])
+        )
+      )
+    }
+    return byAttr
+  }, [constraints])
+
+  const violations = constraints?.violations ?? []
 
   const handleConfirmPincode = () => {
     if (!/^\d{6}$/.test(pincode)) return
@@ -451,6 +499,12 @@ export default function PriceEstimator({
 
   const handleSaveThisCake = async () => {
     if (!pincodeConfirmed || locked || saving) return
+    // The backend refuses violating combinations at save time anyway; stopping here keeps the customer
+    // from clicking into a rejection whose reason is already on screen above.
+    if (violations.length > 0) {
+      setSaveError(violations.map((v) => v.message).join(" "))
+      return
+    }
     setSaving(true)
     setSaveError(null)
 
@@ -667,6 +721,28 @@ export default function PriceEstimator({
                 </div>
               </div>
 
+              {/* Constraint violations — the current combination breaks an OPS-authored rule. Shown
+                  here, above the options, because Save This Cake will refuse it server-side anyway;
+                  better to say so while the customer is still choosing than to fail at the end. */}
+              {violations.length > 0 && (
+                <div
+                  className="rounded-xl border border-amber-300 bg-amber-50 p-3"
+                  role="status"
+                  data-testid="constraint-violations"
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                    Adjust your cake
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {violations.map((v) => (
+                      <li key={v.attributeKey} className="text-xs text-amber-900">
+                        {v.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Weight (main pricing lever) */}
               <div>
                 <SectionLabel>
@@ -676,6 +752,7 @@ export default function PriceEstimator({
                   options={selectors.weights}
                   value={sel.weight}
                   onChange={(v) => setSel((s) => ({ ...s, weight: v }))}
+                  constraints={constraintsByAttribute.get("weight")}
                 />
               </div>
 
@@ -686,6 +763,7 @@ export default function PriceEstimator({
                   options={selectors.flavors}
                   value={sel.flavor}
                   onChange={(v) => setSel((s) => ({ ...s, flavor: v }))}
+                  constraints={constraintsByAttribute.get("flavor")}
                 />
               </div>
 
@@ -816,7 +894,7 @@ export default function PriceEstimator({
             <button
               type="button"
               onClick={handleSaveThisCake}
-              disabled={!pincodeConfirmed || locked || saving}
+              disabled={!pincodeConfirmed || locked || saving || violations.length > 0}
               className={`w-full rounded-2xl py-3 text-sm font-bold text-white shadow-md transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 locked
                   ? "bg-emerald-600 shadow-none"
@@ -829,7 +907,9 @@ export default function PriceEstimator({
                   ? "Saving…"
                   : !pincodeConfirmed
                     ? "📍 Confirm pincode to continue"
-                    : "🔒 Save This Cake"}
+                    : violations.length > 0
+                      ? "⚠️ Adjust your cake to continue"
+                      : "🔒 Save This Cake"}
             </button>
             {saveError && (
               <p className="text-center text-xs font-medium text-red-500">{saveError}</p>

@@ -333,6 +333,22 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
   },
 ]
 
+// ─── Tier -> sensible default weight ──────────────────────────────────────────
+//
+// Shared between the generator's own Weight/Tiers pills (ai-studio-section.tsx) and the price
+// estimator (price-estimator.tsx) so there's exactly one definition of "what weight makes sense for
+// N tiers" — a customer bumping Tiers to 3 without touching Weight used to leave Weight at its
+// unrelated default (1kg), which the backend constraint engine rightly flags as invalid (a 3-tier
+// cake needs at least 2kg of cake to actually stack). This mapping is a UX default, not the
+// authoritative rule — the backend's OPS-configured constraint is still what actually gates Save/
+// Order, this just keeps the common case from starting in a state that already violates it.
+export const TIER_DEFAULT_WEIGHT: Record<string, string> = {
+  "1": "1",
+  "2": "2",
+  "3": "3",
+  "4": "4",
+}
+
 // ─── Curated messages from CrossFriend for each occasion ─────────────────────
 
 export const CF_OCCASION_MESSAGES: Record<string, string> = {

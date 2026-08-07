@@ -45,9 +45,32 @@ export interface PriceEstimateInput {
   pincode?: string
 }
 
+/** One selectable value's validity, as computed by the backend constraints engine. */
+export interface ConstraintValueState {
+  valueId: string
+  value: string
+  enabled: boolean
+  recommended: boolean
+  /** Why it's disabled (or recommended) — the OPS-authored rule message, shown to the customer. */
+  reason?: string
+}
+
+export interface ConstraintOptionState {
+  attributeKey: string
+  values: ConstraintValueState[]
+}
+
+export interface ConstraintState {
+  /** Every attribute's full option space, not just the current selection. */
+  options: ConstraintOptionState[]
+  /** Selections that are currently invalid, with the rule message explaining why. */
+  violations: { attributeKey: string; message: string }[]
+}
+
 export interface PriceEstimateResult {
   total: number
   breakdown: { label: string; amount: number }[]
+  constraints?: ConstraintState
 }
 
 /**
@@ -77,7 +100,11 @@ export async function estimateAiCakePrice(
     return { error: data.error || "Could not calculate price." }
   }
 
-  return { total: data.total, breakdown: data.breakdown }
+  // `constraints` comes back from the same call — the backend evaluates the pricing and constraints
+  // engines together so one round trip answers both "how much" and "what's allowed". Passing it
+  // through is what lets the estimator grey out impossible combinations instead of only discovering
+  // them when Save This Cake is rejected.
+  return { total: data.total, breakdown: data.breakdown, constraints: data.constraints }
 }
 
 /**

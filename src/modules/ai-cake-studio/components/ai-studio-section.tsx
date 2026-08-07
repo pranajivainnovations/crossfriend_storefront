@@ -11,6 +11,7 @@ import {
   MOCK_GENERATED_DESIGNS,
   PROMPT_TEMPLATES,
   CF_OCCASION_MESSAGES,
+  TIER_DEFAULT_WEIGHT,
 } from "../data/mock-data"
 import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
@@ -1038,7 +1039,22 @@ export default function AiStudioSection({ customer }: Props) {
               <PillSelector
                 options={selectors.tiers || FALLBACK_SELECTORS.tiers!}
                 value={sel.tiers}
-                onChange={(v) => setSel((c) => ({ ...c, tiers: v }))}
+                onChange={(v) => {
+                  setSel((c) => {
+                    // Weight and Tiers are independent pills, so raising Tiers without touching
+                    // Weight used to leave Weight at whatever it already was (often the 1kg default)
+                    // — an invalid combination the constraint engine correctly rejects, since a
+                    // multi-tier cake needs more cake than that to actually stack. Bump Weight up to
+                    // this tier count's sensible default, but only ever up: a customer who deliberately
+                    // picked a larger weight for fewer tiers keeps that choice.
+                    const suggested = TIER_DEFAULT_WEIGHT[v]
+                    const weight =
+                      suggested && parseFloat(suggested) > parseFloat(c.weight)
+                        ? suggested
+                        : c.weight
+                    return { ...c, tiers: v, weight }
+                  })
+                }}
                 disabled={generating}
               />
             </div>
