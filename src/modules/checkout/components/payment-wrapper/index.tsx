@@ -1,22 +1,32 @@
 "use client"
 
 import { Cart, PaymentSession } from "@medusajs/medusa"
-import { loadStripe } from "@stripe/stripe-js"
+import dynamic from "next/dynamic"
 import React from "react"
-import StripeWrapper from "./stripe-wrapper"
-import { PayPalScriptProvider } from "@paypal/react-paypal-js"
-import { createContext } from "react"
+
+export { StripeContext } from "./stripe-context"
+
+/**
+ * Stripe and PayPal are loaded on demand, never as part of the checkout bundle.
+ *
+ * This store settles orders through the manual provider, so statically importing both SDKs meant
+ * shipping roughly 1.8MB of unpacked payment libraries to every customer on the single most
+ * conversion-critical page — to render a button that just posts to our own backend. next/dynamic
+ * moves each behind its own chunk, fetched only if that provider is actually the one selected.
+ */
+const StripeProvider = dynamic(() => import("./stripe-provider"), {
+  ssr: false,
+})
+const PaypalProvider = dynamic(() => import("./paypal-provider"), {
+  ssr: false,
+})
 
 type WrapperProps = {
   cart: Omit<Cart, "refundable_amount" | "refunded_total">
   children: React.ReactNode
 }
 
-export const StripeContext = createContext(false)
-
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_KEY
-const stripePromise = stripeKey ? loadStripe(stripeKey) : null
-
 const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
 
 const Wrapper: React.FC<WrapperProps> = ({ cart, children }) => {
@@ -24,17 +34,9 @@ const Wrapper: React.FC<WrapperProps> = ({ cart, children }) => {
 
   const isStripe = paymentSession?.provider_id?.includes("stripe")
 
-  if (isStripe && paymentSession && stripePromise) {
+  if (isStripe && paymentSession && stripeKey) {
     return (
-      <StripeContext.Provider value={true}>
-        <StripeWrapper
-          paymentSession={paymentSession}
-          stripeKey={stripeKey}
-          stripePromise={stripePromise}
-        >
-          {children}
-        </StripeWrapper>
-      </StripeContext.Provider>
+      <StripeProvider paymentSession={paymentSession}>{children}</StripeProvider>
     )
   }
 
@@ -44,16 +46,9 @@ const Wrapper: React.FC<WrapperProps> = ({ cart, children }) => {
     cart
   ) {
     return (
-      <PayPalScriptProvider
-        options={{
-          "client-id": process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test",
-          currency: cart?.region.currency_code.toUpperCase(),
-          intent: "authorize",
-          components: "buttons",
-        }}
-      >
+      <PaypalProvider currencyCode={cart.region.currency_code}>
         {children}
-      </PayPalScriptProvider>
+      </PaypalProvider>
     )
   }
 

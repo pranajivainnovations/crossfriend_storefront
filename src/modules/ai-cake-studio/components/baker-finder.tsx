@@ -173,10 +173,15 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
     setOrderingKey(bakerId ?? "automatch")
 
     const result = await orderAiCake(savedProduct.variantId, bakerId, pincode)
-    // A successful order redirects server-side (never returns here) — only a failure returns a value.
-    if (result?.error) {
+    if ("error" in result && result.error) {
       setOrderError(result.error)
       setOrderingKey(null)
+      return
+    }
+    // Hard navigation, not router.push — guarantees a fresh server render of /cart instead of a
+    // possibly-stale client Router Cache entry from before this item was added.
+    if ("redirectTo" in result && result.redirectTo) {
+      window.location.href = result.redirectTo
     }
   }
 

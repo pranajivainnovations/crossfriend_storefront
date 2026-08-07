@@ -1,16 +1,19 @@
 "use client"
 
+import Image from "next/image"
+
 import { INSPIRATION_CARDS, SHOWCASE_CREATIONS } from "../data/mock-data"
 
 function ShowcaseCard({ item }: { item: { id: string; title: string; subtitle: string; tag: string; imagePath: string } }) {
   return (
     <div className="group relative w-[260px] flex-shrink-0 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm transition hover:shadow-md sm:w-auto">
       <div className="relative h-[180px] w-full overflow-hidden bg-gradient-to-br from-violet-100 to-purple-100 sm:aspect-[4/3] sm:h-auto">
-        <img
+        <Image
           src={item.imagePath}
           alt={item.title}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
+          fill
+          sizes="(max-width: 640px) 260px, 33vw"
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-violet-700 shadow-sm backdrop-blur">
           {item.tag}

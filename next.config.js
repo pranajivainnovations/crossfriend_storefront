@@ -29,7 +29,14 @@ const nextConfig = withStoreConfig({
     ],
     // Optimize image delivery
     formats: ['image/avif', 'image/webp'],
-    minimumCacheTTL: 60 * 60 * 24, // 24 hours
+    // Optimized derivatives are expensive to produce and these images effectively never change, so
+    // there's no reason to re-encode them daily. Replacing an image in place now needs a new
+    // filename (or a ?v= query) to be picked up promptly — that's the trade for not paying the
+    // optimizer over and over for identical output.
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+    // Default includes 3840px (4K). Nothing on this storefront renders an image anywhere near that
+    // wide, so every entry is a srcset candidate that costs an encode and buys nothing.
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
   },
   // Compression
   compress: true,

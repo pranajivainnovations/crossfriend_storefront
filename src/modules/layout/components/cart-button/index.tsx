@@ -8,9 +8,14 @@ const fetchCart = async () => {
   try {
     const cart = await retrieveCart()
 
-    if (cart?.items.length) {
-      const enrichedItems = await enrichLineItems(cart?.items, cart?.region_id)
-      cart.items = enrichedItems as LineItem[]
+    if (cart?.items?.length) {
+      // Only overwrite the real line items if enrichment actually produced some — assigning an empty
+      // result would show "Cart (0)" in the nav on every page while the cart really has items in it.
+      // See enrichLineItems.
+      const enrichedItems = await enrichLineItems(cart.items, cart.region_id)
+      if (enrichedItems?.length) {
+        cart.items = enrichedItems as LineItem[]
+      }
     }
 
     return cart

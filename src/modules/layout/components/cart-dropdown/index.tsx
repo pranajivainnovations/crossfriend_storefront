@@ -12,6 +12,7 @@ import LineItemOptions from "@modules/common/components/line-item-options"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "@modules/products/components/thumbnail"
+import { getCartItemHref } from "@lib/util/cart-item-link"
 
 const CartDropdown = ({
   cart: cartState,
@@ -79,6 +80,12 @@ const CartDropdown = ({
           <LocalizedClientLink
             className="hover:text-ui-fg-base"
             href="/cart"
+            // This link is visible in the nav on every page, so Next.js's default viewport prefetch
+            // would otherwise seed the client Router Cache with a stale /cart payload — and Next 14's
+            // client cache treats a prefetched dynamic page as fresh for 30s regardless of server-side
+            // revalidatePath/revalidateTag, which is exactly what caused the "blank cart, refresh
+            // fixes it" bug after adding an item. Disabling prefetch here forces a real request instead.
+            prefetch={false}
             data-testid="nav-cart-link"
           >{`Cart (${totalItems})`}</LocalizedClientLink>
         </Popover.Button>
@@ -107,29 +114,41 @@ const CartDropdown = ({
                     .sort((a, b) => {
                       return a.created_at > b.created_at ? -1 : 1
                     })
-                    .map((item) => (
+                    .map((item) => {
+                      const href = getCartItemHref(item)
+
+                      return (
                       <div
                         className="grid grid-cols-[122px_1fr] gap-x-4"
                         key={item.id}
                         data-testid="cart-item"
                       >
-                        <LocalizedClientLink
-                          href={`/products/${item.variant.product.handle}`}
-                          className="w-24"
-                        >
-                          <Thumbnail thumbnail={item.thumbnail} size="square" />
-                        </LocalizedClientLink>
+                        {href ? (
+                          <LocalizedClientLink href={href} className="w-24">
+                            <Thumbnail thumbnail={item.thumbnail} size="square" />
+                          </LocalizedClientLink>
+                        ) : (
+                          <div className="w-24">
+                            <Thumbnail thumbnail={item.thumbnail} size="square" />
+                          </div>
+                        )}
                         <div className="flex flex-col justify-between flex-1">
                           <div className="flex flex-col flex-1">
                             <div className="flex items-start justify-between">
                               <div className="flex flex-col overflow-ellipsis whitespace-nowrap mr-4 w-[180px]">
                                 <h3 className="text-base-regular overflow-hidden text-ellipsis">
-                                  <LocalizedClientLink
-                                    href={`/products/${item.variant.product.handle}`}
-                                    data-testid="product-link"
-                                  >
-                                    {item.title}
-                                  </LocalizedClientLink>
+                                  {href ? (
+                                    <LocalizedClientLink
+                                      href={href}
+                                      data-testid="product-link"
+                                    >
+                                      {item.title}
+                                    </LocalizedClientLink>
+                                  ) : (
+                                    <span data-testid="product-link">
+                                      {item.title}
+                                    </span>
+                                  )}
                                 </h3>
                                 <LineItemOptions
                                   variant={item.variant}
@@ -161,7 +180,8 @@ const CartDropdown = ({
                           </DeleteButton>
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                 </div>
                 <div className="p-4 flex flex-col gap-y-4 text-small-regular">
                   <div className="flex items-center justify-between">
@@ -181,7 +201,7 @@ const CartDropdown = ({
                       })}
                     </span>
                   </div>
-                  <LocalizedClientLink href="/cart" passHref>
+                  <LocalizedClientLink href="/cart" passHref prefetch={false}>
                     <Button
                       className="w-full"
                       size="large"

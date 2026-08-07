@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
+import Image from "next/image"
 import Link from "next/link"
 import type { Customer } from "@medusajs/medusa"
 import DesignLightbox from "./design-lightbox"
@@ -190,11 +191,14 @@ export default function ShowcaseGallery({ customer }: Props) {
                     setLightboxOpen(true)
                   }}
                 >
-                  <img
+                  {/* next/image, not a plain <img> — these are full-resolution ~1.7MB generated PNGs
+                      off S3 and the gallery shows a whole grid of them at thumbnail size. */}
+                  <Image
                     src={design.imageUrl}
                     alt={`${design.style} ${design.occasion || ""} cake design`}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
                   />
 
                   {/* Hover overlay */}

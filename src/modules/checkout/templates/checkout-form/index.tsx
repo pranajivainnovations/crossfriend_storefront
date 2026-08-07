@@ -23,7 +23,13 @@ export default async function CheckoutForm({
     return null
   }
 
-  const cart = (await getCart(cartId)) as CartWithCheckoutStep
+  // Independent — the customer lookup doesn't depend on the cart, so fetch both at once instead of
+  // waiting on one before starting the other. (Fetched speculatively even on the redirect path below;
+  // that's a harmless, read-only query, not worth special-casing away for the uncommon case.)
+  const [cart, customer] = await Promise.all([
+    getCart(cartId) as Promise<CartWithCheckoutStep>,
+    getCustomer(),
+  ])
 
   if (!cart) {
     return null
@@ -40,8 +46,6 @@ export default async function CheckoutForm({
   if (requestedStep !== "address" && requestedStep !== cart.checkout_step) {
     redirect(`/checkout?step=${cart.checkout_step}`)
   }
-
-  const customer = await getCustomer()
 
   return (
     <div>

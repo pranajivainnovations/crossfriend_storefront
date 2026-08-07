@@ -668,12 +668,20 @@ export const retrieveCollection = cache(async function (id: string) {
     })
 })
 
-export const getCollectionsList = cache(async function (
-  offset: number = 0,
-  limit: number = 100
-): Promise<{ collections: ProductCollection[]; count: number }> {
-  const collections = await medusaClient.collections
-    .list({ limit, offset }, { next: { tags: ["collections"] } })
+/**
+ * One canonical fetch of every CrossFriend collection, memoized for the lifetime of a request.
+ *
+ * The brand filter is applied in memory, so asking the API for a "page" never meant much anyway —
+ * a limit of 3 could come back with zero CrossFriend collections. Fetching the whole (small) set
+ * once and slicing locally is both more correct and dramatically cheaper: React's cache() keys on
+ * arguments, so the old per-limit calls meant the homepage (limit 3), the occasions helper (100)
+ * and the footer (6) each paid their own round trip to render a single page.
+ */
+const fetchAllCollections = cache(async function (): Promise<
+  ProductCollection[]
+> {
+  return medusaClient.collections
+    .list({ limit: 100, offset: 0 }, { next: { tags: ["collections"] } })
     .then(({ collections }) =>
       collections.filter(
         (col) =>
@@ -683,12 +691,17 @@ export const getCollectionsList = cache(async function (
     .catch((err) => {
       throw err
     })
+})
 
-  const count = collections.length
+export const getCollectionsList = cache(async function (
+  offset: number = 0,
+  limit: number = 100
+): Promise<{ collections: ProductCollection[]; count: number }> {
+  const all = await fetchAllCollections()
 
   return {
-    collections,
-    count,
+    collections: all.slice(offset, offset + limit),
+    count: all.length,
   }
 })
 

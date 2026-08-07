@@ -11,7 +11,6 @@ import {
 } from "@lib/data"
 import { GiftCard, StorePostCartsCartReq } from "@medusajs/medusa"
 import { revalidateTag, revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 
 const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
 
@@ -114,12 +113,19 @@ export async function submitDiscountForm(
  * ever had one answer. On success the cart already has address + shipping + payment fully resolved,
  * so this goes straight to review instead of a "delivery" step that no longer has anything to show.
  */
+/**
+ * Returns `{ error }` or `{ redirectTo }` instead of calling `redirect()` itself — a `redirect()`
+ * fired in the same action as `revalidatePath`/`revalidateTag` performs a soft, client-side
+ * transition that can still serve the browser's stale cached "review" render (from before shipping/
+ * payment were resolved), leaving the customer looking at a blank step with no way forward. The
+ * caller does a hard navigation instead, which always re-fetches from the server.
+ */
 export async function setAddresses(currentState: unknown, formData: FormData) {
-  if (!formData) return "No form data received"
+  if (!formData) return { error: "No form data received" }
 
   const cartId = cookies().get("_medusa_cart_id")?.value
 
-  if (!cartId) return { message: "No cartId cookie found" }
+  if (!cartId) return { error: "No cartId cookie found" }
 
   const data = {
     shipping_address: {
@@ -174,15 +180,15 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
     })
     const json = await res.json().catch(() => ({}))
     if (!res.ok) {
-      return json.error || "Something went wrong preparing checkout. Please try again."
+      return { error: json.error || "Something went wrong preparing checkout. Please try again." }
     }
     revalidateTag("cart")
     revalidatePath("/", "layout")
   } catch (error: any) {
-    return error.toString()
+    return { error: error.toString() }
   }
 
-  redirect(`/checkout?step=review`)
+  return { redirectTo: "/checkout?step=review" }
 }
 
 export async function setShippingMethod(shippingMethodId: string) {
@@ -212,6 +218,11 @@ export async function setPaymentMethod(providerId: string) {
   }
 }
 
+/**
+ * Returns `redirectTo` instead of calling `redirect()` itself — see setAddresses above for why: a
+ * `redirect()` fired alongside `revalidatePath`/`revalidateTag` can still serve a stale cached render
+ * of the confirmation page. Callers must hard-navigate (`window.location.href`) when it's present.
+ */
 export async function placeOrder() {
   const cartId = cookies().get("_medusa_cart_id")?.value
 
@@ -229,7 +240,7 @@ export async function placeOrder() {
 
   if (cart?.type === "order") {
     cookies().set("_medusa_cart_id", "", { maxAge: -1 })
-    redirect(`/order/confirmed/${cart?.data.id}`)
+    return { redirectTo: `/order/confirmed/${cart?.data.id}` }
   }
 
   return cart

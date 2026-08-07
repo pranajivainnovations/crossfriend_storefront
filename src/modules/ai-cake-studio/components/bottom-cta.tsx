@@ -20,15 +20,16 @@ export default function BottomCta() {
           <div className="pointer-events-none absolute right-16 bottom-8 text-xl text-white/45">✧</div>
 
           <div className="pointer-events-none relative mx-auto mb-4 h-24 w-24 overflow-hidden rounded-full border border-white/40 bg-white/20 shadow-lg shadow-violet-900/20 sm:h-28 sm:w-28">
-            {/* Fallback ring visible until banner-cake.png is uploaded */}
+            {/* Fallback ring, visible if the banner image fails to load */}
             <div className="absolute inset-0 flex items-center justify-center text-3xl">🎂</div>
+            {/* No `priority` — this is a 112px decorative avatar at the very bottom of the page.
+                Preloading it only steals bandwidth from the hero, which is the real LCP element. */}
             <Image
-              src="/ai-cake-studio/banner/banner-cake.png"
+              src="/ai-cake-studio/banner/banner-cake.jpg"
               alt="Banner cake"
               fill
               className="object-cover"
               sizes="112px"
-              priority
             />
           </div>
 

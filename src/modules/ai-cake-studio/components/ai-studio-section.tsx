@@ -2,6 +2,7 @@
 
 import DesignLightbox from "./design-lightbox"
 
+import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import type { Customer } from "@medusajs/medusa"
@@ -338,12 +339,19 @@ function DesignCard({
     >
       <div className="relative">
         {hasImage ? (
-          <img
-            src={design.imageUrl}
-            alt={design.title}
-            className="h-40 w-full object-cover"
-            loading="lazy"
-          />
+          // next/image, not a plain <img> — the generated designs are ~1.7MB full-resolution PNGs
+          // straight off S3, and this card renders them into a 160px-tall thumbnail. Going through
+          // the image optimizer serves an appropriately-sized AVIF/WebP instead, which is the
+          // difference between a few KB and several MB per generated design on this screen.
+          <div className="relative h-40 w-full">
+            <Image
+              src={design.imageUrl!}
+              alt={design.title}
+              fill
+              sizes="(max-width: 640px) 100vw, 33vw"
+              className="object-cover"
+            />
+          </div>
         ) : (
           <div className={`h-28 w-full bg-gradient-to-br ${design.gradient}`} />
         )}

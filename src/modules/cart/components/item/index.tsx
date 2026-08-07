@@ -14,6 +14,7 @@ import Spinner from "@modules/common/icons/spinner"
 import { useState } from "react"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import { getCartItemHref } from "@lib/util/cart-item-link"
 
 type ItemProps = {
   item: Omit<LineItem, "beforeInsert">
@@ -25,7 +26,7 @@ const Item = ({ item, region, type = "full" }: ItemProps) => {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { handle } = item.variant.product
+  const href = getCartItemHref(item)
 
   const changeQuantity = async (quantity: number) => {
     setError(null)
@@ -48,15 +49,26 @@ const Item = ({ item, region, type = "full" }: ItemProps) => {
   return (
     <Table.Row className="w-full" data-testid="product-row">
       <Table.Cell className="!pl-0 p-4 w-24">
-        <LocalizedClientLink
-          href={`/products/${handle}`}
-          className={clx("flex", {
-            "w-16": type === "preview",
-            "small:w-24 w-12": type === "full",
-          })}
-        >
-          <Thumbnail thumbnail={item.thumbnail} size="square" />
-        </LocalizedClientLink>
+        {href ? (
+          <LocalizedClientLink
+            href={href}
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail thumbnail={item.thumbnail} size="square" />
+          </LocalizedClientLink>
+        ) : (
+          <div
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail thumbnail={item.thumbnail} size="square" />
+          </div>
+        )}
       </Table.Cell>
 
       <Table.Cell className="text-left">

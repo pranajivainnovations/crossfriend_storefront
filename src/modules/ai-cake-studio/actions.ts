@@ -2,7 +2,6 @@
 
 import { cookies } from "next/headers"
 import { revalidateTag, revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 import { getOrSetCart } from "@modules/cart/actions"
 import { addItem } from "@lib/data"
 
@@ -138,12 +137,17 @@ export async function saveAiCakeProduct(
  * `pincode` is carried on the line item too — the price the customer just saw was calculated for this
  * pincode, so the checkout address step reads it back off the cart to lock the postal code field
  * instead of letting the customer quietly change it after the fact and invalidate the price.
+ *
+ * Returns `redirectTo` instead of calling `redirect()` itself — a `redirect()` fired in the same
+ * action as `revalidatePath`/`revalidateTag` performs a soft, client-side transition that can still
+ * serve the browser's stale cached (pre-add, empty) `/cart` render instead of the fresh one, which is
+ * exactly the "blank cart after ordering" bug this replaced. The caller does a hard navigation instead.
  */
 export async function orderAiCake(
   variantId: string,
   bakerId: string | null,
   pincode: string
-): Promise<{ error: string } | undefined> {
+): Promise<{ error: string; redirectTo?: undefined } | { error?: undefined; redirectTo: string }> {
   const cart = await getOrSetCart()
   if (!cart) {
     return { error: "Could not start your cart. Please try again." }
@@ -162,5 +166,5 @@ export async function orderAiCake(
 
   revalidateTag("cart")
   revalidatePath("/", "layout")
-  redirect("/cart")
+  return { redirectTo: "/cart" }
 }

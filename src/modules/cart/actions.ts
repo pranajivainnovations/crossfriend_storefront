@@ -172,22 +172,30 @@ export async function enrichLineItems(
   // over here.
   const validLineItems = lineItems.filter((lineItem) => lineItem.variant != null)
 
+  // If there are no valid line items, return an empty array
+  if (!validLineItems.length) {
+    return []
+  }
+
   // Prepare query parameters
   const queryParams = {
     ids: validLineItems.map((lineItem) => lineItem.variant.product_id),
     regionId: regionId,
   }
 
-  // If there are no valid line items, return an empty array
-  if (!validLineItems.length) {
-    return []
-  }
-
   // Fetch products by their IDs
-  const products = await getProductsById(queryParams)
+  const products = await getProductsById(queryParams).catch(() => null)
 
-  if (!products) {
-    return []
+  // Enrichment is an enhancement, never a requirement — the line items coming in already carry
+  // everything the cart needs to render (title, thumbnail, price, variant, product). Returning []
+  // here instead would make the customer's cart appear EMPTY on the cart page, the checkout page and
+  // the nav badge all at once, because every caller assigns this result straight onto cart.items.
+  // getProductsById swallows any error into null, and the store products endpoint legitimately
+  // returns nothing for AI Studio cakes (they're created with status "draft", which the store API
+  // filters out) — so "no products came back" is an expected, non-exceptional state, not a reason to
+  // throw away the cart.
+  if (!products || !products.length) {
+    return validLineItems
   }
 
   // Enrich line items with product and variant information

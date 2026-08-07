@@ -114,6 +114,7 @@ export default async function Footer() {
                 <li>
                   <LocalizedClientLink
                     href="/cart"
+                    prefetch={false}
                     className="hover:text-white transition-colors"
                   >
                     Cart

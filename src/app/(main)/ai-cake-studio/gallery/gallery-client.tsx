@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
+import Image from "next/image"
 import Link from "next/link"
 import type { Customer } from "@medusajs/medusa"
 import DesignLightbox from "@modules/ai-cake-studio/components/design-lightbox"
@@ -292,11 +293,14 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
                     setLightboxOpen(true)
                   }}
                 >
-                  <img
+                  {/* next/image, not a plain <img> — the source files are full-resolution ~1.7MB
+                      generated PNGs and this is a thumbnail grid. */}
+                  <Image
                     src={design.imageUrl}
                     alt={`${design.style} ${design.occasion || ""} cake design`}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
                   />
 
                   <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/20">

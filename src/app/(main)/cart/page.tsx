@@ -29,9 +29,13 @@ const fetchCart = async () => {
     return null
   }
 
-  if (cart?.items.length) {
-    const enrichedItems = await enrichLineItems(cart?.items, cart?.region_id)
-    cart.items = enrichedItems as LineItem[]
+  if (cart?.items?.length) {
+    // Only overwrite the real line items if enrichment actually produced some — assigning an empty
+    // result would blank out a cart that genuinely has items in it. See enrichLineItems.
+    const enrichedItems = await enrichLineItems(cart.items, cart.region_id)
+    if (enrichedItems?.length) {
+      cart.items = enrichedItems as LineItem[]
+    }
   }
 
   cart.checkout_step = cart && getCheckoutStep(cart)
@@ -40,8 +44,9 @@ const fetchCart = async () => {
 }
 
 export default async function Cart() {
-  const cart = await fetchCart()
-  const customer = await getCustomer()
+  // Independent — the customer lookup doesn't depend on the cart, so there's no reason for these two
+  // remote-DB round trips to happen one after another.
+  const [cart, customer] = await Promise.all([fetchCart(), getCustomer()])
 
   return <CartTemplate cart={cart} customer={customer} />
 }

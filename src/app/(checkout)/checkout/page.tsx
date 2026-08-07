@@ -25,9 +25,13 @@ const fetchCart = async () => {
     return null
   }
 
-  if (cart?.items.length) {
-    const enrichedItems = await enrichLineItems(cart?.items, cart?.region_id)
-    cart.items = enrichedItems as LineItem[]
+  if (cart?.items?.length) {
+    // Only overwrite the real line items if enrichment actually produced some — assigning an empty
+    // result would strand the customer on "Your cart is empty" mid-checkout. See enrichLineItems.
+    const enrichedItems = await enrichLineItems(cart.items, cart.region_id)
+    if (enrichedItems?.length) {
+      cart.items = enrichedItems as LineItem[]
+    }
   }
 
   return cart

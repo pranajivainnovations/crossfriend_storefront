@@ -32,6 +32,10 @@ function CakeHeroVisual() {
             src="/ai-cake-studio/hero/hero-cake.jpg"
             alt="AI cake studio hero cake"
             fill
+            // Without sizes, `fill` assumes 100vw and pulls a full-viewport-width file for a slot
+            // that's roughly half the screen on desktop. This is the LCP image, so the wasted bytes
+            // land squarely on the metric that decides how fast the page feels.
+            sizes="(max-width: 1024px) 100vw, 50vw"
             className="object-cover"
             priority
           />

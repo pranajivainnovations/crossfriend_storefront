@@ -11,7 +11,7 @@ import HowItWorks from "@modules/home/components/how-it-works"
 import Testimonials from "@modules/home/components/testimonials"
 import CtaBanner from "@modules/home/components/cta-banner"
 import { ProductCollectionWithPreviews } from "types/global"
-import { cache } from "react"
+import { cache, Suspense } from "react"
 
 // Never prerender — always fetch fresh from Medusa at request time
 export const dynamic = "force-dynamic"
@@ -84,8 +84,9 @@ const getCollectionsWithProducts = cache(
 )
 
 export default async function Home() {
-  const collections = await getCollectionsWithProducts()
-  const region = await getRegion()
+  // Independent — collections/products and region resolution don't depend on each other, so there's
+  // no reason for the remote-DB round trips to happen one after another.
+  const [collections, region] = await Promise.all([getCollectionsWithProducts(), getRegion()])
 
   if (!collections || !region) {
     return null
@@ -99,11 +100,17 @@ export default async function Home() {
       {/* Trust signals — builds confidence immediately */}
       <TrustBar />
 
-      {/* Occasion grid — visual, bento-style browsing */}
-      <OccasionGrid />
+      {/* Occasion grid and category strip both fetch on the server. Without a Suspense boundary an
+          async child blocks the whole document, so the hero — which needs no data at all — waits on
+          them before anything reaches the browser. Wrapped, the page streams: hero and trust bar
+          paint immediately and these fill in when their data lands. */}
+      <Suspense fallback={<div className="h-96" />}>
+        <OccasionGrid />
+      </Suspense>
 
-      {/* Quick category strip — horizontal scroll */}
-      <CategoryStrip />
+      <Suspense fallback={<div className="h-32" />}>
+        <CategoryStrip />
+      </Suspense>
 
       {/* Featured product collections */}
       <div className="bg-grey-5/50">

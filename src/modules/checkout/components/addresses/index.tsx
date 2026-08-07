@@ -5,6 +5,7 @@ import {
   useRouter,
   usePathname,
 } from "next/navigation"
+import { useEffect } from "react"
 import { Cart, Customer } from "@medusajs/medusa"
 import { CheckCircleSolid } from "@medusajs/icons"
 import { Heading, Text, useToggleState } from "@medusajs/ui"
@@ -46,7 +47,15 @@ const Addresses = ({
     router.push(pathname + "?step=address")
   }
 
-  const [message, formAction] = useFormState(setAddresses, null)
+  const [state, formAction] = useFormState(setAddresses, null)
+
+  // Hard navigation, not router.push — guarantees a fresh server render of the review step instead of
+  // a possibly-stale client Router Cache entry from before shipping/payment were resolved.
+  useEffect(() => {
+    if (state?.redirectTo) {
+      window.location.href = state.redirectTo
+    }
+  }, [state])
 
   return (
     <div className="bg-white">
@@ -94,7 +103,7 @@ const Addresses = ({
               </div>
             )}
             <SubmitButton className="mt-6" data-testid="submit-address-button">Continue to review</SubmitButton>
-            <ErrorMessage error={message} data-testid="address-error-message" />
+            <ErrorMessage error={state?.error} data-testid="address-error-message" />
           </div>
         </form>
       ) : (
