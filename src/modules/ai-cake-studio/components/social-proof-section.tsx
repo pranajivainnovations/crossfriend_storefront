@@ -6,8 +6,8 @@ import { INSPIRATION_CARDS, SHOWCASE_CREATIONS } from "../data/mock-data"
 
 function ShowcaseCard({ item }: { item: { id: string; title: string; subtitle: string; tag: string; imagePath: string } }) {
   return (
-    <div className="group relative w-[260px] flex-shrink-0 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm transition hover:shadow-md sm:w-auto">
-      <div className="relative h-[180px] w-full overflow-hidden bg-gradient-to-br from-violet-100 to-purple-100 sm:aspect-[4/3] sm:h-auto">
+    <div className="group relative w-[260px] flex-shrink-0 overflow-hidden rounded-2xl border border-cf-purple-100 bg-white shadow-sm transition hover:shadow-md sm:w-auto">
+      <div className="relative h-[180px] w-full overflow-hidden bg-gradient-to-br from-cf-purple-100 to-purple-100 sm:aspect-[4/3] sm:h-auto">
         <Image
           src={item.imagePath}
           alt={item.title}
@@ -15,7 +15,7 @@ function ShowcaseCard({ item }: { item: { id: string; title: string; subtitle: s
           sizes="(max-width: 640px) 260px, 33vw"
           className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
-        <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-violet-700 shadow-sm backdrop-blur">
+        <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-cf-purple-700 shadow-sm backdrop-blur">
           {item.tag}
         </span>
       </div>
@@ -72,7 +72,7 @@ export default function SocialProofSection() {
                 key={card.id}
                 type="button"
                 onClick={scrollToStudio}
-                className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:border-violet-400 hover:bg-violet-100"
+                className="flex items-center gap-1.5 rounded-full border border-cf-purple-200 bg-cf-purple-50 px-3 py-1.5 text-xs font-semibold text-cf-purple-700 transition hover:border-cf-purple-400 hover:bg-cf-purple-100"
               >
                 <span>{card.emoji}</span>
                 {card.category}
@@ -83,10 +83,10 @@ export default function SocialProofSection() {
 
         {/* Stats */}
         <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 px-3 py-5 shadow-lg shadow-violet-200">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cf-purple-600 to-purple-700 px-3 py-5 shadow-lg shadow-cf-purple-200">
             <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-white/10 blur-sm" />
             <p className="relative text-3xl font-extrabold text-white">500+</p>
-            <p className="relative mt-1 text-[11px] font-semibold text-violet-200">Designs Created</p>
+            <p className="relative mt-1 text-[11px] font-semibold text-cf-purple-200">Designs Created</p>
           </div>
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-600 px-3 py-5 shadow-lg shadow-pink-200">
             <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-white/10 blur-sm" />
@@ -101,24 +101,24 @@ export default function SocialProofSection() {
         </div>
 
         {/* Trust badges */}
-        <div className="rounded-2xl border border-violet-100 bg-white/80 p-4 backdrop-blur">
+        <div className="rounded-2xl border border-cf-purple-100 bg-white/80 p-4 backdrop-blur">
           <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
-            <div className="rounded-xl bg-violet-50/60 px-3 py-3">
+            <div className="rounded-xl bg-cf-purple-50/60 px-3 py-3">
               <span className="text-lg">🤖</span>
               <p className="mt-1 text-xs font-bold text-slate-700">AI Powered</p>
               <p className="text-[10px] text-slate-500">Unique every time</p>
             </div>
-            <div className="rounded-xl bg-violet-50/60 px-3 py-3">
+            <div className="rounded-xl bg-cf-purple-50/60 px-3 py-3">
               <span className="text-lg">🛡️</span>
               <p className="mt-1 text-xs font-bold text-slate-700">Verified Bakers</p>
               <p className="text-[10px] text-slate-500">Quality assured</p>
             </div>
-            <div className="rounded-xl bg-violet-50/60 px-3 py-3">
+            <div className="rounded-xl bg-cf-purple-50/60 px-3 py-3">
               <span className="text-lg">⚡</span>
               <p className="mt-1 text-xs font-bold text-slate-700">60 Seconds</p>
               <p className="text-[10px] text-slate-500">Design to order</p>
             </div>
-            <div className="rounded-xl bg-violet-50/60 px-3 py-3">
+            <div className="rounded-xl bg-cf-purple-50/60 px-3 py-3">
               <span className="text-lg">📍</span>
               <p className="mt-1 text-xs font-bold text-slate-700">Local Delivery</p>
               <p className="text-[10px] text-slate-500">Bakers near you</p>

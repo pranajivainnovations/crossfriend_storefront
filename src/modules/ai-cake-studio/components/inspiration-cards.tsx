@@ -21,7 +21,7 @@ export default function InspirationCards() {
           <button
             type="button"
             onClick={() => document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })}
-            className="text-sm font-semibold text-violet-600 transition hover:text-violet-700"
+            className="text-sm font-semibold text-cf-purple-600 transition hover:text-cf-purple-700"
           >
             Use these in studio →
           </button>
@@ -41,7 +41,7 @@ export default function InspirationCards() {
                 document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })
               }
             >
-              <div className="relative overflow-hidden rounded-2xl border border-violet-100 bg-white p-2.5 shadow-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-violet-100/60">
+              <div className="relative overflow-hidden rounded-2xl border border-cf-purple-100 bg-white p-2.5 shadow-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-cf-purple-100/60">
                 <div className={`relative h-32 overflow-hidden rounded-xl bg-gradient-to-br ${card.gradient}`}>
                   {/* Emoji fallback — visible when image hasn't been uploaded yet */}
                   <div className="absolute inset-0 flex items-center justify-center text-4xl">

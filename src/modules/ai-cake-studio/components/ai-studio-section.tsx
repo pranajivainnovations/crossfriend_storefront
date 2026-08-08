@@ -17,7 +17,14 @@ import PriceEstimator from "./price-estimator"
 import MobileOtpAuth from "./mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
-import type { SavedAiCakeProduct } from "../actions"
+import StudioProgressRail, { type StudioStep } from "./studio-progress-rail"
+import ShareToCommunityToggle from "./share-to-community-toggle"
+import {
+  fetchAiCakeConstraints,
+  type ConstraintState,
+  type SavedAiCakeProduct,
+} from "../actions"
+import StudioOptionPills, { type OptionConstraint } from "./studio-option-pills"
 import {
   generateCakeDesigns,
   uploadReferenceImage,
@@ -27,6 +34,10 @@ import {
 } from "@lib/data/ai-studio"
 
 const FREE_ATTEMPTS_LIMIT = 3
+
+/** Where this browser remembers the designs it generated, and for how long. See the restore effect. */
+const DESIGNS_STORAGE_KEY = "cf-ai-studio-designs"
+const DESIGNS_TTL_MS = 24 * 60 * 60 * 1000
 
 // ─── AI model picker — config-driven ────────────────────────────────────────
 //
@@ -105,6 +116,15 @@ type UseCakePayload = {
   flavor: string
   prompt: string
   compiledPrompt?: string
+  /**
+   * The physical spec the image actually depicts. Optional because designs generated before these
+   * were recorded genuinely don't know — those keep the studio's defaults rather than being assigned
+   * a size nobody chose. Without these, adopting a 3-tier showcase cake priced it as whatever weight
+   * happened to be selected, so the picture, the quote and the cart could all disagree.
+   */
+  weight?: string
+  tiers?: string
+  shape?: string
 }
 
 /** "Use this prompt" handoff — style/occasion/flavor are optional since older
@@ -246,8 +266,8 @@ const COLOR_OPTIONS: BuilderOption[] = [
 
 function EmptyCreationsPanel() {
   return (
-    <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-violet-200 bg-violet-50/30 p-6 text-center">
-      <span className="text-5xl text-violet-500">🎂</span>
+    <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-cf-purple-200 bg-cf-purple-50/30 p-6 text-center">
+      <span className="text-5xl text-cf-purple-500">🎂</span>
       <p className="text-sm font-semibold text-slate-600">Your generated designs will appear here</p>
       <p className="text-xs text-slate-400">Describe your cake and hit Generate</p>
     </div>
@@ -281,12 +301,12 @@ function CakeBuildingAnimation({ compact = false }: { compact?: boolean }) {
   const tiers = [
     { w: "w-24", color: "bg-amber-200" },
     { w: "w-20", color: "bg-pink-200" },
-    { w: "w-14", color: "bg-violet-300" },
+    { w: "w-14", color: "bg-cf-purple-300" },
   ]
 
   return (
     <div
-      className={`flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 ${
+      className={`flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cf-purple-200 bg-cf-purple-50/40 ${
         compact ? "px-2" : "px-4"
       }`}
     >
@@ -314,7 +334,7 @@ function CakeBuildingAnimation({ compact = false }: { compact?: boolean }) {
           🕯️
         </motion.span>
       </div>
-      <p className="text-center text-xs font-semibold text-violet-500">
+      <p className="text-center text-xs font-semibold text-cf-purple-500">
         {CAKE_BUILDING_PHRASES[phraseIndex]}
       </p>
     </div>
@@ -335,7 +355,7 @@ function DesignCard({
   return (
     <div
       className={`overflow-hidden rounded-xl border bg-white transition ${
-        selected ? "border-violet-400 ring-2 ring-violet-300 shadow-sm" : "border-violet-100"
+        selected ? "border-cf-purple-400 ring-2 ring-cf-purple-300 shadow-sm" : "border-cf-purple-100"
       }`}
     >
       <div className="relative">
@@ -369,7 +389,7 @@ function DesignCard({
         </button>
 
         {selected && (
-          <div className="absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white shadow">
+          <div className="absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-cf-purple-600 text-white shadow">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
               <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
             </svg>
@@ -380,6 +400,9 @@ function DesignCard({
       <div className="p-3">
         <h4 className="text-sm font-semibold text-slate-900">{design.title}</h4>
         <p className="mt-1 line-clamp-2 text-xs text-slate-500">{design.description}</p>
+        {/* Designs are private now; this is how a customer chooses to publish one. Only renders for
+            designs that exist server-side — a locally-generated card has nothing to toggle yet. */}
+        <ShareToCommunityToggle designId={design.designId} />
       </div>
     </div>
   )
@@ -388,7 +411,7 @@ function DesignCard({
 function AttemptsBadge({ attemptsLeft }: { attemptsLeft: number }) {
   if (attemptsLeft <= 0) return null
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+    <span className="inline-flex items-center gap-1 rounded-full bg-cf-purple-50 px-3 py-1 text-xs font-semibold text-cf-purple-700 ring-1 ring-cf-purple-200">
       ✨ {attemptsLeft} free attempt{attemptsLeft !== 1 ? "s" : ""} remaining
     </span>
   )
@@ -408,41 +431,35 @@ function ExhaustedBanner() {
 }
 
 /** Reusable pill selector row */
+/**
+ * Thin wrapper over the shared StudioOptionPills so this file's existing call sites keep their shape
+ * while gaining per-option constraint state. Pass `constraints` for any attribute the rules engine
+ * knows about; omit it for the ones it doesn't (colour, AI model).
+ */
 function PillSelector({
   options,
   value,
   onChange,
   disabled,
   size = "normal",
+  constraints,
 }: {
   options: BuilderOption[]
   value: string
   onChange: (v: string) => void
   disabled?: boolean
   size?: "normal" | "small"
+  constraints?: Map<string, OptionConstraint>
 }) {
-  const baseClass = size === "small"
-    ? "rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60"
-    : "rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60"
-
   return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(opt.value)}
-          className={`${baseClass} ${
-            value === opt.value
-              ? "bg-violet-600 text-white"
-              : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
-          }`}
-        >
-          {opt.emoji && <>{opt.emoji} </>}{opt.label}
-        </button>
-      ))}
-    </div>
+    <StudioOptionPills
+      options={options}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      size={size}
+      constraints={constraints}
+    />
   )
 }
 
@@ -453,6 +470,20 @@ export default function AiStudioSection({ customer }: Props) {
 
   const [selectors, setSelectors] = useState<StudioSelectors>(FALLBACK_SELECTORS)
   const [prompt, setPrompt] = useState("")
+  // The template a chip is offering to load while the box already has text. Held here until the
+  // customer decides, so the choice can be made inline instead of through a modal browser dialog.
+  const [pendingTemplate, setPendingTemplate] = useState<string | null>(null)
+  // True once the customer has picked their own style/occasion/flavor. Adopting a showcase cake only
+  // needs to ask about overwriting these when there's something of theirs to overwrite — asking when
+  // the form is still at its defaults would be a pointless interruption.
+  const [settingsTouched, setSettingsTouched] = useState(false)
+  // A showcase cake's settings, waiting on that decision.
+  const [pendingCakeSettings, setPendingCakeSettings] = useState<
+    { style: string; occasion: string; flavor: string } | null
+  >(null)
+  // Live option validity from the constraints engine, so impossible combinations are visibly closed
+  // off while designing rather than discovered at the price step.
+  const [constraints, setConstraints] = useState<ConstraintState | null>(null)
 
   // Reference image upload — optional, stands in for (or supplements) the
   // typed prompt. Uploads immediately on file select; purpose is fixed on
@@ -514,6 +545,25 @@ export default function AiStudioSection({ customer }: Props) {
   // which no longer collects or creates either of these itself.
   const [savedProduct, setSavedProduct] = useState<SavedAiCakeProduct | null>(null)
   const [confirmedPincode, setConfirmedPincode] = useState<string | null>(null)
+  // Whether the customer has actually reached the baker panel (BakerFinder reports this when it opens),
+  // so the rail can show "Order" as current rather than parking on "Baker" forever.
+  const [reachedOrder, setReachedOrder] = useState(false)
+
+  /**
+   * Where the customer is in the four-step flow, derived from real state rather than tracked
+   * separately — there's no way for the rail to drift out of sync with what's actually on screen.
+   *   design → nothing accepted yet
+   *   price  → a design is selected, but no product created
+   *   baker  → the price is locked (savedProduct exists), choosing who bakes it
+   *   order  → a baker has been picked, heading for the cart
+   */
+  const currentStep: StudioStep = reachedOrder
+    ? "order"
+    : savedProduct
+      ? "baker"
+      : selectedDesignId
+        ? "price"
+        : "design"
 
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -558,6 +608,85 @@ export default function AiStudioSection({ customer }: Props) {
       })
       .catch(() => {})
   }, [isLoggedIn])
+
+  /**
+   * Generated designs survive a reload.
+   *
+   * They used to live in React state only, so a refresh, a back button, or a phone call mid-flow wiped
+   * them — and each one cost the customer a free attempt and cost us a real image generation. The
+   * images themselves are already on S3; all that's needed is to remember which ones this browser
+   * produced. Kept for a day, which comfortably covers "I'll finish this tonight" without hoarding.
+   */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DESIGNS_STORAGE_KEY)
+      if (!raw) return
+      const saved = JSON.parse(raw) as { at: number; designs: GeneratedDesign[] }
+      if (!saved?.designs?.length) return
+      if (Date.now() - saved.at > DESIGNS_TTL_MS) {
+        localStorage.removeItem(DESIGNS_STORAGE_KEY)
+        return
+      }
+      setDesigns(saved.designs)
+      setGenerated(true)
+    } catch {
+      // Corrupt or unavailable storage (private mode, quota) — carry on with an empty studio.
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (designs.length === 0) {
+        localStorage.removeItem(DESIGNS_STORAGE_KEY)
+        return
+      }
+      localStorage.setItem(
+        DESIGNS_STORAGE_KEY,
+        JSON.stringify({ at: Date.now(), designs })
+      )
+    } catch {
+      // Storage full or blocked — the studio still works, it just won't remember.
+    }
+  }, [designs])
+
+  /**
+   * Re-evaluate which options are still possible whenever a selection changes. Debounced lightly —
+   * this is a cheap read (the engine caches its rule set and catalogue) but there's no reason to fire
+   * it on every pill tap in a rapid sequence.
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchAiCakeConstraints({
+        weight: sel.weight,
+        tiers: sel.tiers,
+        shape: sel.shape,
+        style: sel.style,
+        flavor: sel.flavor,
+      }).then((result) => {
+        if (result) setConstraints(result)
+      })
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [sel.weight, sel.tiers, sel.shape, sel.style, sel.flavor])
+
+  /** attributeKey -> (value token -> validity), so each pill group can look up its own options. */
+  const constraintsByAttribute = useMemo(() => {
+    const byAttr = new Map<string, Map<string, OptionConstraint>>()
+    for (const option of constraints?.options ?? []) {
+      byAttr.set(
+        option.attributeKey,
+        new Map(
+          option.values.map((v) => [
+            v.value,
+            { enabled: v.enabled, recommended: v.recommended, reason: v.reason },
+          ])
+        )
+      )
+    }
+    return byAttr
+  }, [constraints])
+
+  const constraintViolations = constraints?.violations ?? []
 
   // Listen for "Use this prompt" / "Use this cake" from showcase gallery
   useEffect(() => {
@@ -718,7 +847,7 @@ export default function AiStudioSection({ customer }: Props) {
         title: d.title,
         description: d.description,
         style: d.style,
-        gradient: "from-violet-400 via-purple-300 to-indigo-400",
+        gradient: "from-cf-purple-400 via-purple-300 to-indigo-400",
         liked: false,
         imageUrl: d.imageUrl,
         compiledPrompt: d.compiledPrompt,
@@ -755,10 +884,14 @@ export default function AiStudioSection({ customer }: Props) {
   }
 
   /**
-   * "Use this cake" — adopts an already-generated design (from the showcase
-   * gallery, same-page or cross-page) as a card here, carries over its known
-   * style/occasion/flavor into the selectors, and immediately accepts it —
-   * the customer never has to type a prompt for this cake at all.
+   * "Use this cake" — adopts an already-generated design (from the showcase gallery, same-page or
+   * cross-page) as a card here and immediately accepts it, so the customer never has to type a prompt
+   * for this cake at all.
+   *
+   * Adopting the design is unconditional — that's the whole point of the button. What *is* asked about
+   * is the design's style/occasion/flavor: if the customer has already picked their own, those get
+   * overwritten, and this used to happen with no indication at all. Same inline choice the template
+   * chips use. Untouched defaults are overwritten silently, since there's nothing there to lose.
    */
   const adoptShowcaseDesign = (payload: UseCakePayload) => {
     const adopted: GeneratedDesign = {
@@ -766,22 +899,85 @@ export default function AiStudioSection({ customer }: Props) {
       designId: payload.id,
       title: `${payload.style}${payload.occasion ? " · " + payload.occasion : ""} Cake`,
       description: payload.prompt,
-      gradient: "from-violet-400 via-purple-300 to-indigo-400",
+      gradient: "from-cf-purple-400 via-purple-300 to-indigo-400",
       style: payload.style,
       liked: false,
       imageUrl: payload.imageUrl,
       compiledPrompt: payload.compiledPrompt,
     }
-    setSel((c) => ({
-      ...c,
-      style: payload.style || c.style,
-      occasion: payload.occasion || c.occasion,
-      flavor: payload.flavor || c.flavor,
-    }))
+
+    /**
+     * The physical spec is applied unconditionally, unlike style/occasion/flavor below.
+     *
+     * Those are taste — the customer may well want this design in their own flavour. Weight, tiers and
+     * shape are what the image *is*: adopting a photo of a 3-tier cake and quoting it as a 0.5 kg
+     * single tier is simply the wrong price for the thing on screen, and that mismatch followed
+     * through to the cart. There's no version of "keep mine" that makes the picture correct.
+     */
+    if (payload.weight || payload.tiers || payload.shape) {
+      setSel((c) => ({
+        ...c,
+        weight: payload.weight || c.weight,
+        tiers: payload.tiers || c.tiers,
+        shape: payload.shape || c.shape,
+      }))
+    }
+
+    const carriesSettings = Boolean(payload.style || payload.occasion || payload.flavor)
+    if (carriesSettings && settingsTouched) {
+      setPendingCakeSettings({
+        style: payload.style,
+        occasion: payload.occasion,
+        flavor: payload.flavor,
+      })
+    } else if (carriesSettings) {
+      setSel((c) => ({
+        ...c,
+        style: payload.style || c.style,
+        occasion: payload.occasion || c.occasion,
+        flavor: payload.flavor || c.flavor,
+      }))
+    }
+
     setDesigns((prev) => [...prev, adopted])
     document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })
     // Wait a tick for the card to actually exist before selecting/scrolling to it.
     setTimeout(() => handleAcceptDesign(adopted.id), 250)
+  }
+
+  const applyPendingCakeSettings = () => {
+    if (!pendingCakeSettings) return
+    setSel((c) => ({
+      ...c,
+      style: pendingCakeSettings.style || c.style,
+      occasion: pendingCakeSettings.occasion || c.occasion,
+      flavor: pendingCakeSettings.flavor || c.flavor,
+    }))
+    setPendingCakeSettings(null)
+  }
+
+  /**
+   * Template chips fill the prompt box. They used to overwrite unconditionally, so one stray click on
+   * what looks like a harmless suggestion destroyed a description the customer may have spent real
+   * thought on — no warning, no undo.
+   *
+   * Now the click asks first, the same way "Use this prompt" asks before loading a design's
+   * style/occasion/flavor over the customer's own choices. Asking rather than refusing matters:
+   * someone who genuinely wants to start over from a template shouldn't have to manually empty the
+   * box to be allowed to. The choice is offered inline rather than through window.confirm so it can
+   * be styled, isn't modal, and doesn't stop the page.
+   */
+  const handleTemplateClick = (templatePrompt: string) => {
+    if (prompt.trim().length > 0) {
+      setPendingTemplate(templatePrompt)
+      return
+    }
+    setPrompt(templatePrompt)
+  }
+
+  const confirmTemplateReplace = () => {
+    if (pendingTemplate) setPrompt(pendingTemplate)
+    setPendingTemplate(null)
   }
 
   /**
@@ -837,13 +1033,54 @@ export default function AiStudioSection({ customer }: Props) {
   return (
     <section id="ai-studio" className="px-4 py-8 sm:px-6 lg:px-12">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[26px] border border-violet-100 bg-white p-5 shadow-[0_24px_60px_rgba(109,40,217,0.12)] sm:p-6">
+        <div className="overflow-hidden rounded-[26px] border border-cf-purple-100 bg-white p-5 shadow-[0_24px_60px_rgba(109,40,217,0.12)] sm:p-6">
 
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">Create Your Cake with AI</h3>
             <p className="text-xs text-slate-500">Describe, choose style and let AI do the magic ✨</p>
           </div>
+
+          {/* Where the customer is in the real four-step journey. See StudioProgressRail for why the
+              numbering moved here off the form's field groups. */}
+          <StudioProgressRail current={currentStep} />
+
+          {/* An adopted showcase cake carries its own style/occasion/flavor. The design itself is
+              already applied; this only asks about replacing selections the customer made themselves. */}
+          {pendingCakeSettings && (
+            <div
+              role="alertdialog"
+              aria-label="Use this cake's settings?"
+              className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3"
+            >
+              <p className="text-xs font-bold text-amber-800">Also use this cake&apos;s settings?</p>
+              <p className="mt-0.5 text-[11px] leading-snug text-amber-700">
+                It was made with{" "}
+                <span className="font-semibold">
+                  {[pendingCakeSettings.style, pendingCakeSettings.occasion, pendingCakeSettings.flavor]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                . Using them replaces the choices you&apos;ve already made.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={applyPendingCakeSettings}
+                  className="rounded-lg bg-amber-600 px-3 py-1 text-[11px] font-bold text-white transition hover:bg-amber-700"
+                >
+                  Use theirs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingCakeSettings(null)}
+                  className="rounded-lg border border-amber-300 bg-white px-3 py-1 text-[11px] font-bold text-amber-800 transition hover:bg-amber-100"
+                >
+                  Keep mine
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Prompt textarea */}
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -853,7 +1090,7 @@ export default function AiStudioSection({ customer }: Props) {
             <div
               role="radiogroup"
               aria-label="AI model"
-              className="flex items-center gap-1 rounded-full border border-violet-100 bg-violet-50/60 p-1"
+              className="flex items-center gap-1 rounded-full border border-cf-purple-100 bg-cf-purple-50/60 p-1"
             >
               {aiModelOptions.filter((opt) => opt.enabled).map((opt) => (
                 <button
@@ -866,8 +1103,8 @@ export default function AiStudioSection({ customer }: Props) {
                   onClick={() => setAiModelId(opt.id)}
                   className={`rounded-full px-3 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                     aiModelId === opt.id
-                      ? "bg-violet-600 text-white shadow-sm"
-                      : "text-violet-500 hover:bg-violet-100"
+                      ? "bg-cf-purple-600 text-white shadow-sm"
+                      : "text-cf-purple-500 hover:bg-cf-purple-100"
                   }`}
                 >
                   {opt.label}
@@ -877,25 +1114,66 @@ export default function AiStudioSection({ customer }: Props) {
           </div>
           <textarea
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value.slice(0, 320))}
+            onChange={(e) => {
+              setPrompt(e.target.value.slice(0, 320))
+              // Editing the description answers the question implicitly — withdraw the offer.
+              if (pendingTemplate) setPendingTemplate(null)
+            }}
             rows={3}
             disabled={generating}
             placeholder="e.g. A two tier princess cake with pink roses and golden crown"
-            className="w-full resize-none rounded-2xl border border-violet-100 bg-violet-50/30 p-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full resize-none rounded-2xl border border-cf-purple-100 bg-cf-purple-50/30 p-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <p className="mt-1 text-right text-[11px] text-slate-400">{prompt.length}/320</p>
 
-          {/* Prompt templates */}
+          {/* Prompt templates — see handleTemplateClick for why these don't overwrite blindly. */}
           <div className="mt-3">
-            <p className="mb-2 text-xs font-semibold text-slate-500">Not sure what to type? Pick a template:</p>
+            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-xs font-semibold text-slate-500">
+                {prompt.trim() ? "Or start from a template:" : "Not sure what to type? Pick a template:"}
+              </p>
+            </div>
+
+            {/* Asked, not assumed — a template click with text already in the box offers the swap
+                rather than performing it. Nothing changes until one of these two buttons is pressed. */}
+            {pendingTemplate && (
+              <div
+                role="alertdialog"
+                aria-label="Replace your description?"
+                className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5"
+              >
+                <p className="text-[11px] font-bold text-amber-800">
+                  Replace what you&apos;ve written?
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-amber-700">
+                  This template will overwrite your current description.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={confirmTemplateReplace}
+                    className="rounded-lg bg-amber-600 px-3 py-1 text-[11px] font-bold text-white transition hover:bg-amber-700"
+                  >
+                    Replace it
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingTemplate(null)}
+                    className="rounded-lg border border-amber-300 bg-white px-3 py-1 text-[11px] font-bold text-amber-800 transition hover:bg-amber-100"
+                  >
+                    Keep mine
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {PROMPT_TEMPLATES.map((t) => (
                 <button
                   key={t.label}
                   type="button"
                   disabled={generating}
-                  onClick={() => setPrompt(t.prompt)}
-                  className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100 disabled:opacity-50"
+                  onClick={() => handleTemplateClick(t.prompt)}
+                  className="rounded-full border border-cf-purple-200 bg-cf-purple-50 px-3 py-1 text-xs font-medium text-cf-purple-700 transition hover:border-cf-purple-400 hover:bg-cf-purple-100 disabled:opacity-50"
                 >
                   {t.label}
                 </button>
@@ -904,7 +1182,7 @@ export default function AiStudioSection({ customer }: Props) {
           </div>
 
           {/* Reference image upload */}
-          <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-violet-50/20 p-4">
+          <div className="mt-4 rounded-2xl border border-dashed border-cf-purple-200 bg-cf-purple-50/20 p-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
               📷 Reference photo (optional)
             </p>
@@ -912,7 +1190,7 @@ export default function AiStudioSection({ customer }: Props) {
             {!referenceFile && (
               <>
                 <label
-                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-3 text-center text-xs font-semibold text-violet-700 transition hover:bg-violet-50 ${
+                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-cf-purple-200 bg-white px-4 py-3 text-center text-xs font-semibold text-cf-purple-700 transition hover:bg-cf-purple-50 ${
                     generating ? "cursor-not-allowed opacity-60" : ""
                   }`}
                 >
@@ -932,14 +1210,14 @@ export default function AiStudioSection({ customer }: Props) {
             )}
             {referenceFile && (
               <div className="flex items-start gap-3">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-violet-200 bg-white">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-cf-purple-200 bg-white">
                   {referencePreviewUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={referencePreviewUrl} alt="Reference" className="h-full w-full object-cover" />
                   )}
                   {referenceUploading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-                      <svg className="h-5 w-5 animate-spin text-violet-500" viewBox="0 0 24 24" fill="none">
+                      <svg className="h-5 w-5 animate-spin text-cf-purple-500" viewBox="0 0 24 24" fill="none">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 11-8 8z" />
                       </svg>
@@ -954,8 +1232,8 @@ export default function AiStudioSection({ customer }: Props) {
                       onClick={() => handleReferencePurposeChange("theme_reference")}
                       className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60 ${
                         referencePurpose === "theme_reference"
-                          ? "bg-violet-600 text-white"
-                          : "border border-violet-200 bg-white text-violet-700"
+                          ? "bg-cf-purple-600 text-white"
+                          : "border border-cf-purple-200 bg-white text-cf-purple-700"
                       }`}
                     >
                       Theme inspiration
@@ -966,8 +1244,8 @@ export default function AiStudioSection({ customer }: Props) {
                       onClick={() => handleReferencePurposeChange("recreate_cake")}
                       className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60 ${
                         referencePurpose === "recreate_cake"
-                          ? "bg-violet-600 text-white"
-                          : "border border-violet-200 bg-white text-violet-700"
+                          ? "bg-cf-purple-600 text-white"
+                          : "border border-cf-purple-200 bg-white text-cf-purple-700"
                       }`}
                     >
                       Recreate this cake
@@ -978,8 +1256,8 @@ export default function AiStudioSection({ customer }: Props) {
                       onClick={() => handleReferencePurposeChange("photo_cake")}
                       className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-60 ${
                         referencePurpose === "photo_cake"
-                          ? "bg-violet-600 text-white"
-                          : "border border-violet-200 bg-white text-violet-700"
+                          ? "bg-cf-purple-600 text-white"
+                          : "border border-cf-purple-200 bg-white text-cf-purple-700"
                       }`}
                     >
                       Photo cake
@@ -1018,16 +1296,34 @@ export default function AiStudioSection({ customer }: Props) {
           </div>
 
           {/* ── Primary — the fields that decide size/shape/price, always visible ── */}
-          <div className="mt-5 space-y-4 rounded-2xl border-2 border-violet-200 bg-white p-4 shadow-sm">
+          <div className="mt-5 space-y-4 rounded-2xl border-2 border-cf-purple-200 bg-white p-4 shadow-sm">
+            {/* No number here — these field groups aren't the steps. The real sequence is in the
+                progress rail at the top of the panel. */}
             <div className="flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">1</span>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-700">Core details</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cf-purple-700">Core details</p>
             </div>
+
+            {/* A combination that breaks a rule, caught here rather than at the price step. The pills
+                below already close off what isn't possible; this explains a selection that became
+                invalid because something else changed around it. */}
+            {constraintViolations.length > 0 && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5" role="status">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                  Not possible to bake
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {constraintViolations.map((v) => (
+                    <li key={v.attributeKey} className="text-xs text-amber-900">{v.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Weight</p>
               <PillSelector
                 options={selectors.weights || FALLBACK_SELECTORS.weights!}
+                constraints={constraintsByAttribute.get("weight")}
                 value={sel.weight}
                 onChange={(v) => setSel((c) => ({ ...c, weight: v }))}
                 disabled={generating}
@@ -1038,6 +1334,7 @@ export default function AiStudioSection({ customer }: Props) {
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Tiers</p>
               <PillSelector
                 options={selectors.tiers || FALLBACK_SELECTORS.tiers!}
+                constraints={constraintsByAttribute.get("tiers")}
                 value={sel.tiers}
                 onChange={(v) => {
                   setSel((c) => {
@@ -1063,6 +1360,7 @@ export default function AiStudioSection({ customer }: Props) {
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Shape</p>
               <PillSelector
                 options={SHAPE_OPTIONS}
+                constraints={constraintsByAttribute.get("shape")}
                 value={sel.shape}
                 onChange={(v) => setSel((c) => ({ ...c, shape: v }))}
                 disabled={generating}
@@ -1077,7 +1375,7 @@ export default function AiStudioSection({ customer }: Props) {
                 value={sel.cakeMessage}
                 onChange={(e) => setSel((c) => ({ ...c, cakeMessage: e.target.value.slice(0, 50) }))}
                 disabled={generating}
-                className="w-full rounded-xl border border-violet-200 bg-violet-50/30 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none disabled:opacity-60"
+                className="w-full rounded-xl border border-cf-purple-200 bg-cf-purple-50/30 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none disabled:opacity-60"
               />
               <p className="mt-1 text-right text-[10px] text-slate-400">{sel.cakeMessage.length}/50</p>
               <p className="mt-1 text-[10px] italic text-slate-400">
@@ -1094,7 +1392,6 @@ export default function AiStudioSection({ customer }: Props) {
               className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
             >
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-700">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-bold text-white">2</span>
                 Style, occasion, flavor &amp; color
               </span>
               <motion.span animate={{ rotate: showMore ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-indigo-400">
@@ -1117,7 +1414,7 @@ export default function AiStudioSection({ customer }: Props) {
                       <PillSelector
                         options={selectors.styles}
                         value={sel.style}
-                        onChange={(v) => setSel((c) => ({ ...c, style: v }))}
+                        onChange={(v) => { setSettingsTouched(true); setSel((c) => ({ ...c, style: v })) }}
                         disabled={generating}
                       />
                     </div>
@@ -1126,7 +1423,7 @@ export default function AiStudioSection({ customer }: Props) {
                       <PillSelector
                         options={selectors.occasions}
                         value={sel.occasion}
-                        onChange={(v) => setSel((c) => ({ ...c, occasion: v }))}
+                        onChange={(v) => { setSettingsTouched(true); setSel((c) => ({ ...c, occasion: v })) }}
                         disabled={generating}
                       />
                     </div>
@@ -1135,7 +1432,7 @@ export default function AiStudioSection({ customer }: Props) {
                       <PillSelector
                         options={selectors.flavors}
                         value={sel.flavor}
-                        onChange={(v) => setSel((c) => ({ ...c, flavor: v }))}
+                        onChange={(v) => { setSettingsTouched(true); setSel((c) => ({ ...c, flavor: v })) }}
                         disabled={generating}
                       />
                     </div>
@@ -1163,7 +1460,6 @@ export default function AiStudioSection({ customer }: Props) {
               className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
             >
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-fuchsia-700">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-fuchsia-500 text-[10px] font-bold text-white">3</span>
                 🔮 Horoscope influence (optional)
               </span>
               <motion.span animate={{ rotate: showExtras ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-fuchsia-400">
@@ -1230,7 +1526,7 @@ export default function AiStudioSection({ customer }: Props) {
                   whileTap={canGenerate ? { scale: 0.98 } : {}}
                   className={`rounded-xl px-5 py-3 text-sm font-bold text-white transition ${
                     canGenerate
-                      ? "bg-gradient-to-r from-violet-600 to-purple-600 shadow-md shadow-violet-200 hover:from-violet-700 hover:to-purple-700"
+                      ? "bg-gradient-to-r from-cf-purple-600 to-purple-600 shadow-md shadow-cf-purple-200 hover:from-cf-purple-700 hover:to-purple-700"
                       : "cursor-not-allowed bg-slate-300"
                   }`}
                 >
@@ -1282,9 +1578,32 @@ export default function AiStudioSection({ customer }: Props) {
             {designs.length > 0 ? (
               <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
 
+                {/* Regenerating with results already on screen. CakeBuildingAnimation only covers the
+                    very first generation (designs.length === 0), so without this a regenerate showed a
+                    spinner in the button and nothing else for the whole wait — long enough to look
+                    like the click didn't register. */}
+                {generating && (
+                  <div
+                    className="flex items-center gap-3 rounded-xl border border-cf-purple-200 bg-cf-purple-50 px-4 py-3"
+                    role="status"
+                  >
+                    <svg className="h-4 w-4 shrink-0 animate-spin text-cf-purple-600" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-cf-purple-700">Designing another cake…</p>
+                      <p className="text-[11px] text-cf-purple-600/80">
+                        Your existing designs stay right here — this one gets added to them.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+
                 {/* CrossFriend occasion message */}
-                <div className="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50 to-purple-50 p-3">
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">
+                <div className="rounded-xl border border-cf-purple-100 bg-gradient-to-br from-cf-purple-50 to-purple-50 p-3">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cf-purple-500">
                     💜 A note from CrossFriend
                   </p>
                   <p className="text-xs leading-relaxed text-slate-600 italic">{cfMessage}</p>
@@ -1292,7 +1611,7 @@ export default function AiStudioSection({ customer }: Props) {
 
                 {/* Horoscope quote — only present when the real backend generated one */}
                 {horoscopeQuote && (
-                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-3">
+                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-cf-purple-50 p-3">
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-500">
                       🔮 Your {effectiveZodiac.sign} Year
                     </p>
@@ -1353,7 +1672,7 @@ export default function AiStudioSection({ customer }: Props) {
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="space-y-2 rounded-2xl border border-violet-200 bg-white p-4">
+                      <div className="space-y-2 rounded-2xl border border-cf-purple-200 bg-white p-4">
                         <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
                           ✅ Great choice! What next?
                         </p>
@@ -1416,6 +1735,7 @@ export default function AiStudioSection({ customer }: Props) {
           <BakerFinder
             generated={generated || designs.length > 0}
             savedProduct={savedProduct}
+            onBakerChosen={() => setReachedOrder(true)}
             pincode={confirmedPincode}
           />
         </div>

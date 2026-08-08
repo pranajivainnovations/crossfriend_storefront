@@ -226,10 +226,10 @@ function PillGroup({
               disabled
                 ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 line-through"
                 : isSelected
-                  ? "bg-violet-600 text-white"
+                  ? "bg-cf-purple-600 text-white"
                   : recommended
                     ? "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-emerald-400"
-                    : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
+                    : "border border-cf-purple-200 bg-white text-cf-purple-700 hover:border-cf-purple-400"
             }`}
           >
             {o.emoji && <>{o.emoji} </>}{o.label}
@@ -260,8 +260,8 @@ function AddonCard({
       onClick={onToggle}
       className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition ${
         selected
-          ? "border-violet-400 bg-violet-50 ring-1 ring-violet-300"
-          : "border-slate-200 bg-white hover:border-violet-200"
+          ? "border-cf-purple-400 bg-cf-purple-50 ring-1 ring-cf-purple-300"
+          : "border-slate-200 bg-white hover:border-cf-purple-200"
       }`}
     >
       {addon.thumbnail ? (
@@ -280,9 +280,9 @@ function AddonCard({
         <p className="mt-0.5 text-[11px] text-slate-500 leading-relaxed">{addon.description}</p>
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
-        <span className="text-xs font-bold text-violet-700">+₹{addon.price}</span>
+        <span className="text-xs font-bold text-cf-purple-700">+₹{addon.price}</span>
         {selected && (
-          <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
+          <span className="rounded-full bg-cf-purple-600 px-2 py-0.5 text-[10px] font-bold text-white">
             Added
           </span>
         )}
@@ -584,7 +584,14 @@ export default function PriceEstimator({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="mt-4 overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm"
+      // State carries the styling, not a fixed hue: once the price is locked this step is "done" and
+      // drops flat onto the warm ground so it stops competing with whatever comes next; while it's the
+      // step in hand it's white and genuinely lifted. See studio-step-card.tsx for the rationale.
+      className={`mt-4 overflow-hidden rounded-2xl transition ${
+        locked
+          ? "border border-cf-purple-100 bg-cf-warm"
+          : "border border-cf-purple-400 bg-white shadow-[0_18px_44px_-18px_rgba(123,47,247,0.45)]"
+      }`}
     >
       {/* Header / Toggle */}
       <button
@@ -592,22 +599,32 @@ export default function PriceEstimator({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-3 px-5 py-4"
       >
-        <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-base">💰</span>
-          <div className="text-left">
-            <p className="text-sm font-bold text-slate-900">Price Estimate</p>
-            <p className="text-xs text-slate-500">
-              {!pincodeConfirmed
-                ? "Enter your delivery pincode to see pricing"
-                : open
-                  ? "Adjust options to see price change"
-                  : `Starting from ₹${grandTotal.toLocaleString("en-IN")}`}
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base ${
+              locked ? "bg-emerald-100" : "bg-cf-purple-100"
+            }`}
+          >
+            {locked ? "✓" : "💰"}
+          </span>
+          <div className="min-w-0 text-left">
+            <p className="text-sm font-bold text-slate-900">
+              {locked ? "Price locked" : "Price"}
+            </p>
+            <p className="truncate text-xs text-slate-500">
+              {locked
+                ? `${sel.weight} kg · ${sel.flavor} · ₹${grandTotal.toLocaleString("en-IN")}`
+                : !pincodeConfirmed
+                  ? "Enter your delivery pincode to see pricing"
+                  : open
+                    ? "Adjust options to see price change"
+                    : `Starting from ₹${grandTotal.toLocaleString("en-IN")}`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {!open && pincodeConfirmed && (
-            <span className="rounded-xl bg-violet-600 px-3 py-1 text-sm font-bold text-white">
+            <span className="rounded-xl bg-cf-purple-600 px-3 py-1 text-sm font-bold text-white">
               ₹{grandTotal.toLocaleString("en-IN")}
             </span>
           )}
@@ -628,7 +645,7 @@ export default function PriceEstimator({
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="border-t border-violet-100 px-5 pb-5 pt-4 space-y-5">
+            <div className="border-t border-cf-purple-100 px-5 pb-5 pt-4 space-y-5">
 
               {locked && (
                 <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
@@ -642,8 +659,8 @@ export default function PriceEstimator({
 
               {/* Pincode — comes first, since price genuinely depends on it. Nothing below is shown
                   or interactive until this is confirmed. */}
-              <div className={`rounded-2xl border px-4 py-3 ${pincodeConfirmed ? "border-emerald-200 bg-emerald-50" : "border-violet-200 bg-violet-50/50"}`}>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">📍 Delivery Pincode</p>
+              <div className={`rounded-2xl border px-4 py-3 ${pincodeConfirmed ? "border-emerald-200 bg-emerald-50" : "border-cf-purple-200 bg-cf-purple-50/50"}`}>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cf-purple-500">📍 Delivery Pincode</p>
                 {!pincodeConfirmed ? (
                   <>
                     <p className="mb-2 text-[11px] text-slate-500">
@@ -658,13 +675,13 @@ export default function PriceEstimator({
                         value={pincode}
                         onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                         onKeyDown={(e) => e.key === "Enter" && handleConfirmPincode()}
-                        className="flex-1 rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none"
+                        className="flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleConfirmPincode}
                         disabled={pincode.length !== 6}
-                        className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-violet-700 disabled:opacity-50"
+                        className="rounded-xl bg-cf-purple-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-cf-purple-700 disabled:opacity-50"
                       >
                         Confirm
                       </button>
@@ -674,7 +691,7 @@ export default function PriceEstimator({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-emerald-700">📍 Pricing for {pincode}</span>
                     {!locked && (
-                      <button type="button" onClick={handleChangePincode} className="text-[11px] font-bold text-violet-600 hover:text-violet-700">
+                      <button type="button" onClick={handleChangePincode} className="text-[11px] font-bold text-cf-purple-600 hover:text-cf-purple-700">
                         Change
                       </button>
                     )}
@@ -682,14 +699,23 @@ export default function PriceEstimator({
                 )}
               </div>
 
+            {/* The block below is dimmed and inert until a pincode is confirmed. Dimmed controls with
+                no explanation read as broken, so say plainly that they're waiting rather than failed. */}
+            {!pincodeConfirmed && (
+              <p className="flex items-center gap-2 rounded-xl border border-dashed border-cf-purple-200 bg-cf-purple-50/40 px-3 py-2 text-[11px] font-medium text-cf-purple-700">
+                <span aria-hidden="true">🔒</span>
+                Your options and price unlock as soon as you confirm a pincode above.
+              </p>
+            )}
+
             <div className={pincodeConfirmed && !locked ? "space-y-5" : "space-y-5 pointer-events-none opacity-40"}>
 
               {/* Live price banner */}
-              <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 p-4 text-white">
+              <div className="rounded-2xl bg-gradient-to-r from-cf-purple-600 to-purple-600 p-4 text-white">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-200">Estimated Price</p>
-                    <p className="mt-0.5 truncate text-[11px] text-violet-200">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cf-purple-200">Estimated Price</p>
+                    <p className="mt-0.5 truncate text-[11px] text-cf-purple-200">
                       {sel.weight} kg · {sel.tiers === "1" ? "Single" : sel.tiers + "-tier"} · {sel.shape} · {cakeStyle} · {sel.flavor}
                     </p>
                   </div>
@@ -706,16 +732,16 @@ export default function PriceEstimator({
               </div>
 
               {/* Design selections (from generation — read-only display) */}
-              <div className="rounded-xl border border-violet-100 bg-violet-50/30 px-4 py-3">
-                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">From your design</p>
+              <div className="rounded-xl border border-cf-purple-100 bg-cf-purple-50/30 px-4 py-3">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cf-purple-500">From your design</p>
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-violet-200">
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-cf-purple-200">
                     {cakeStyle} style
                   </span>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-violet-200">
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-cf-purple-200">
                     {sel.tiers === "1" ? "Single tier" : sel.tiers + " tiers"}
                   </span>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-violet-200">
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-cf-purple-200">
                     {sel.shape}
                   </span>
                 </div>
@@ -778,11 +804,11 @@ export default function PriceEstimator({
                   placeholder="e.g. Happy Birthday Priya"
                   value={sel.message}
                   onChange={(e) => setSel((s) => ({ ...s, message: e.target.value.slice(0, 50) }))}
-                  className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none"
+                  className="w-full rounded-xl border border-cf-purple-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none"
                 />
                 <div className="mt-1 flex items-center justify-between">
                   {sel.message.trim().length > 0 ? (
-                    <span className="text-[11px] font-semibold text-violet-600">+₹{pricing.options.messageOnCake}</span>
+                    <span className="text-[11px] font-semibold text-cf-purple-600">+₹{pricing.options.messageOnCake}</span>
                   ) : <span />}
                   <p className="text-[10px] text-slate-400">{sel.message.length}/50</p>
                 </div>
@@ -802,12 +828,12 @@ export default function PriceEstimator({
                       onClick={() => setSel((s) => ({ ...s, [key]: !s[key] }))}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                         sel[key]
-                          ? "bg-violet-600 text-white"
-                          : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
+                          ? "bg-cf-purple-600 text-white"
+                          : "border border-cf-purple-200 bg-white text-cf-purple-700 hover:border-cf-purple-400"
                       }`}
                     >
                       {label}
-                      <span className={sel[key] ? "ml-1 text-violet-200" : "ml-1 text-violet-400"}>
+                      <span className={sel[key] ? "ml-1 text-cf-purple-200" : "ml-1 text-cf-purple-400"}>
                         +₹{extra}
                       </span>
                     </button>
@@ -836,7 +862,7 @@ export default function PriceEstimator({
               {otherAddons.length > 0 && (
                 <details className="group">
                   <summary className="cursor-pointer list-none">
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-cf-purple-600 hover:text-cf-purple-700">
                       <span className="transition group-open:rotate-90 inline-block">▶</span>
                       More add-ons ({otherAddons.length})
                     </span>
@@ -855,7 +881,7 @@ export default function PriceEstimator({
               )}
 
               {/* Breakdown + Grand Total */}
-              <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
+              <div className="rounded-2xl border border-cf-purple-200 bg-cf-purple-50/50 p-4">
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Breakdown</p>
                 <div className="space-y-1.5">
                   {breakdown.map((item, i) => (
@@ -873,14 +899,14 @@ export default function PriceEstimator({
                       </div>
                     ))}
                 </div>
-                <div className="mt-3 flex items-center justify-between border-t border-violet-200 pt-3">
+                <div className="mt-3 flex items-center justify-between border-t border-cf-purple-200 pt-3">
                   <p className="text-sm font-bold text-slate-900">Estimated Total</p>
                   <motion.p
                     key={grandTotal}
                     initial={{ scale: 1.12, opacity: 0.7 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 380, damping: 24 }}
-                    className="text-2xl font-black text-violet-700"
+                    className="text-2xl font-black text-cf-purple-700"
                   >
                     ₹{grandTotal.toLocaleString("en-IN")}
                   </motion.p>
@@ -898,19 +924,32 @@ export default function PriceEstimator({
               className={`w-full rounded-2xl py-3 text-sm font-bold text-white shadow-md transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 locked
                   ? "bg-emerald-600 shadow-none"
-                  : "bg-gradient-to-r from-violet-600 to-purple-600 shadow-violet-200 hover:from-violet-700 hover:to-purple-700"
+                  : "bg-cf-orange shadow-orange-200 hover:bg-cf-orange-dark"
               }`}
             >
               {locked
-                ? "✅ Cake Saved"
+                ? "✅ Price locked"
                 : saving
-                  ? "Saving…"
+                  ? "Locking…"
                   : !pincodeConfirmed
                     ? "📍 Confirm pincode to continue"
                     : violations.length > 0
                       ? "⚠️ Adjust your cake to continue"
-                      : "🔒 Save This Cake"}
+                      : "Confirm & Lock Price"}
             </button>
+            {/* The old label was "Save This Cake", which reads as "keep this for later" — the exact
+                opposite of what it does. This creates the real product, fixes the price, and freezes
+                the pincode and every option, so the copy now says so before the click, not after. */}
+            {!locked && pincodeConfirmed && violations.length === 0 && !saving && (
+              <p className="text-center text-[11px] leading-relaxed text-slate-500">
+                Locks your cake, price and delivery area. You can&apos;t change options after this.
+              </p>
+            )}
+            {locked && (
+              <p className="text-center text-[11px] leading-relaxed text-emerald-700">
+                Your price is fixed. Pick a different design if you need to change anything.
+              </p>
+            )}
             {saveError && (
               <p className="text-center text-xs font-medium text-red-500">{saveError}</p>
             )}

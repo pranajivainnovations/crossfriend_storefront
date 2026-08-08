@@ -12,14 +12,14 @@ export default function BottomCta() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-          className="relative overflow-hidden rounded-[30px] bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 p-8 text-center shadow-[0_24px_80px_rgba(109,40,217,0.35)] sm:p-12"
+          className="relative overflow-hidden rounded-[30px] bg-gradient-to-r from-cf-purple-600 via-purple-600 to-fuchsia-600 p-8 text-center shadow-[0_24px_80px_rgba(109,40,217,0.35)] sm:p-12"
         >
           <div className="pointer-events-none absolute left-5 top-5 text-2xl text-white/55">✦</div>
           <div className="pointer-events-none absolute left-16 top-11 text-xl text-white/45">✧</div>
           <div className="pointer-events-none absolute right-6 top-8 text-2xl text-white/50">✦</div>
           <div className="pointer-events-none absolute right-16 bottom-8 text-xl text-white/45">✧</div>
 
-          <div className="pointer-events-none relative mx-auto mb-4 h-24 w-24 overflow-hidden rounded-full border border-white/40 bg-white/20 shadow-lg shadow-violet-900/20 sm:h-28 sm:w-28">
+          <div className="pointer-events-none relative mx-auto mb-4 h-24 w-24 overflow-hidden rounded-full border border-white/40 bg-white/20 shadow-lg shadow-cf-purple-900/20 sm:h-28 sm:w-28">
             {/* Fallback ring, visible if the banner image fails to load */}
             <div className="absolute inset-0 flex items-center justify-center text-3xl">🎂</div>
             {/* No `priority` — this is a 112px decorative avatar at the very bottom of the page.
@@ -49,7 +49,7 @@ export default function BottomCta() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })}
-              className="rounded-xl bg-white px-8 py-3 text-base font-bold text-violet-700 transition hover:bg-violet-50"
+              className="rounded-xl bg-white px-8 py-3 text-base font-bold text-cf-purple-700 transition hover:bg-cf-purple-50"
             >
               ✨ Start Designing Now
             </motion.button>

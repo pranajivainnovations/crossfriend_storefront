@@ -42,7 +42,28 @@ module.exports = {
           pink: "#FF2D87",
           yellow: "#FFD166",
           "yellow-light": "#FFE49A",
-          purple: "#7B2FF7",
+          /**
+           * Full tint/shade scale so features can be built entirely from brand tokens instead of
+           * reaching for Tailwind's generic `violet-*` (which the AI Cake Studio did 242 times, in a
+           * colour one hex step away from this one — close enough to look intentional, far enough
+           * that a brand change would have silently skipped the whole feature).
+           *
+           * DEFAULT is the exact brand value, so `bg-cf-purple` keeps working everywhere it already
+           * appears while `bg-cf-purple-100` etc. become available alongside it.
+           */
+          purple: {
+            DEFAULT: "#7B2FF7",
+            50: "#F6F1FF",
+            100: "#EDE3FF",
+            200: "#DCC9FF",
+            300: "#C3A3FF",
+            400: "#A575FF",
+            500: "#8B47FF",
+            600: "#7B2FF7",
+            700: "#6620D6",
+            800: "#521AAB",
+            900: "#3F157F",
+          },
           "purple-light": "#9B5FFF",
           warm: "#FFF7F0",
           "warm-dark": "#FFEEDD",

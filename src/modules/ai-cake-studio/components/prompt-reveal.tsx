@@ -48,7 +48,7 @@ export default function PromptReveal({ prompt, compact = false, variant = "light
         className={`w-full rounded-xl border transition ${
           isDark
             ? "border-white/20 bg-white/10 text-white/80 hover:bg-white/20"
-            : "border-violet-200 bg-white text-violet-700 hover:bg-violet-50"
+            : "border-cf-purple-200 bg-white text-cf-purple-700 hover:bg-cf-purple-50"
         } ${compact ? "py-1.5 text-[11px] font-semibold" : "py-2 text-xs font-semibold"}`}
       >
         🔍 {open ? "Hide AI Prompt" : "View AI Prompt"}
@@ -63,7 +63,7 @@ export default function PromptReveal({ prompt, compact = false, variant = "light
             transition={{ duration: 0.25 }}
             className="overflow-hidden"
           >
-            <div className={`mt-2 rounded-xl border p-3 ${isDark ? "border-white/10 bg-white/5" : "border-violet-100 bg-violet-50/40"}`}>
+            <div className={`mt-2 rounded-xl border p-3 ${isDark ? "border-white/10 bg-white/5" : "border-cf-purple-100 bg-cf-purple-50/40"}`}>
               <p className={`max-h-40 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed ${isDark ? "text-white/70" : "text-slate-600"}`}>
                 {prompt}
               </p>
@@ -74,7 +74,7 @@ export default function PromptReveal({ prompt, compact = false, variant = "light
                   handleCopy()
                 }}
                 className={`mt-2 rounded-lg px-3 py-1 text-[11px] font-semibold transition ${
-                  isDark ? "bg-white text-violet-700 hover:bg-white/90" : "bg-violet-600 text-white hover:bg-violet-700"
+                  isDark ? "bg-white text-cf-purple-700 hover:bg-white/90" : "bg-cf-purple-600 text-white hover:bg-cf-purple-700"
                 }`}
               >
                 {copied ? "✓ Copied!" : "📋 Copy Prompt"}

@@ -88,7 +88,7 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mt-4 rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 p-[2px] shadow-lg shadow-violet-200/70"
+      className="mt-4 rounded-2xl bg-gradient-to-r from-cf-purple-600 via-fuchsia-500 to-cf-purple-600 p-[2px] shadow-lg shadow-cf-purple-200/70"
     >
     <div className="rounded-[14px] bg-white p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -96,7 +96,7 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
           <p className="text-sm font-bold text-slate-800">🔐 Sign in to generate your cake</p>
           <p className="mt-0.5 text-xs text-slate-500">No password · No email needed</p>
         </div>
-        <span className="shrink-0 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-2.5 py-1 text-[10px] font-bold text-white">
+        <span className="shrink-0 rounded-full bg-gradient-to-r from-cf-purple-600 to-fuchsia-600 px-2.5 py-1 text-[10px] font-bold text-white">
           🎁 {attemptsLimit} free
         </span>
       </div>
@@ -112,7 +112,7 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
             className="space-y-2"
           >
             <div className="flex gap-2">
-              <span className="flex items-center rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-500 select-none">
+              <span className="flex items-center rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-500 select-none">
                 +91
               </span>
               <input
@@ -123,13 +123,13 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
                 onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 onKeyDown={(e) => e.key === "Enter" && sendOtp()}
                 placeholder="Mobile number"
-                className="flex-1 rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                className="flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200"
               />
               <button
                 type="button"
                 onClick={sendOtp}
                 disabled={loading || mobile.length !== 10}
-                className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-violet-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl bg-gradient-to-r from-cf-purple-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-cf-purple-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -158,7 +158,7 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
               OTP sent to +91 {mobile} ·{" "}
               <button
                 type="button"
-                className="text-violet-600 underline underline-offset-2"
+                className="text-cf-purple-600 underline underline-offset-2"
                 onClick={() => { setStep("mobile"); setOtp(""); setError("") }}
               >
                 Change
@@ -174,13 +174,13 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 onKeyDown={(e) => e.key === "Enter" && verifyOtp()}
                 placeholder="6-digit OTP"
-                className="flex-1 rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm tracking-[0.4em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                className="flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm tracking-[0.4em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200"
               />
               <button
                 type="button"
                 onClick={verifyOtp}
                 disabled={loading || otp.length !== 6}
-                className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-violet-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl bg-gradient-to-r from-cf-purple-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-cf-purple-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -198,7 +198,7 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
                 <button
                   type="button"
                   onClick={sendOtp}
-                  className="text-violet-600 underline underline-offset-2"
+                  className="text-cf-purple-600 underline underline-offset-2"
                 >
                   Resend OTP
                 </button>

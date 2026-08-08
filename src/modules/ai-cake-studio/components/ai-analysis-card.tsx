@@ -38,7 +38,7 @@ function ProgressMetric({ label, value, color, subLabel }: ProgressMetricProps) 
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
         <motion.div
           className={`h-full rounded-full bg-gradient-to-r ${
-            value > 90 ? "from-emerald-400 to-emerald-500" : "from-violet-500 to-purple-500"
+            value > 90 ? "from-emerald-400 to-emerald-500" : "from-cf-purple-500 to-purple-500"
           }`}
           initial={{ width: 0 }}
           animate={{ width: `${value}%` }}
@@ -73,9 +73,9 @@ export default function AiAnalysisCard({ analysis }: AiAnalysisCardProps) {
       className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-2xl shadow-slate-100/60"
     >
       {/* Header */}
-      <div className="border-b border-slate-100 bg-gradient-to-r from-violet-50 to-purple-50 px-8 py-6">
+      <div className="border-b border-slate-100 bg-gradient-to-r from-cf-purple-50 to-purple-50 px-8 py-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-600 shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cf-purple-600 shadow-sm">
             <span className="text-lg">🤖</span>
           </div>
           <div>
@@ -126,16 +126,16 @@ export default function AiAnalysisCard({ analysis }: AiAnalysisCardProps) {
             <ProgressMetric
               label="AI Confidence"
               value={analysis.aiConfidence}
-              color="text-violet-600"
+              color="text-cf-purple-600"
               subLabel="Model confidence in design accuracy"
             />
 
             {/* Recommendation badge */}
-            <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-purple-50 p-4">
-              <p className="text-xs font-semibold text-violet-700">💡 AI Recommendation</p>
+            <div className="rounded-2xl border border-cf-purple-100 bg-gradient-to-br from-cf-purple-50 to-purple-50 p-4">
+              <p className="text-xs font-semibold text-cf-purple-700">💡 AI Recommendation</p>
               <p className="mt-2 text-xs leading-5 text-slate-600">
                 This design pairs well with{" "}
-                <span className="font-semibold text-violet-700">vanilla bean sponge</span> and a
+                <span className="font-semibold text-cf-purple-700">vanilla bean sponge</span> and a
                 light compote filling for the best bakery experience.
               </p>
             </div>

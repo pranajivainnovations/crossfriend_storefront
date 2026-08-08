@@ -106,7 +106,7 @@ export default function CommentSection({ designId, isLoggedIn }: Props) {
           <button
             type="submit"
             disabled={submitting || !input.trim()}
-            className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-violet-700 transition disabled:opacity-50"
+            className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-cf-purple-700 transition disabled:opacity-50"
           >
             Post
           </button>

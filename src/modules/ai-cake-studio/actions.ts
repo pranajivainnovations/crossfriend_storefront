@@ -74,6 +74,40 @@ export interface PriceEstimateResult {
 }
 
 /**
+ * Which option combinations are currently allowed, for a partially-made selection.
+ *
+ * Separate from estimateAiCakePrice because constraints don't need a weight or a pincode — asking the
+ * price route for them meant the design step couldn't show them at all, since it runs before either
+ * of those exists. This lets tiers gate weight while the customer is still designing, instead of
+ * waiting until the price panel to reveal that their combination was never possible.
+ */
+export async function fetchAiCakeConstraints(input: {
+  weight?: string
+  tiers?: string
+  shape?: string
+  style?: string
+  flavor?: string
+  photoOnCake?: boolean
+  messageOnCake?: boolean
+}): Promise<ConstraintState | null> {
+  try {
+    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/ai-studio/constraints`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return { options: data.options ?? [], violations: data.violations ?? [] }
+  } catch {
+    // Never block the form on this — an unconstrained form is the safe fallback, and both the price
+    // route and the save-time backstop re-check before anything is ordered.
+    return null
+  }
+}
+
+/**
  * Live-estimator pricing — calls the same authoritative backend route saveAiCakeProduct's price came
  * from (and the same one the OPS Simulator calls), so the number shown while adjusting options is
  * never out of sync with what Save This Cake will actually charge. The estimator now collects pincode

@@ -6,7 +6,7 @@ import { HOW_IT_WORKS_STEPS } from "../data/mock-data"
 export default function HowItWorks() {
   return (
     <section className="relative overflow-hidden px-6 py-8 sm:px-8 lg:px-12">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-white via-violet-50/35 to-white" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-white via-cf-purple-50/35 to-white" />
 
       <div className="mx-auto max-w-7xl">
         <motion.div
@@ -23,8 +23,8 @@ export default function HowItWorks() {
 
         <div className="relative grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           <div className="pointer-events-none absolute left-[16%] right-[16%] top-[50px] hidden h-px lg:block">
-            <div className="h-px w-full bg-gradient-to-r from-violet-200 via-purple-200 to-fuchsia-200" />
-            <div className="absolute inset-0 h-px animate-pulse bg-gradient-to-r from-violet-400/50 via-purple-300/50 to-fuchsia-300/50 blur-sm" />
+            <div className="h-px w-full bg-gradient-to-r from-cf-purple-200 via-purple-200 to-fuchsia-200" />
+            <div className="absolute inset-0 h-px animate-pulse bg-gradient-to-r from-cf-purple-400/50 via-purple-300/50 to-fuchsia-300/50 blur-sm" />
           </div>
 
           {HOW_IT_WORKS_STEPS.map((step, i) => (

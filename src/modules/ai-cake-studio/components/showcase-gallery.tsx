@@ -19,6 +19,10 @@ interface ShowcaseDesign {
   style: string
   occasion: string
   flavor: string
+  /** Physical spec the image depicts — undefined for designs generated before it was recorded. */
+  weight?: string
+  tiers?: string
+  shape?: string
   likeCount: number
   commentCount: number
   viewCount: number
@@ -98,6 +102,9 @@ export default function ShowcaseGallery({ customer }: Props) {
             flavor: design.flavor,
             prompt: design.prompt,
             compiledPrompt: design.compiledPrompt,
+            weight: design.weight,
+            tiers: design.tiers,
+            shape: design.shape,
           },
         })
       )
@@ -109,7 +116,7 @@ export default function ShowcaseGallery({ customer }: Props) {
     id: d.id,
     title: `${d.style}${d.occasion ? " · " + d.occasion : ""} Cake`,
     description: d.prompt,
-    gradient: "from-violet-400 via-purple-300 to-indigo-400",
+    gradient: "from-cf-purple-400 via-purple-300 to-indigo-400",
     style: d.style,
     liked: false,
     imageUrl: d.imageUrl,
@@ -135,7 +142,7 @@ export default function ShowcaseGallery({ customer }: Props) {
           </div>
           <Link
             href="/ai-cake-studio/gallery"
-            className="text-sm font-semibold text-violet-600 transition hover:text-violet-700"
+            className="text-sm font-semibold text-cf-purple-600 transition hover:text-cf-purple-700"
           >
             View all →
           </Link>
@@ -150,8 +157,8 @@ export default function ShowcaseGallery({ customer }: Props) {
               onClick={() => setFilter(f.value)}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                 filter === f.value
-                  ? "bg-violet-600 text-white"
-                  : "border border-violet-200 bg-white text-violet-700 hover:border-violet-400"
+                  ? "bg-cf-purple-600 text-white"
+                  : "border border-cf-purple-200 bg-white text-cf-purple-700 hover:border-cf-purple-400"
               }`}
             >
               {f.label}
@@ -165,7 +172,7 @@ export default function ShowcaseGallery({ customer }: Props) {
             {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
-                className="h-64 animate-pulse rounded-2xl border border-violet-100 bg-violet-50"
+                className="h-64 animate-pulse rounded-2xl border border-cf-purple-100 bg-cf-purple-50"
               />
             ))}
           </div>
@@ -181,11 +188,11 @@ export default function ShowcaseGallery({ customer }: Props) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: index * 0.05 }}
-                className="group overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm transition hover:shadow-md"
+                className="group overflow-hidden rounded-2xl border border-cf-purple-100 bg-white shadow-sm transition hover:shadow-md"
               >
                 {/* Image */}
                 <div
-                  className="relative aspect-square cursor-pointer overflow-hidden bg-gradient-to-br from-violet-100 to-purple-50"
+                  className="relative aspect-square cursor-pointer overflow-hidden bg-gradient-to-br from-cf-purple-100 to-purple-50"
                   onClick={() => {
                     setLightboxIndex(index)
                     setLightboxOpen(true)
@@ -203,7 +210,7 @@ export default function ShowcaseGallery({ customer }: Props) {
 
                   {/* Hover overlay */}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/20">
-                    <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-violet-700 opacity-0 transition group-hover:opacity-100">
+                    <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-cf-purple-700 opacity-0 transition group-hover:opacity-100">
                       View full
                     </span>
                   </div>
@@ -227,7 +234,7 @@ export default function ShowcaseGallery({ customer }: Props) {
                 {/* Info */}
                 <div className="p-3">
                   <div className="mb-2 flex flex-wrap gap-1">
-                    <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                    <span className="rounded-full bg-cf-purple-50 px-2 py-0.5 text-[10px] font-semibold text-cf-purple-700">
                       {design.style}
                     </span>
                     {design.occasion && (
@@ -248,7 +255,7 @@ export default function ShowcaseGallery({ customer }: Props) {
                     <button
                       type="button"
                       onClick={() => handleUsePrompt(design)}
-                      className="flex-1 rounded-xl border border-violet-200 bg-violet-50 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
+                      className="flex-1 rounded-xl border border-cf-purple-200 bg-cf-purple-50 py-1.5 text-[11px] font-semibold text-cf-purple-700 transition hover:bg-cf-purple-100"
                     >
                       <span className="hidden sm:inline">✨ Use this prompt</span>
                       <span className="sm:hidden">✨ Prompt</span>
@@ -275,7 +282,7 @@ export default function ShowcaseGallery({ customer }: Props) {
           <div className="mt-6 text-center">
             <Link
               href="/ai-cake-studio/gallery"
-              className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50"
+              className="inline-flex items-center gap-2 rounded-xl border border-cf-purple-200 bg-white px-5 py-2.5 text-sm font-semibold text-cf-purple-700 transition hover:bg-cf-purple-50"
             >
               View all community designs →
             </Link>

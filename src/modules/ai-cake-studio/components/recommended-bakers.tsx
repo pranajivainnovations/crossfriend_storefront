@@ -31,7 +31,7 @@ function BakerCard({ baker, index }: { baker: Baker; index: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1, ease: cubicBezier(0.22, 1, 0.36, 1) }}
       whileHover={{ y: -5 }}
-      className="group overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-100/60 transition-shadow duration-300 hover:shadow-2xl hover:shadow-violet-100/40"
+      className="group overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-100/60 transition-shadow duration-300 hover:shadow-2xl hover:shadow-cf-purple-100/40"
     >
       {/* Top band with gradient */}
       <div className={`h-3 w-full bg-gradient-to-r ${baker.avatarGradient}`} />
@@ -48,7 +48,7 @@ function BakerCard({ baker, index }: { baker: Baker; index: number }) {
                 title="Verified"
                 className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-2 ring-white"
               >
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-violet-600 fill-current">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-cf-purple-600 fill-current">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </span>
@@ -69,7 +69,7 @@ function BakerCard({ baker, index }: { baker: Baker; index: number }) {
           </div>
 
           {baker.badge && (
-            <span className="shrink-0 rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700">
+            <span className="shrink-0 rounded-full bg-cf-purple-50 border border-cf-purple-100 px-2.5 py-1 text-[11px] font-bold text-cf-purple-700">
               {baker.badge}
             </span>
           )}
@@ -95,7 +95,7 @@ function BakerCard({ baker, index }: { baker: Baker; index: number }) {
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
-          className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 py-3 text-sm font-bold text-white shadow-sm shadow-violet-200 transition hover:from-violet-700 hover:to-purple-700"
+          className="mt-5 w-full rounded-2xl bg-gradient-to-r from-cf-purple-600 to-purple-600 py-3 text-sm font-bold text-white shadow-sm shadow-cf-purple-200 transition hover:from-cf-purple-700 hover:to-purple-700"
         >
           View Profile →
         </motion.button>
@@ -110,7 +110,7 @@ export default function RecommendedBakers({ bakers }: RecommendedBakersProps) {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-600">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cf-purple-600">
             Powered by AI matching
           </p>
           <h3 className="mt-1.5 font-heading text-2xl font-bold text-slate-900">
@@ -122,7 +122,7 @@ export default function RecommendedBakers({ bakers }: RecommendedBakersProps) {
         </div>
         <button
           type="button"
-          className="hidden rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-violet-200 hover:text-violet-700 sm:block"
+          className="hidden rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-cf-purple-200 hover:text-cf-purple-700 sm:block"
         >
           See all bakers →
         </button>

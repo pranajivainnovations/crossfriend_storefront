@@ -35,7 +35,7 @@ function BakerCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.07, ease: "easeOut" }}
       className={`flex items-start gap-4 rounded-2xl border p-4 ${
-        baker.verified ? "border-orange-100 bg-orange-50/40" : "border-slate-200 bg-slate-50/60"
+        baker.verified ? "border-cf-purple-100 bg-cf-purple-50/40" : "border-slate-200 bg-slate-50/60"
       }`}
     >
       {/* Avatar */}
@@ -70,7 +70,7 @@ function BakerCard({
           {baker.location && <span>📍 {baker.location}</span>}
           {baker.turnaround && <span>⏱ {baker.turnaround}</span>}
           {baker.minPrice != null && (
-            <span className="font-semibold text-orange-700">from ₹{baker.minPrice.toLocaleString("en-IN")}</span>
+            <span className="font-semibold text-cf-purple-700">from ₹{baker.minPrice.toLocaleString("en-IN")}</span>
           )}
         </div>
       </div>
@@ -113,11 +113,14 @@ interface Props {
   /** Confirmed by PriceEstimator before pricing even shows — this panel just uses it, it no longer
    * collects its own pincode. */
   pincode: string | null
+  /** Fires when the customer commits to a baker, so the progress rail can advance from Baker to Order
+   * instead of parking on Baker while the cart page loads. */
+  onBakerChosen?: () => void
 }
 
 type ServiceStatus = "enabled" | "coming_soon" | "unknown"
 
-export default function BakerFinder({ generated, savedProduct, pincode }: Props) {
+export default function BakerFinder({ generated, savedProduct, pincode, onBakerChosen }: Props) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [bakers, setBakers] = useState<BakerProfile[] | null>(null)
@@ -171,6 +174,7 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
     if (!savedProduct || orderingKey || !pincode) return
     setOrderError(null)
     setOrderingKey(bakerId ?? "automatch")
+    onBakerChosen?.()
 
     const result = await orderAiCake(savedProduct.variantId, bakerId, pincode)
     if ("error" in result && result.error) {
@@ -193,23 +197,37 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
-      className="mt-4 overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-sm"
+      // Locked until the price is confirmed. Dashed and flat rather than a solid card with a
+      // greyed-out label — dashed reads as "not yet", solid-but-dimmed reads as "broken". This panel
+      // used to be orange while everything around it was violet, which encoded nothing at all.
+      className={`mt-4 overflow-hidden rounded-2xl transition ${
+        !savedProduct
+          ? "border-[1.5px] border-dashed border-slate-300 bg-transparent"
+          : "border border-cf-purple-400 bg-white shadow-[0_18px_44px_-18px_rgba(123,47,247,0.45)]"
+      }`}
     >
       {/* ── Header / Toggle ── */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4"
+        disabled={!savedProduct}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 disabled:cursor-not-allowed"
       >
-        <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-100 text-base">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base ${
+              savedProduct ? "bg-cf-purple-100" : "bg-slate-100"
+            }`}
+          >
             🏪
           </span>
-          <div className="text-left">
-            <p className="text-sm font-bold text-slate-900">Choose How to Order</p>
-            <p className="text-xs text-slate-500">
+          <div className="min-w-0 text-left">
+            <p className={`text-sm font-bold ${savedProduct ? "text-slate-900" : "text-slate-400"}`}>
+              Choose a baker
+            </p>
+            <p className="truncate text-xs text-slate-500">
               {!savedProduct
-                ? "Save your cake above to unlock this"
+                ? "Unlocks once your price is confirmed above"
                 : loading
                   ? "Finding bakers near you…"
                   : bakers != null
@@ -244,10 +262,10 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="border-t border-orange-100 px-5 pb-5 pt-4 space-y-4">
+            <div className="border-t border-cf-purple-100 px-5 pb-5 pt-4 space-y-4">
 
               {!savedProduct && (
-                <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
+                <div className="rounded-2xl border border-dashed border-cf-purple-200 py-8 text-center">
                   <p className="text-2xl">🔒</p>
                   <p className="mt-2 text-sm font-semibold text-slate-700">Save your cake first</p>
                   <p className="mt-1 text-xs text-slate-500">Open the price estimator above and click &quot;Save This Cake&quot; to unlock ordering.</p>
@@ -257,7 +275,7 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
               {savedProduct && loading && (
                 <div className="space-y-3">
                   {[1, 2, 3].map((n) => (
-                    <div key={n} className="h-24 animate-pulse rounded-2xl bg-orange-50" />
+                    <div key={n} className="h-24 animate-pulse rounded-2xl bg-cf-purple-50" />
                   ))}
                 </div>
               )}
@@ -268,18 +286,18 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
 
               {savedProduct && !loading && bakers != null && (
                 serviceStatus === "unknown" ? (
-                  <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
+                  <div className="rounded-2xl border border-dashed border-cf-purple-200 py-8 text-center">
                     <p className="text-2xl">🤔</p>
                     <p className="mt-2 text-sm font-semibold text-slate-700">Pincode not recognized</p>
                   </div>
                 ) : serviceStatus === "coming_soon" ? (
-                  <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
+                  <div className="rounded-2xl border border-dashed border-cf-purple-200 py-8 text-center">
                     <p className="text-2xl">🚧</p>
                     <p className="mt-2 text-sm font-semibold text-slate-700">Not in this area yet</p>
                     <p className="mt-1 text-xs text-slate-500">We&apos;re expanding fast — check back soon!</p>
                   </div>
                 ) : bakers.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-orange-200 py-8 text-center">
+                  <div className="rounded-2xl border border-dashed border-cf-purple-200 py-8 text-center">
                     <p className="text-2xl">🌱</p>
                     <p className="mt-2 text-sm font-semibold text-slate-700">No bakers found in this area</p>
                     <p className="mt-1 text-xs text-slate-500">We&apos;re growing fast — check back soon!</p>
@@ -287,7 +305,7 @@ export default function BakerFinder({ generated, savedProduct, pincode }: Props)
                 ) : (
                   <div className="space-y-3">
                     {matchType === "nearby" && (
-                      <p className="rounded-xl bg-orange-50 px-3 py-2 text-center text-[11px] font-medium text-orange-700">
+                      <p className="rounded-xl bg-cf-purple-50 px-3 py-2 text-center text-[11px] font-medium text-cf-purple-700">
                         No bakers exactly in this pincode — showing bakers from nearby areas
                       </p>
                     )}
