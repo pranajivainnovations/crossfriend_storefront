@@ -23,7 +23,7 @@ export default async function CategoryStrip() {
           </LocalizedClientLink>
         ))}
         <LocalizedClientLink
-          href="/store"
+          href="/ready-to-order"
           className="chip-cf whitespace-nowrap shrink-0 !bg-cf-orange !text-white"
         >
           View All →

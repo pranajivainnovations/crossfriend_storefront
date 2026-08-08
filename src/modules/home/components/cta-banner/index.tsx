@@ -30,7 +30,7 @@ export default function CtaBanner() {
           </p>
           <div className="flex flex-col xsmall:flex-row gap-3 justify-center">
             <LocalizedClientLink
-              href="/store"
+              href="/ready-to-order"
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-white text-cf-orange font-semibold text-base hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
             >
               Shop Now

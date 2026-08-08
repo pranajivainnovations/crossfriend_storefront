@@ -108,11 +108,11 @@ export default function MegaMenu({
                     </ul>
                     <div className="mt-4">
                       <LocalizedClientLink
-                        href="/store"
+                        href="/ready-to-order"
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-cf-warm transition-colors text-sm font-medium text-cf-orange"
                         onClick={close}
                       >
-                        View All Products →
+                        Browse Ready to Order →
                       </LocalizedClientLink>
                     </div>
                   </div>

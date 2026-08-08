@@ -99,7 +99,7 @@ const Hero = () => {
             className="flex flex-col xsmall:flex-row gap-3 mt-2"
           >
             <LocalizedClientLink
-              href="/store"
+              href="/ready-to-order"
               className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-cf-orange text-white font-semibold text-base shadow-lg shadow-cf-orange/25 hover:shadow-xl hover:shadow-cf-orange/30 hover:-translate-y-0.5 transition-all duration-200"
             >
               <span>Shop Now</span>

@@ -58,12 +58,45 @@ const getMedusaHeaders = (tags: string[] = []) => {
   return headers
 }
 
+/**
+ * The sales channel CrossFriend trades on.
+ *
+ * Resolved from the backend rather than an env var: a mistyped id would put every cart on the
+ * wrong channel and make every CrossFriend product silently un-addable, with a symptom ("add to
+ * cart does nothing") that points nowhere near the cause.
+ *
+ * Cached per request by React and for an hour in the data cache — a sales channel is created once
+ * and never changes, so this costs one round trip an hour rather than one per cart.
+ */
+export const getCrossFriendSalesChannelId = cache(async function () {
+  try {
+    const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
+    const res = await fetch(`${backendUrl}/store/crossfriend/sales-channel`, {
+      next: { revalidate: 3600, tags: ["sales-channel"] },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return (data?.salesChannelId as string | null) ?? null
+  } catch {
+    return null
+  }
+})
+
 // Cart actions
 export async function createCart(data = {}) {
   const headers = getMedusaHeaders(["cart"])
 
+  // Medusa refuses a line item whose product is not on the cart's sales channel, and the store's
+  // DEFAULT channel is Pranajiva's — so without this, nothing in the CrossFriend catalogue can be
+  // added to a cart. Falls back to Medusa's default when unresolved, which is the behaviour this
+  // had before, rather than failing to create a cart at all.
+  const salesChannelId = await getCrossFriendSalesChannelId()
+
   return medusaClient.carts
-    .create(data, headers)
+    .create(
+      { ...(salesChannelId ? { sales_channel_id: salesChannelId } : {}), ...data },
+      headers
+    )
     .then(({ cart }) => cart)
     .catch((err) => {
       console.log(err)
@@ -431,9 +464,21 @@ export const getProductsById = cache(async function ({
   regionId: string
 }) {
   const headers = getMedusaHeaders(["products"])
+  const salesChannelId = await getCrossFriendSalesChannelId()
 
   return medusaClient.products
-    .list({ id: ids, region_id: regionId }, headers)
+    .list(
+      {
+        id: ids,
+        region_id: regionId,
+        // Required, not optional. With sales channels enabled, a products query that names no
+        // channel is answered from the store's DEFAULT channel — which here is Pranajiva's. A
+        // CrossFriend product then comes back as simply "not found", with no error to explain it.
+        // That silently emptied baker profiles until it was caught.
+        ...(salesChannelId ? { sales_channel_id: [salesChannelId] } : {}),
+      } as Record<string, unknown>,
+      headers
+    )
     .then(({ products }) => products)
     .catch((err) => {
       console.log(err)
@@ -463,9 +508,18 @@ export const getProductByHandle = cache(async function (
   handle: string
 ): Promise<{ product: PricedProduct }> {
   const headers = getMedusaHeaders(["products"])
+  const salesChannelId = await getCrossFriendSalesChannelId()
 
   const product = await medusaClient.products
-    .list({ handle }, headers)
+    .list(
+      {
+        handle,
+        // Same reason as getProductsById: without a channel this resolves against the store's
+        // default (Pranajiva's), so every baker product 404s on its own detail page.
+        ...(salesChannelId ? { sales_channel_id: [salesChannelId] } : {}),
+      } as Record<string, unknown>,
+      headers
+    )
     .then(({ products }) => products[0])
     .catch((err) => {
       throw err

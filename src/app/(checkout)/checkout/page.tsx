@@ -49,7 +49,7 @@ export default async function Checkout({
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 content-container">
         <h1 className="text-xl font-semibold text-grey-80">Your cart is empty</h1>
         <p className="text-sm text-ui-fg-muted">Add some items to your cart to proceed with checkout.</p>
-        <a href="/store" className="px-6 py-2 bg-cf-orange text-white rounded-lg text-sm font-medium hover:bg-cf-orange-dark transition-colors">
+        <a href="/ready-to-order" className="px-6 py-2 bg-cf-orange text-white rounded-lg text-sm font-medium hover:bg-cf-orange-dark transition-colors">
           Continue Shopping
         </a>
       </div>

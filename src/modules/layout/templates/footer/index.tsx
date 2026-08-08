@@ -122,10 +122,10 @@ export default async function Footer() {
                 </li>
                 <li>
                   <LocalizedClientLink
-                    href="/store"
+                    href="/ready-to-order"
                     className="hover:text-white transition-colors"
                   >
-                    All Products
+                    Ready to Order
                   </LocalizedClientLink>
                 </li>
               </ul>

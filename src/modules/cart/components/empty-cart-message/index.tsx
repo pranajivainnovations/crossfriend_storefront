@@ -16,7 +16,7 @@ const EmptyCartMessage = () => {
         the link below to start browsing our products.
       </Text>
       <div>
-        <InteractiveLink href="/store">Explore products</InteractiveLink>
+        <InteractiveLink href="/ready-to-order">Browse cakes</InteractiveLink>
       </div>
     </div>
   )

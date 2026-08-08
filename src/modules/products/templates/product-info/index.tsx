@@ -13,6 +13,13 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
   const meta = getMetadata(product)
   const isCakeProduct = isCake(product)
 
+  // Not part of the typed ProductMetadata contract — these are written by the baker portal at
+  // product-creation time and are absent on every house-catalogue product, so they are read
+  // defensively rather than added to the shared contract.
+  const rawMeta = (product.metadata ?? {}) as Record<string, unknown>
+  const bakerName = typeof rawMeta.baker_name === "string" ? rawMeta.baker_name : undefined
+  const bakerSlug = typeof rawMeta.baker_slug === "string" ? rawMeta.baker_slug : undefined
+
   // Derive type label from product type value
   const typeLabel = productType
     ? productType.charAt(0).toUpperCase() + productType.slice(1)
@@ -92,6 +99,25 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
 
         {/* Cake urgency */}
         {isCakeProduct && <CakeUrgencyBadge />}
+
+        {/* Who made it. Read from product metadata, which is denormalised at creation time, so a
+            product page costs no extra query to attribute. Ownership itself lives in
+            baker_network.baker_products — this is a rendering cache, never an authority. */}
+        {bakerName && (
+          <div className="flex items-center gap-x-2 rounded-large border border-cf-purple-100 bg-cf-purple-50 px-4 py-3">
+            <span className="text-small-regular text-grey-50">From</span>
+            {bakerSlug ? (
+              <LocalizedClientLink
+                href={`/bakers/${bakerSlug}`}
+                className="text-base-semi text-cf-purple-700 hover:underline"
+              >
+                {bakerName}
+              </LocalizedClientLink>
+            ) : (
+              <span className="text-base-semi text-grey-90">{bakerName}</span>
+            )}
+          </div>
+        )}
 
         {/* Description */}
         <Text

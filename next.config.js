@@ -48,6 +48,21 @@ const nextConfig = withStoreConfig({
   },
   // Redirect trailing slashes for cleaner SEO URLs
   trailingSlash: false,
+  /**
+   * /store was the old catalogue route; "Ready to Order" replaced it.
+   *
+   * Handled here rather than by a page calling permanentRedirect() so the redirect happens in the
+   * routing layer — no React render, no layout, and a real 308 that search engines and existing
+   * bookmarks follow. A redirect page had to render the whole app shell just to throw it away.
+   *
+   * Two URLs for one catalogue would also split search ranking and give customers two names for
+   * the same thing, which is why this is a redirect and not a second listing.
+   */
+  async redirects() {
+    return [
+      { source: "/store", destination: "/ready-to-order", permanent: true },
+    ]
+  },
   // Headers for caching static assets
   async headers() {
     return [

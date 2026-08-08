@@ -10,6 +10,9 @@ import CategoryStrip from "@modules/home/components/category-strip"
 import HowItWorks from "@modules/home/components/how-it-works"
 import Testimonials from "@modules/home/components/testimonials"
 import CtaBanner from "@modules/home/components/cta-banner"
+import IntentPaths from "@modules/home/components/intent-paths"
+import MarketplacePreview from "@modules/home/components/marketplace-preview"
+import LocalBakers from "@modules/home/components/local-bakers"
 import { ProductCollectionWithPreviews } from "types/global"
 import { cache, Suspense } from "react"
 
@@ -100,6 +103,11 @@ export default async function Home() {
       {/* Trust signals — builds confidence immediately */}
       <TrustBar />
 
+      {/* The two purchase intents, immediately after the hero. This is the first real decision the
+          page asks a visitor to make, so it sits above everything that assumes they have already
+          chosen. Needs no data, so it streams with the hero rather than waiting behind a fetch. */}
+      <IntentPaths />
+
       {/* Occasion grid and category strip both fetch on the server. Without a Suspense boundary an
           async child blocks the whole document, so the hero — which needs no data at all — waits on
           them before anything reaches the browser. Wrapped, the page streams: hero and trust bar
@@ -110,6 +118,18 @@ export default async function Home() {
 
       <Suspense fallback={<div className="h-32" />}>
         <CategoryStrip />
+      </Suspense>
+
+      {/* Marketplace and bakers. Both hit the network, so both stream independently — one baker
+          query must not hold up the product grid, and neither should delay the hero. Each renders
+          nothing at all when empty, so a marketplace that is still onboarding shows no hollow
+          section headings. */}
+      <Suspense fallback={<div className="h-96" />}>
+        <MarketplacePreview />
+      </Suspense>
+
+      <Suspense fallback={<div className="h-80" />}>
+        <LocalBakers />
       </Suspense>
 
       {/* Featured product collections */}

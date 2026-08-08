@@ -48,7 +48,7 @@ export default async function CategoryTemplate({
           </LocalizedClientLink>
           <span>/</span>
           <LocalizedClientLink
-            href="/store"
+            href="/ready-to-order"
             className="hover:text-cf-orange transition-colors"
           >
             Store

@@ -13,7 +13,7 @@ import { usePlanning } from "@modules/planning/context/planning-context"
 
 const SideMenuItems = {
   Home: "/",
-  Store: "/store",
+  "Ready to Order": "/ready-to-order",
   Search: "/search",
   Account: "/account",
   Cart: "/cart",
