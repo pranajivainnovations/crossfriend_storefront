@@ -3,6 +3,7 @@
 import { Cart, PaymentSession } from "@medusajs/medusa"
 import { Button } from "@medusajs/ui"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import { placeOrder } from "@modules/checkout/actions"
 import React, { useState } from "react"
 
@@ -74,15 +75,17 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 }
 
 const GiftCardPaymentButton = () => {
+  const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
 
   const handleOrder = async () => {
     setSubmitting(true)
     const result = await placeOrder()
-    // Hard navigation, not router.push — guarantees a fresh server render of the confirmation page
-    // instead of a possibly-stale client Router Cache entry.
+    // A client-side transition is safe here and much faster than reloading the document: the
+    // confirmation URL contains the brand-new order id, so there is no Router Cache entry for it to
+    // go stale — this is the first time the browser has ever asked for that route.
     if (result && "redirectTo" in result && result.redirectTo) {
-      window.location.href = result.redirectTo
+      router.replace(result.redirectTo)
     }
   }
 
@@ -98,6 +101,7 @@ const GiftCardPaymentButton = () => {
 }
 
 const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
+  const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -107,8 +111,10 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
       setSubmitting(false)
       return null
     })
+    // See GiftCardPaymentButton — the confirmation URL is unique per order, so there's nothing
+    // cached to serve stale and no reason to pay for a full document reload.
     if (result && "redirectTo" in result && result.redirectTo) {
-      window.location.href = result.redirectTo
+      router.replace(result.redirectTo)
     }
   }
 

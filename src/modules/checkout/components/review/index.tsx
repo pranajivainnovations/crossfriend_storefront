@@ -3,17 +3,17 @@
 import { Heading, Text, clx } from "@medusajs/ui"
 
 import PaymentButton from "../payment-button"
-import { useSearchParams } from "next/navigation"
 import { Cart } from "@medusajs/medusa"
 
 const Review = ({
   cart,
+  activeStep,
 }: {
   cart: Omit<Cart, "refundable_amount" | "refunded_total">
+  /** Resolved by CheckoutForm — the URL's ?step when there is one, the cart's own step otherwise. */
+  activeStep: string
 }) => {
-  const searchParams = useSearchParams()
-
-  const isOpen = searchParams.get("step") === "review"
+  const isOpen = activeStep === "review"
 
   const paidByGiftcard =
     cart?.gift_cards && cart?.gift_cards?.length > 0 && cart?.total === 0

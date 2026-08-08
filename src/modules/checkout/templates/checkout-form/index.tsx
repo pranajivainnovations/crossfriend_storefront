@@ -37,13 +37,22 @@ export default async function CheckoutForm({
 
   cart.checkout_step = getCheckoutStep(cart)
 
-  // The URL's ?step is the only thing either Addresses or Review actually opens on — if it names a
-  // step the cart isn't really ready for (no step at all, a stale bookmark, or a request that
-  // succeeded partway and left the cart without shipping/payment), neither section renders open and
-  // the customer is stuck looking at nothing. Never redirect away from an explicit "address" request
-  // though — that's how "Edit" navigates back to change a saved address, and that has to stay possible
-  // even once the cart is otherwise ready for review.
-  if (requestedStep !== "address" && requestedStep !== cart.checkout_step) {
+  // Which section renders open. Arriving at /checkout with no ?step at all is the normal case — it's
+  // how every customer gets here from the cart — and it used to cost a full extra server render: the
+  // redirect below fired, the browser came back, and the whole page (cart fetch, product enrichment,
+  // customer lookup) ran a second time before anything was shown. There was never a decision to make
+  // there; the step the cart is ready for is already known at this point, so use it directly.
+  const activeStep = requestedStep ?? cart.checkout_step
+
+  // An explicit ?step the cart isn't ready for is still worth correcting — a stale bookmark, or a
+  // request that succeeded partway and left the cart without shipping/payment, would otherwise open
+  // a section with nothing in it. "address" is never redirected away from: that's how "Edit" gets
+  // back to change a saved address, which has to stay possible once the cart is ready for review.
+  if (
+    requestedStep &&
+    requestedStep !== "address" &&
+    requestedStep !== cart.checkout_step
+  ) {
     redirect(`/checkout?step=${cart.checkout_step}`)
   }
 
@@ -51,11 +60,11 @@ export default async function CheckoutForm({
     <div>
       <div className="w-full grid grid-cols-1 gap-y-8">
         <div>
-          <Addresses cart={cart} customer={customer} />
+          <Addresses cart={cart} customer={customer} activeStep={activeStep} />
         </div>
 
         <div>
-          <Review cart={cart} />
+          <Review cart={cart} activeStep={activeStep} />
         </div>
       </div>
     </div>

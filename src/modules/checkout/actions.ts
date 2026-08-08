@@ -3,13 +3,18 @@
 import { cookies } from "next/headers"
 
 import {
+  addShippingAddress,
   addShippingMethod,
   completeCart,
   deleteDiscount,
   setPaymentSession,
   updateCart,
 } from "@lib/data"
-import { GiftCard, StorePostCartsCartReq } from "@medusajs/medusa"
+import {
+  GiftCard,
+  StorePostCartsCartReq,
+  StorePostCustomersCustomerAddressesReq,
+} from "@medusajs/medusa"
 import { revalidateTag, revalidatePath } from "next/cache"
 
 const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
@@ -127,19 +132,23 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
 
   if (!cartId) return { error: "No cartId cookie found" }
 
+  // Hoisted so it can be reused for the address-book write below — reading it back off `data` isn't
+  // possible, since StorePostCartsCartReq types shipping_address as `string | AddressPayload`.
+  const shippingAddress = {
+    first_name: formData.get("shipping_address.first_name") as string,
+    last_name: formData.get("shipping_address.last_name") as string,
+    address_1: formData.get("shipping_address.address_1") as string,
+    address_2: "",
+    company: formData.get("shipping_address.company") as string,
+    postal_code: formData.get("shipping_address.postal_code") as string,
+    city: formData.get("shipping_address.city") as string,
+    country_code: formData.get("shipping_address.country_code") as string,
+    province: formData.get("shipping_address.province") as string,
+    phone: formData.get("shipping_address.phone") as string,
+  }
+
   const data = {
-    shipping_address: {
-      first_name: formData.get("shipping_address.first_name"),
-      last_name: formData.get("shipping_address.last_name"),
-      address_1: formData.get("shipping_address.address_1"),
-      address_2: "",
-      company: formData.get("shipping_address.company"),
-      postal_code: formData.get("shipping_address.postal_code"),
-      city: formData.get("shipping_address.city"),
-      country_code: formData.get("shipping_address.country_code"),
-      province: formData.get("shipping_address.province"),
-      phone: formData.get("shipping_address.phone"),
-    },
+    shipping_address: shippingAddress,
     email: formData.get("email"),
   } as StorePostCartsCartReq
 
@@ -163,26 +172,46 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
 
   const token = cookies().get("_medusa_jwt")?.value
 
+  // Saving to the customer's address book is what makes the NEXT checkout prefill — without it
+  // `customer.shipping_addresses` stays empty forever and the address form is blank every time. The
+  // client only sets this flag for an address that isn't already saved (see ShippingAddress), and it
+  // runs alongside the checkout call rather than after it, so it adds no waiting for the customer.
+  const shouldSaveAddress = formData.get("save_address") === "1" && !!token
+
+  const saveAddress = shouldSaveAddress
+    ? addShippingAddress({
+        address: shippingAddress,
+      } as StorePostCustomersCustomerAddressesReq).catch(() => null)
+    : Promise.resolve(null)
+
   try {
-    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/checkout/initialize`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        cartId,
-        shipping_address: data.shipping_address,
-        billing_address: data.billing_address,
-        email: data.email,
+    const [res] = await Promise.all([
+      fetch(`${MEDUSA_BACKEND_URL}/store/checkout/initialize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          cartId,
+          shipping_address: data.shipping_address,
+          billing_address: data.billing_address,
+          email: data.email,
+        }),
+        cache: "no-store",
       }),
-      cache: "no-store",
-    })
+      // Never let a failed address-book write block an order — it's a convenience for next time, not
+      // part of this purchase. Errors are already swallowed above; this just keeps the two in step.
+      saveAddress,
+    ])
+
     const json = await res.json().catch(() => ({}))
     if (!res.ok) {
       return { error: json.error || "Something went wrong preparing checkout. Please try again." }
     }
     revalidateTag("cart")
+    revalidateTag("customer")
+    revalidatePath("/checkout")
     revalidatePath("/", "layout")
   } catch (error: any) {
     return { error: error.toString() }
@@ -221,7 +250,8 @@ export async function setPaymentMethod(providerId: string) {
 /**
  * Returns `redirectTo` instead of calling `redirect()` itself — see setAddresses above for why: a
  * `redirect()` fired alongside `revalidatePath`/`revalidateTag` can still serve a stale cached render
- * of the confirmation page. Callers must hard-navigate (`window.location.href`) when it's present.
+ * of the confirmation page. Callers navigate with `router.replace()`; the confirmation URL carries
+ * the new order's id, so it has no cache entry that could be stale.
  */
 export async function placeOrder() {
   const cartId = cookies().get("_medusa_cart_id")?.value

@@ -1,10 +1,6 @@
 "use client"
 
-import {
-  useSearchParams,
-  useRouter,
-  usePathname,
-} from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useEffect } from "react"
 import { Cart, Customer } from "@medusajs/medusa"
 import { CheckCircleSolid } from "@medusajs/icons"
@@ -24,18 +20,20 @@ import compareAddresses from "@lib/util/compare-addresses"
 const Addresses = ({
   cart,
   customer,
+  activeStep,
 }: {
   cart: Omit<Cart, "refundable_amount" | "refunded_total"> | null
   customer: Omit<Customer, "password_hash"> | null
+  /** Resolved by CheckoutForm — the URL's ?step when there is one, the cart's own step otherwise. */
+  activeStep: string
 }) => {
-  const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
   // India-only: fixed country code. Future: derive from [region] param.
   const countryCode = "in"
 
-  const isOpen = searchParams.get("step") === "address"
+  const isOpen = activeStep === "address"
 
   const { state: sameAsSBilling, toggle: toggleSameAsBilling } = useToggleState(
     cart?.shipping_address && cart?.billing_address
@@ -49,13 +47,19 @@ const Addresses = ({
 
   const [state, formAction] = useFormState(setAddresses, null)
 
-  // Hard navigation, not router.push — guarantees a fresh server render of the review step instead of
-  // a possibly-stale client Router Cache entry from before shipping/payment were resolved.
+  // A client-side transition, not `window.location.href`. The full document reload this replaced was
+  // the single slowest moment in checkout — it threw away the loaded app and re-downloaded every
+  // bundle just to move between two steps of the same page. What it was guarding against was a stale
+  // Router Cache entry for the review step, cached before shipping/payment existed; `setAddresses`
+  // already revalidates those paths server-side before returning, and the `refresh()` below forces
+  // the new route's data to come from the server regardless, so the guarantee survives without the
+  // reload. `replace`, not `push`, keeps Back out of a half-submitted address form.
   useEffect(() => {
     if (state?.redirectTo) {
-      window.location.href = state.redirectTo
+      router.replace(state.redirectTo)
+      router.refresh()
     }
-  }, [state])
+  }, [state, router])
 
   return (
     <div className="bg-white">

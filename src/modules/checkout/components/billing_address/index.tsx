@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import Input from "@modules/common/components/input"
 import CountrySelect from "../country-select"
 import { Cart } from "@medusajs/medusa"
+import { usePincodeAutofill } from "../../hooks/use-pincode-autofill"
 
 const BillingAddress = ({
   cart,
@@ -10,32 +11,66 @@ const BillingAddress = ({
   cart: Omit<Cart, "refundable_amount" | "refunded_total"> | null
   countryCode: string
 }) => {
-  const [formData, setFormData] = useState({
-    "billing_address.first_name": cart?.billing_address?.first_name || "",
-    "billing_address.last_name": cart?.billing_address?.last_name || "",
-    "billing_address.address_1": cart?.billing_address?.address_1 || "",
-    "billing_address.company": cart?.billing_address?.company || "",
-    "billing_address.postal_code": cart?.billing_address?.postal_code || "",
-    "billing_address.city": cart?.billing_address?.city || "",
-    "billing_address.country_code":
-      cart?.billing_address?.country_code || countryCode || "",
-    "billing_address.province": cart?.billing_address?.province || "",
-    "billing_address.phone": cart?.billing_address?.phone || "",
-  })
-
-  useEffect(() => {
-    setFormData({
+  // Single builder for the initial state and the effect below — see the same note in
+  // ../shipping-address: keeping two copies is how the effect lost the `countryCode` fallback and
+  // reset the country select to its placeholder on mount.
+  const buildFormData = useCallback(
+    () => ({
       "billing_address.first_name": cart?.billing_address?.first_name || "",
       "billing_address.last_name": cart?.billing_address?.last_name || "",
       "billing_address.address_1": cart?.billing_address?.address_1 || "",
       "billing_address.company": cart?.billing_address?.company || "",
       "billing_address.postal_code": cart?.billing_address?.postal_code || "",
       "billing_address.city": cart?.billing_address?.city || "",
-      "billing_address.country_code": cart?.billing_address?.country_code || "",
+      "billing_address.country_code":
+        cart?.billing_address?.country_code || countryCode || "",
       "billing_address.province": cart?.billing_address?.province || "",
       "billing_address.phone": cart?.billing_address?.phone || "",
-    })
+    }),
+    [cart?.billing_address, countryCode]
+  )
+
+  const [formData, setFormData] = useState(buildFormData)
+
+  useEffect(() => {
+    setFormData(buildFormData())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart?.billing_address])
+
+  // City and State come from the pincode here too; the customer's own edits always win.
+  const autofilledRef = useRef<{ city: string; province: string }>({
+    city: "",
+    province: "",
+  })
+
+  const applyPincodeArea = useCallback(
+    ({ city, state }: { city: string; state: string }) => {
+      setFormData((prev) => {
+        const next = { ...prev }
+
+        const cityIsOurs =
+          !prev["billing_address.city"] ||
+          prev["billing_address.city"] === autofilledRef.current.city
+        if (city && cityIsOurs) {
+          next["billing_address.city"] = city
+          autofilledRef.current.city = city
+        }
+
+        const provinceIsOurs =
+          !prev["billing_address.province"] ||
+          prev["billing_address.province"] === autofilledRef.current.province
+        if (state && provinceIsOurs) {
+          next["billing_address.province"] = state
+          autofilledRef.current.province = state
+        }
+
+        return next
+      })
+    },
+    []
+  )
+
+  usePincodeAutofill(formData["billing_address.postal_code"], applyPincodeArea)
 
   const handleChange = (
     e: React.ChangeEvent<
