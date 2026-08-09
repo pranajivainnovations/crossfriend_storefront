@@ -5,7 +5,8 @@ import { ENTITY, LEGAL_PENDING } from "@lib/constants/legal"
 import { Callout, LegalShell, List, Section } from "@modules/legal/components/legal-shell"
 
 export const metadata: Metadata = {
-  title: "Baker Terms | CrossFriend",
+  alternates: { canonical: "/seller-terms" },
+  title: "Baker Terms",
   description:
     "The terms that apply to bakers and sellers listing on CrossFriend — onboarding, FSSAI requirements, listing obligations, payouts, and grounds for suspension.",
 }

@@ -5,7 +5,8 @@ import { ENTITY } from "@lib/constants/legal"
 import { Callout, LegalShell, List, Section } from "@modules/legal/components/legal-shell"
 
 export const metadata: Metadata = {
-  title: "Refunds & Cancellations | CrossFriend",
+  alternates: { canonical: "/refund-policy" },
+  title: "Refunds & Cancellations",
   description:
     "How to cancel a CrossFriend order, when you get a refund, and what to do if a cake arrives damaged, late or wrong. Written for freshly made, perishable food.",
 }

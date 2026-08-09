@@ -2,13 +2,87 @@ import { Metadata } from "next"
 
 import StoreTemplate from "@modules/store/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
+import { getTaxonomy } from "@lib/data/taxonomy"
 
 export const dynamic = "force-dynamic"
 
-export const metadata: Metadata = {
-  title: "Shop Everything | CrossFriend",
-  description:
-    "Browse every CrossFriend product — cakes, decorations, gifts, costumes and toys. Filter by occasion or by what you're looking for.",
+type StoreSearchParams = {
+  sortBy?: SortOptions
+  page?: string
+  type?: string
+  collection?: string
+}
+
+/**
+ * Per-filter metadata, replacing a static export that gave every variant of this page an identical
+ * title and no canonical at all.
+ *
+ * Two problems that fixes:
+ *
+ * 1. `/store`, `/store?type=cake` and `/store?type=costume` were indistinguishable to a crawler —
+ *    same title, same description, no canonical to tell them apart. Six type URLs competing as
+ *    duplicates of one another is worse than having one, and the sitemap lists all of them.
+ * 2. The page supplied its own brand suffix while the root layout's title template already
+ *    appends one — so the tag rendered the brand name twice. The suffix belongs to the template,
+ *    not to the page. The same bug was present on fifteen other pages.
+ *
+ * The label comes from the taxonomy rather than a hardcoded map, so a type added in OPS gets a
+ * correct title with no code change — the same rule the rest of the storefront now follows.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: StoreSearchParams
+}): Promise<Metadata> {
+  const typeValue = searchParams.type?.trim()
+  const collection = searchParams.collection?.trim()
+
+  if (!typeValue && !collection) {
+    return {
+      title: "Shop Everything",
+      description:
+        "Browse every CrossFriend product — cakes, decorations, gifts, costumes and toys. Filter by occasion or by what you're looking for.",
+      alternates: { canonical: "/store" },
+    }
+  }
+
+  const taxonomy = await getTaxonomy().catch(() => null)
+  const type = typeValue
+    ? taxonomy?.types.find((t) => t.value === typeValue)
+    : undefined
+  const occasion = collection
+    ? taxonomy?.occasions.find((o) => o.handle === collection)
+    : undefined
+
+  const typeLabel = type?.label ?? typeValue
+  const occasionLabel = occasion?.label ?? collection
+
+  const title =
+    typeLabel && occasionLabel
+      ? `${typeLabel} for ${occasionLabel}`
+      : typeLabel
+        ? `${typeLabel} — Shop Online`
+        : `${occasionLabel} Shop`
+
+  const description =
+    typeLabel && occasionLabel
+      ? `Shop ${typeLabel.toLowerCase()} for ${occasionLabel.toLowerCase()} on CrossFriend, from local bakers and makers.`
+      : typeLabel
+        ? `Shop ${typeLabel.toLowerCase()} on CrossFriend — made and delivered by local bakers and makers.`
+        : `Everything you need for ${occasionLabel?.toLowerCase()} on CrossFriend.`
+
+  // Canonical carries the filter, so each filtered view is its own page rather than a duplicate of
+  // the bare catalogue. Sort and page are deliberately excluded — they reorder the same set and
+  // would otherwise mint a distinct canonical per sort order.
+  const params = new URLSearchParams()
+  if (typeValue) params.set("type", typeValue)
+  if (collection) params.set("collection", collection)
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/store?${params.toString()}` },
+  }
 }
 
 /**
@@ -33,12 +107,7 @@ export const metadata: Metadata = {
 export default async function StorePage({
   searchParams,
 }: {
-  searchParams: {
-    sortBy?: SortOptions
-    page?: string
-    type?: string
-    collection?: string
-  }
+  searchParams: StoreSearchParams
 }) {
   const { sortBy, page, type, collection } = searchParams
 

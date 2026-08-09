@@ -26,7 +26,17 @@ RUN npm ci
 COPY . .
 
 # Build arguments for environment variables (non-backend, safe to bake)
-ARG NEXT_PUBLIC_BASE_URL=http://localhost:8000
+#
+# NEXT_PUBLIC_* is inlined by the bundler during `npm run build` below — it is NOT read when the
+# container starts. Setting it in the runner stage or in `docker compose environment:` has no
+# effect on canonical URLs, og:url or the sitemap. It must be correct HERE, at build time.
+#
+# The default is the production domain, not localhost. It used to be http://localhost:8000, and
+# because nothing on the deploy host exported the variable, every production build baked that in —
+# so the live site published <link rel="canonical" href="http://localhost:8000/..."> on every page,
+# telling Google the real content lived at an address it cannot reach. A wrong-but-real default is
+# recoverable; a localhost default silently de-indexes the site.
+ARG NEXT_PUBLIC_BASE_URL=https://crossfriend.in
 ARG NEXT_PUBLIC_DEFAULT_REGION=in
 
 # Set environment variables for build

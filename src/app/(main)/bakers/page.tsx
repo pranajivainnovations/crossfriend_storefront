@@ -2,15 +2,19 @@ import { Metadata } from "next"
 import Link from "next/link"
 
 import { listBakers } from "@lib/data/bakers"
+import { BAKERS_FAQ } from "@lib/constants/faq"
+import { breadcrumbJsonLd, faqJsonLd, jsonLdScriptProps } from "@lib/util/seo"
 import BakerCard from "@modules/bakers/components/baker-card"
+import FaqSection from "@modules/common/components/faq-section"
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/bakers" },
   title: "Local Bakers",
   description:
     "Discover local bakers on CrossFriend. Browse verified bakeries near you and order cakes, pastries and desserts made fresh.",
   keywords: ["local bakers", "bakery near me", "cake shops", "order from local bakery"],
   openGraph: {
-    title: "Local Bakers | CrossFriend",
+    title: "Local Bakers",
     description: "Discover verified local bakeries and order cakes, pastries and desserts.",
   },
 }
@@ -39,6 +43,16 @@ export default async function BakersPage({
 
   return (
     <div className="content-container py-10">
+      <script {...jsonLdScriptProps(faqJsonLd(BAKERS_FAQ))} />
+      <script
+        {...jsonLdScriptProps(
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "Bakers", path: "/bakers" },
+          ])
+        )}
+      />
+
       <div className="mb-8 max-w-2xl">
         <h1 className="text-2xl-semi text-grey-90">Local Bakers</h1>
         <p className="mt-2 text-base-regular text-grey-50">
@@ -128,6 +142,15 @@ export default async function BakersPage({
           )}
         </>
       )}
+
+      {/* Rendered because the FAQPage markup above may only describe visible content. Doubles as
+          the answer to "who actually bakes this" — the question a first-time marketplace customer
+          asks and an answer engine is asked on their behalf. */}
+      <FaqSection
+        entries={BAKERS_FAQ}
+        title="About the bakers on CrossFriend"
+        className="!px-0"
+      />
     </div>
   )
 }

@@ -8,6 +8,13 @@ import { getProductsById, getRegion } from "@lib/data"
 import transformProductPreview from "@lib/util/transform-product-preview"
 import BakerBadges from "@modules/bakers/components/baker-badges"
 import ProductPreview from "@modules/products/components/product-preview"
+import {
+  ORGANIZATION_ID,
+  absoluteUrl,
+  breadcrumbJsonLd,
+  jsonLdScriptProps,
+  plainText,
+} from "@lib/util/seo"
 
 type Props = { params: { slug: string } }
 
@@ -18,16 +25,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { baker } = data
   const location = [baker.city, baker.state].filter(Boolean).join(", ")
   const description =
-    baker.bio?.slice(0, 155) ||
+    plainText(baker.bio, 155) ||
     `Order cakes and desserts from ${baker.name}${location ? ` in ${location}` : ""} on CrossFriend.`
 
   return {
-    title: baker.name,
+    // The bakery's own name plus where it is. "Butter Berry" alone competes with every bakery of
+    // that name in the country; "Butter Berry, Meerut" is what someone nearby actually types.
+    title: location ? `${baker.name} — ${location}` : baker.name,
     description,
     openGraph: {
-      title: `${baker.name} | CrossFriend`,
+      title: baker.name,
       description,
       images: baker.coverUrl || baker.photoUrl ? [baker.coverUrl || baker.photoUrl!] : undefined,
+    },
+    alternates: {
+      canonical: `/bakers/${params.slug}`,
     },
   }
 }
@@ -65,8 +77,65 @@ export default async function BakerProfilePage({ params }: Props) {
   const products =
     region && priced ? priced.map((p) => transformProductPreview(p, region)) : []
 
+  /**
+   * Bakery is a subtype of FoodEstablishment, which is a LocalBusiness — the type Google uses for
+   * "cake shop near me". City and state are the strongest signal here, so they are always present
+   * even when the street address is not, which is the normal case: we hold the area a bakery serves
+   * long before we hold its doorway.
+   *
+   * Deliberately NO aggregateRating. `rating` and `reviewCount` on this profile come from Google
+   * Places, not from customers of CrossFriend. Marking up a third party's ratings as though they
+   * were our own breaks Google's own rule that review markup must reflect reviews collected by the
+   * site, and risks a manual action against the whole domain. When CrossFriend collects its own
+   * reviews, this is where they belong.
+   */
+  const bakerUrl = absoluteUrl(`/bakers/${params.slug}`)
+  const bakeryJsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Bakery",
+    "@id": `${bakerUrl}#bakery`,
+    name: baker.name,
+    url: bakerUrl,
+    description:
+      plainText(baker.bio, 300) ||
+      `${baker.name}${location ? ` in ${location}` : ""} sells cakes and desserts on CrossFriend.`,
+    address: {
+      "@type": "PostalAddress",
+      ...(baker.city ? { addressLocality: baker.city } : {}),
+      ...(baker.state ? { addressRegion: baker.state } : {}),
+      ...(baker.pincode ? { postalCode: baker.pincode } : {}),
+      addressCountry: "IN",
+    },
+    parentOrganization: { "@id": ORGANIZATION_ID },
+  }
+
+  const bakerImage = baker.photoUrl || baker.coverUrl
+  if (bakerImage) bakeryJsonLd.image = [bakerImage]
+  if (baker.websiteUrl) bakeryJsonLd.sameAs = [baker.websiteUrl]
+  if (baker.specialties?.length) bakeryJsonLd.knowsAbout = baker.specialties
+  if (products.length) {
+    bakeryJsonLd.hasOfferCatalog = {
+      "@type": "OfferCatalog",
+      name: `Products from ${baker.name}`,
+      itemListElement: products.slice(0, 30).map((product, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: absoluteUrl(`/products/${product.handle}`),
+        name: product.title,
+      })),
+    }
+  }
+
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Bakers", path: "/bakers" },
+    { name: baker.name, path: `/bakers/${params.slug}` },
+  ])
+
   return (
     <div className="pb-16">
+      <script {...jsonLdScriptProps(bakeryJsonLd)} />
+      <script {...jsonLdScriptProps(breadcrumbs)} />
       {/* Cover */}
       <div className="relative h-48 w-full overflow-hidden bg-cf-purple-100 small:h-64">
         {baker.coverUrl ? (

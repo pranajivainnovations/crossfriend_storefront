@@ -5,6 +5,7 @@ import MarketplaceTemplate from "@modules/marketplace/templates"
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/ready-to-order" },
   title: "Ready to Order",
   description:
     "Cakes, pastries, desserts and gifts from local bakers — already made and ready to deliver. Order from verified bakeries near you.",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
     "same day cake delivery",
   ],
   openGraph: {
-    title: "Ready to Order | CrossFriend",
+    title: "Ready to Order",
     description: "Cakes and treats from local bakers, ready to deliver.",
   },
 }

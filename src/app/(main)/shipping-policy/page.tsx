@@ -5,7 +5,8 @@ import { ENTITY } from "@lib/constants/legal"
 import { Callout, LegalShell, List, Section } from "@modules/legal/components/legal-shell"
 
 export const metadata: Metadata = {
-  title: "Shipping & Delivery | CrossFriend",
+  alternates: { canonical: "/shipping-policy" },
+  title: "Shipping & Delivery",
   description:
     "Where CrossFriend delivers, how long orders take, same-day cut-offs, and what happens if a delivery cannot be completed.",
 }

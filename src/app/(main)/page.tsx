@@ -23,6 +23,7 @@ import { cache, Suspense } from "react"
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/" },
   title: "CrossFriend — Make Every Celebration Unforgettable",
   description:
     "Plan your perfect celebration. Shop cakes, decorations, gifts, costumes and more — all in one place. Same-day delivery available.",

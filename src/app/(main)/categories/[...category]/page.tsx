@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       `${title} category.`
 
     return {
-      title: `${title} | CrossFriend`,
+      title: `${title}`,
       description,
       alternates: {
         canonical: `${params.category.join("/")}`,

@@ -13,13 +13,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const occasion = await getOccasionBySlug(params.occasion)
   if (!occasion) return {}
 
-  const title = `${occasion.label} Celebration | CrossFriend`
+  const title = `${occasion.label} Celebration`
   const description = `${occasion.tagline} — shop cakes, decorations, gifts & more for your ${occasion.label.toLowerCase()} celebration.`
 
   return {
     title,
     description,
     openGraph: { title, description },
+    alternates: { canonical: `/occasions/${params.occasion}` },
   }
 }
 

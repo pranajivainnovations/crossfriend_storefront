@@ -6,7 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8000}
+        # THIS is the one that decides canonical URLs — build args are baked in by the bundler.
+        # Changing it requires a rebuild (`docker compose up -d --build`); `up` alone reuses the
+        # existing image and silently keeps the old value.
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://crossfriend.in}
         NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
     image: crossfriend-storefront:latest
     container_name: crossfriend-storefront
@@ -17,7 +20,10 @@ services:
       NODE_ENV: production
       PORT: 8000
       MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9001}
-      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8000}
+      # Kept only so the value is visible when inspecting a running container. It has NO effect on
+      # rendered URLs — that was verified by building with one value and starting with another:
+      # the build-time value won. Do not expect changing this line to fix a canonical.
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://crossfriend.in}
       NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
     extra_hosts:
       - "host.docker.internal:host-gateway"

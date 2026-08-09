@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import OrderTracker from "@modules/order/components/order-tracker"
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/order/track" },
   title: "Track Your Order",
   description: "Track the status of your CrossFriend order in real-time.",
 }

@@ -10,11 +10,12 @@ import {
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/collections" },
   title: "All Collections",
   description:
     "Browse our curated collections — birthday essentials, anniversary specials, festive packs, kids party kits, and more.",
   openGraph: {
-    title: "Shop by Collection | CrossFriend",
+    title: "Shop by Collection",
     description:
       "Browse our curated collections — birthday essentials, anniversary specials, festive packs, and more.",
   },

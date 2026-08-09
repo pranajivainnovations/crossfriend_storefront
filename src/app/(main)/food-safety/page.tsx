@@ -4,7 +4,8 @@ import { ENTITY } from "@lib/constants/legal"
 import { Callout, LegalShell, List, Section } from "@modules/legal/components/legal-shell"
 
 export const metadata: Metadata = {
-  title: "Food Safety & Allergens | CrossFriend",
+  alternates: { canonical: "/food-safety" },
+  title: "Food Safety & Allergens",
   description:
     "Allergen information on CrossFriend, how it is collected, and important limitations if you or someone you are ordering for has a food allergy.",
 }

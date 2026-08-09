@@ -31,6 +31,21 @@ export const ENTITY = {
 } as const
 
 /**
+ * Public profiles that belong to CrossFriend, emitted as `sameAs` on the Organization.
+ *
+ * `sameAs` is how a search or answer engine confirms that the CrossFriend on this site, the one on
+ * Instagram, and the one in a Google Business Profile are a single entity rather than three
+ * similarly-named businesses. Without it each mention is orphaned and none of them accumulate to
+ * the same brand.
+ *
+ * Empty for now, and emitted only when non-empty — an Organization with `sameAs: []` asserts
+ * "this brand exists nowhere else", which is worse than saying nothing. Add the real URLs
+ * (Instagram, Facebook, LinkedIn, YouTube, and the Google Business Profile / Maps share link) and
+ * they flow into the markup with no further change.
+ */
+export const SOCIAL_PROFILES: string[] = []
+
+/**
  * One date for all documents. They were written together and are consistent with each other, so
  * dating them separately would imply a revision history that does not exist.
  */

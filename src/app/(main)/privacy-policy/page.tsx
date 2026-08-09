@@ -4,7 +4,8 @@ import { ENTITY } from "@lib/constants/legal"
 import { Callout, LegalShell, List, Section } from "@modules/legal/components/legal-shell"
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | CrossFriend",
+  alternates: { canonical: "/privacy-policy" },
+  title: "Privacy Policy",
   description:
     "What personal data CrossFriend collects, why we collect it, who we share it with — including the bakers who make your order — and how to exercise your rights.",
 }

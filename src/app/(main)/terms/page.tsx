@@ -5,7 +5,8 @@ import { ENTITY, LEGAL_PENDING } from "@lib/constants/legal"
 import { Callout, LegalShell, List, Section } from "@modules/legal/components/legal-shell"
 
 export const metadata: Metadata = {
-  title: "Terms of Service | CrossFriend",
+  alternates: { canonical: "/terms" },
+  title: "Terms of Service",
   description:
     "The terms that apply when you use CrossFriend to order cakes and celebration products from local bakers, or to design a cake in the AI Cake Studio.",
 }

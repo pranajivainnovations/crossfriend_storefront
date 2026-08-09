@@ -28,8 +28,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const metadata = {
-    title: `${collection.title} | CrossFriend`,
-    description: `${collection.title} collection`,
+    title: collection.title,
+    description: `Shop the ${collection.title} collection on CrossFriend — cakes, gifts and celebration products from local bakers and makers.`,
+    alternates: { canonical: `/collections/${params.handle}` },
   } as Metadata
 
   return metadata
