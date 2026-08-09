@@ -290,3 +290,25 @@
     transform: translateY(0);
   }
 }
+
+/**
+ * Reduced motion.
+ *
+ * Site-wide rather than per-component: the storefront animates in a lot of places (floating emoji,
+ * shimmer, confetti, section reveals, the homepage design marquee) and none of it carried a
+ * reduced-motion path. Drifting and looping imagery is exactly what triggers vestibular discomfort,
+ * and every one of these animations is decorative — the content reads identically without them.
+ *
+ * `!important` because Tailwind's animation utilities are also single-class declarations at the
+ * same specificity, so without it whichever came last in the sheet would win.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

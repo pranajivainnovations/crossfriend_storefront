@@ -1,119 +1,46 @@
 /**
- * Occasion Map — Server-Only Loader
+ * RETIRED — the occasion × product type mapping now lives in Postgres.
  *
- * Reads type-occasion-map.json at runtime from the filesystem.
- * Falls back to the hardcoded TYPE_OCCASION_MAP in product-contract.ts
- * if the file is missing or contains invalid data.
+ * It is edited in OPS at /taxonomy, served by GET /store/crossfriend/taxonomy, and read by
+ * `@lib/data/taxonomy`. Use `getOccasionTypeValues(handle)` instead of the old `getOccasionTypes`.
  *
- * IMPORTANT: This file uses Node.js `fs` — never import it in client components.
+ * ── Why this file is gone rather than kept as a fallback ────────────────────────────────────────
+ * It read type-occasion-map.json from disk, overlaid it on a hardcoded TYPE_OCCASION_MAP, and
+ * validated every key against a frozen PRODUCT_TYPES array — silently discarding anything the array
+ * did not already contain. The JSON's `"Fancy-Dress"` key had therefore never taken effect at any
+ * point in its life: the whitelist spells it `costume`, so the loader dropped the line and fell
+ * back to the hardcoded default. Someone edited that file believing they had changed behaviour.
+ *
+ * A fallback would reintroduce exactly that failure mode — a second answer that silently wins when
+ * the first is unavailable, with no way to tell which one is live. The taxonomy route already
+ * degrades safely on its own: an unreachable backend yields an empty taxonomy, and every consumer
+ * renders nothing rather than something wrong.
+ *
+ * This stub exists only so a stale import fails at build time with an explanation, instead of
+ * resolving to a module that quietly returns different answers.
  */
 
-import fs from "fs"
-import path from "path"
-import {
-  TYPE_OCCASION_MAP,
-  PRODUCT_TYPES,
-  OCCASION_COLLECTIONS,
-  type ProductType,
-  type OccasionCollection,
-} from "@lib/types/product-contract"
-
-const CONFIG_PATH = path.join(
-  process.cwd(),
-  "src/lib/config/type-occasion-map.json"
-)
-
-/**
- * Reads and validates type-occasion-map.json.
- * Unknown types or occasion values are silently ignored.
- * Falls back to the hardcoded TYPE_OCCASION_MAP on any error.
- */
-export function loadOccasionMap(): Record<ProductType, OccasionCollection[]> {
-  try {
-    if (!fs.existsSync(CONFIG_PATH)) {
-      return TYPE_OCCASION_MAP
-    }
-
-    const raw = fs.readFileSync(CONFIG_PATH, "utf-8")
-    const parsed = JSON.parse(raw)
-
-    // Start from hardcoded defaults, then apply overrides from JSON
-    const result: Record<ProductType, OccasionCollection[]> = { ...TYPE_OCCASION_MAP }
-
-    for (const [type, occasions] of Object.entries(parsed)) {
-      // Skip comment/meta keys and unknown types
-      if (type.startsWith("_")) continue
-      if (!(PRODUCT_TYPES as readonly string[]).includes(type)) continue
-      if (!Array.isArray(occasions)) continue
-
-      // Strip any invalid occasion values
-      const valid = (occasions as string[]).filter(
-        (o): o is OccasionCollection =>
-          (OCCASION_COLLECTIONS as readonly string[]).includes(o)
-      )
-
-      result[type as ProductType] = valid
-    }
-
-    return result
-  } catch (err) {
-    console.error("[CrossFriend] Failed to load type-occasion-map.json, using defaults:", err)
-    return TYPE_OCCASION_MAP
-  }
+export function loadOccasionMap(): never {
+  throw new Error(
+    "loadOccasionMap() is retired. The occasion × type matrix is in Postgres — " +
+      "use getTaxonomy() from @lib/data/taxonomy, edited in OPS at /taxonomy."
+  )
 }
 
-/**
- * Given an occasion slug (e.g. "anniversary"), returns the product type
- * values that should appear on that occasion page.
- *
- * Usage (server component only):
- *   const types = getOccasionTypes("anniversary")
- *   // → ["cake", "decor", "gift", "wellness"]
- */
-export function getOccasionTypes(occasionSlug: string): ProductType[] {
-  const map = loadOccasionMap()
-  return (Object.entries(map) as [ProductType, OccasionCollection[]][])
-    .filter(([, occasions]) =>
-      occasions.includes(occasionSlug as OccasionCollection)
-    )
-    .map(([type]) => type)
+export function getOccasionTypes(): never {
+  throw new Error(
+    "getOccasionTypes() is retired. Use getOccasionTypeValues(handle) from @lib/data/taxonomy."
+  )
 }
 
-/**
- * Returns the ordered list of occasion slugs from the JSON config's `_occasions` array.
- * Falls back to OCCASION_COLLECTIONS if the key is missing.
- */
-export function loadConfiguredOccasions(): string[] {
-  try {
-    if (!fs.existsSync(CONFIG_PATH)) return Array.from(OCCASION_COLLECTIONS)
-    const raw = fs.readFileSync(CONFIG_PATH, "utf-8")
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed._occasions) && parsed._occasions.length > 0) {
-      return parsed._occasions as string[]
-    }
-  } catch {
-    // fall through
-  }
-  return Array.from(OCCASION_COLLECTIONS)
+export function loadConfiguredOccasions(): never {
+  throw new Error(
+    "loadConfiguredOccasions() is retired. Use getTaxonomy().occasions from @lib/data/taxonomy."
+  )
 }
 
-/**
- * Returns the ordered list of product type values from the JSON config's `_types` array,
- * falling back to the non-underscore keys, then to PRODUCT_TYPES.
- */
-export function loadConfiguredTypes(): string[] {
-  try {
-    if (!fs.existsSync(CONFIG_PATH)) return Array.from(PRODUCT_TYPES)
-    const raw = fs.readFileSync(CONFIG_PATH, "utf-8")
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed._types) && parsed._types.length > 0) {
-      return parsed._types as string[]
-    }
-    // Fall back to non-underscore keys
-    const keys = Object.keys(parsed).filter((k) => !k.startsWith("_"))
-    if (keys.length > 0) return keys
-  } catch {
-    // fall through
-  }
-  return Array.from(PRODUCT_TYPES)
+export function loadConfiguredTypes(): never {
+  throw new Error(
+    "loadConfiguredTypes() is retired. Use getTaxonomy().types from @lib/data/taxonomy."
+  )
 }

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+
+import { getOccasions } from "@lib/data/dynamic"
 
 /**
- * Revalidation endpoint — clears Next.js page cache after config changes.
+ * Revalidation endpoint — clears Next.js page cache after a taxonomy change.
  *
- * Use after editing src/lib/config/type-occasion-map.json on the server.
+ * Optional: the taxonomy is read on a 60s window, so an OPS edit appears on its own within a
+ * minute. Call this to make it immediate.
  *
  * Usage:
  *   curl -X POST "https://your-domain.com/api/revalidate" \
@@ -43,16 +46,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ revalidated: true, path: body.path })
   }
 
-  // Revalidate all known occasion pages + home
-  const paths = [
-    "/",
-    "/occasions",
-    "/occasions/birthday",
-    "/occasions/anniversary",
-    "/occasions/festival",
-    "/occasions/kids",
-    "/occasions/special",
-  ]
+  // Drop the cached taxonomy first, so the occasion list below is read fresh rather than from the
+  // 60s window we are trying to bypass — and so every page that renders navigation picks up an OPS
+  // change on its next request instead of waiting out the window.
+  revalidateTag("taxonomy")
+
+  // Occasion paths are derived, not listed. The previous hardcoded array could not know about an
+  // occasion added in OPS, so a new one would have kept serving a stale page until it happened to
+  // expire — the same "config that silently disagrees with the database" problem this whole change
+  // set exists to remove.
+  const occasions = await getOccasions()
+  const paths = ["/", "/occasions", ...occasions.map((o) => `/occasions/${o.slug}`)]
 
   for (const p of paths) {
     revalidatePath(p)

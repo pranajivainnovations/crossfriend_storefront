@@ -8,6 +8,24 @@ type ProductInfoProps = {
   product: PricedProduct
 }
 
+/**
+ * Turns the baker's stored lead time into the phrase a customer needs.
+ *
+ * The stored number is the upper bound of the band the baker chose, so this reads as "ready within
+ * X" rather than an exact promise. Days are used past 24 hours because nobody plans a cake in
+ * 48-hour units.
+ */
+function formatLeadTime(hours: number): string | undefined {
+  if (!Number.isFinite(hours) || hours < 0) return undefined
+  if (hours === 0) return "Ready now"
+  if (hours <= 12) return `Ready in about ${hours} hours`
+  if (hours <= 24) return "Ready same day"
+
+  const days = Math.round(hours / 24)
+  if (days <= 7) return `Ready in about ${days} day${days === 1 ? "" : "s"}`
+  return "Ready in over a week"
+}
+
 const ProductInfo = ({ product }: ProductInfoProps) => {
   const productType = getProductType(product)
   const meta = getMetadata(product)
@@ -19,6 +37,10 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
   const rawMeta = (product.metadata ?? {}) as Record<string, unknown>
   const bakerName = typeof rawMeta.baker_name === "string" ? rawMeta.baker_name : undefined
   const bakerSlug = typeof rawMeta.baker_slug === "string" ? rawMeta.baker_slug : undefined
+
+  // Lead time the baker committed to, stored as the upper bound of a band in hours.
+  const prepHours = Number(rawMeta.prep_hours)
+  const readyIn = Number.isFinite(prepHours) ? formatLeadTime(prepHours) : undefined
 
   // Derive type label from product type value
   const typeLabel = productType
@@ -104,17 +126,24 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
             product page costs no extra query to attribute. Ownership itself lives in
             baker_network.baker_products — this is a rendering cache, never an authority. */}
         {bakerName && (
-          <div className="flex items-center gap-x-2 rounded-large border border-cf-purple-100 bg-cf-purple-50 px-4 py-3">
-            <span className="text-small-regular text-grey-50">From</span>
-            {bakerSlug ? (
-              <LocalizedClientLink
-                href={`/bakers/${bakerSlug}`}
-                className="text-base-semi text-cf-purple-700 hover:underline"
-              >
-                {bakerName}
-              </LocalizedClientLink>
-            ) : (
-              <span className="text-base-semi text-grey-90">{bakerName}</span>
+          <div className="rounded-large border border-cf-purple-100 bg-cf-purple-50 px-4 py-3">
+            <div className="flex items-center gap-x-2">
+              <span className="text-small-regular text-grey-50">From</span>
+              {bakerSlug ? (
+                <LocalizedClientLink
+                  href={`/bakers/${bakerSlug}`}
+                  className="text-base-semi text-cf-purple-700 hover:underline"
+                >
+                  {bakerName}
+                </LocalizedClientLink>
+              ) : (
+                <span className="text-base-semi text-grey-90">{bakerName}</span>
+              )}
+            </div>
+            {readyIn && (
+              <p className="mt-1 text-small-regular text-grey-60">
+                <span aria-hidden="true">🕒</span> {readyIn}
+              </p>
             )}
           </div>
         )}

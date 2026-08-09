@@ -219,6 +219,19 @@ module.exports = {
           "0%": { opacity: "0", transform: "scale(0.95)" },
           "100%": { opacity: "1", transform: "scale(1)" },
         },
+        /**
+         * Homepage hero marquee. The list is rendered twice and moved by exactly -50%, so the
+         * second copy lands where the first began and the loop is seamless — any other distance
+         * shows a jump on every cycle.
+         */
+        "drift-up": {
+          "0%": { transform: "translateY(0)" },
+          "100%": { transform: "translateY(-50%)" },
+        },
+        "drift-down": {
+          "0%": { transform: "translateY(-50%)" },
+          "100%": { transform: "translateY(0)" },
+        },
       },
       animation: {
         ring: "ring 2.2s cubic-bezier(0.5, 0, 0.5, 1) infinite",
@@ -240,6 +253,11 @@ module.exports = {
         "confetti-fall": "confetti-fall 3s ease-in forwards",
         float: "float 3s ease-in-out infinite",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        // Slow enough to read as ambient rather than as something demanding attention. The two
+        // columns differ by 7s so they never fall into step, which would make the grid look like a
+        // single moving block.
+        "drift-up": "drift-up 48s linear infinite",
+        "drift-down": "drift-down 55s linear infinite",
         // Futuristic animations
         "glow-pulse": "glow-pulse 2s ease-in-out infinite",
         "slide-up-fade": "slide-up-fade 0.4s ease-out forwards",

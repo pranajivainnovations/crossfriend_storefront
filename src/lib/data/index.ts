@@ -543,20 +543,32 @@ export const getProductsList = cache(async function ({
 }> {
   const limit = queryParams?.limit || 12
 
-  const region = await getRegion(countryCode)
+  const [region, salesChannelId] = await Promise.all([
+    getRegion(countryCode),
+    getCrossFriendSalesChannelId(),
+  ])
 
   if (!region) {
     return emptyResponse
   }
 
-  const { products: allProducts } = await medusaClient.products
+  // Without a channel this returns the DEFAULT channel's products — which on this shared install is
+  // Pranajiva's wellness catalogue, never CrossFriend's. Returning nothing is the safer failure:
+  // an empty grid is confusing, the other brand's products are wrong.
+  if (!salesChannelId) {
+    console.error("[data] crossfriend sales channel unresolved — refusing to list products")
+    return emptyResponse
+  }
+
+  const { products: allProducts, count } = await medusaClient.products
     .list(
       {
-        limit: 100,
-        offset: 0,
+        limit,
+        offset: pageParam,
         region_id: region.id,
+        sales_channel_id: [salesChannelId],
         ...queryParams,
-      },
+      } as Record<string, unknown>,
       { next: { tags: ["products"] } }
     )
     .then((res) => res)
@@ -564,22 +576,21 @@ export const getProductsList = cache(async function ({
       throw err
     })
 
-  // Filter by brand = crossfriend
-  const brandFiltered = allProducts.filter(
-    (p) => String(p.metadata?.brand || "").toLowerCase() === "crossfriend"
+  // Previously this fetched a fixed 100 rows and filtered `metadata.brand` in JavaScript. That was
+  // wrong twice over: the store API cannot filter on metadata at all, so the 100-row window was
+  // taken from the WRONG channel and the brand filter matched nothing — every category, collection
+  // and store page was structurally empty. It also made `count` a count of one page rather than of
+  // the result set, so pagination lied. Sales channel is an indexed relation the API filters on
+  // server-side, which is both correct and the only thing that scales.
+  const transformedProducts = (allProducts ?? []).map((product) =>
+    transformProductPreview(product, region!)
   )
 
-  const count = brandFiltered.length
-  const paginatedSlice = brandFiltered.slice(pageParam, pageParam + limit)
-
-  const transformedProducts = paginatedSlice.map((product) => {
-    return transformProductPreview(product, region!)
-  })
-
-  const nextPage = count > pageParam + limit ? pageParam + limit : null
+  const total = count ?? transformedProducts.length
+  const nextPage = total > pageParam + limit ? pageParam + limit : null
 
   return {
-    response: { products: transformedProducts, count },
+    response: { products: transformedProducts, count: total },
     nextPage,
     queryParams,
   }
@@ -607,25 +618,52 @@ export const getProductsListWithSort = cache(
   }> {
     const limit = queryParams?.limit || 12
 
-    const region = await getRegion(countryCode)
+    const [region, salesChannelId] = await Promise.all([
+      getRegion(countryCode),
+      getCrossFriendSalesChannelId(),
+    ])
 
-    if (!region) {
-      return {
-        response: { products: [], count: 0 },
-        nextPage: null,
-        queryParams,
+    const empty = {
+      response: { products: [] as ProductPreviewType[], count: 0 },
+      nextPage: null,
+      queryParams,
+    }
+
+    if (!region) return empty
+
+    // See getProductsList: no channel means the default channel, which is Pranajiva's.
+    if (!salesChannelId) {
+      console.error("[data] crossfriend sales channel unresolved — refusing to list products")
+      return empty
+    }
+
+    // Type is resolved to an id and filtered in Postgres rather than compared in JavaScript. The
+    // old approach compared `p.type?.value` over a 100-row window taken from the wrong channel, so
+    // it matched nothing regardless of what was asked for.
+    let typeId: string | null = null
+    if (typeFilter) {
+      typeId = await resolveProductTypeId(typeFilter)
+      if (!typeId) {
+        // An unknown type is an empty result, not an unfiltered one — silently ignoring the filter
+        // is how `?type=costume` used to return the entire catalogue.
+        return empty
       }
     }
 
-    // Fetch raw products for filtering
+    // Sorting stays in memory because price sorting needs the calculated price, which Medusa
+    // computes per region AFTER the query — there is no column to ORDER BY. Everything that CAN be
+    // filtered server-side now is, so this window holds CrossFriend products only rather than
+    // whatever the first 100 rows of another brand's catalogue happened to be.
     const { products: rawProducts } = await medusaClient.products
       .list(
         {
           limit: 100,
           offset: 0,
           region_id: region.id,
+          sales_channel_id: [salesChannelId],
+          ...(typeId ? { type_id: [typeId] } : {}),
           ...queryParams,
-        },
+        } as Record<string, unknown>,
         { next: { tags: ["products"] } }
       )
       .then((res) => res)
@@ -633,17 +671,10 @@ export const getProductsListWithSort = cache(
         throw err
       })
 
-    // Filter by brand = crossfriend
-    let filteredProducts = rawProducts.filter(
-      (p) => String(p.metadata?.brand || "").toLowerCase() === "crossfriend"
-    )
-    if (typeFilter) {
-      filteredProducts = filteredProducts.filter(
-        (p) => p.type?.value?.toLowerCase() === typeFilter.toLowerCase()
-      )
-    }
+    let filteredProducts = rawProducts ?? []
 
-    // Apply tags filter
+    // Tags remain a JavaScript filter: the store API's `tags` parameter takes tag IDs, while our
+    // URLs carry human-readable tag values.
     if (tagsFilter) {
       const filterTags = tagsFilter.split(",").map((t) => t.trim().toLowerCase())
       filteredProducts = filteredProducts.filter((p) =>
@@ -1011,8 +1042,19 @@ export const getProducts = cache(async function (
     collectionId,
   } = options
 
-  const region = await getRegion()
+  const [region, salesChannelId] = await Promise.all([
+    getRegion(),
+    getCrossFriendSalesChannelId(),
+  ])
   if (!region) {
+    return { products: [], count: 0, previews: [] }
+  }
+
+  // Occasion sections and quick-add kits both come through here. Without the channel this returned
+  // the default channel — Pranajiva's — so an occasion page could only ever render the other
+  // brand's products or, more usually, nothing at all.
+  if (!salesChannelId) {
+    console.error("[CrossFriend] sales channel unresolved — getProducts() refusing to list")
     return { products: [], count: 0, previews: [] }
   }
 
@@ -1021,7 +1063,8 @@ export const getProducts = cache(async function (
     limit,
     offset,
     region_id: region.id,
-  }
+    sales_channel_id: [salesChannelId],
+  } as StoreGetProductsParams
 
   // Resolve type value → type_id
   if (type) {

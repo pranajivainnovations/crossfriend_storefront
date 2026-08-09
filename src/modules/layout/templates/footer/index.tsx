@@ -2,6 +2,7 @@ import { Text } from "@medusajs/ui"
 
 import { getCollectionsList } from "@lib/data"
 import { getOccasions, getProductTypes } from "@lib/data/dynamic"
+import { ENTITY, LEGAL_PAGES } from "@lib/constants/legal"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import MedusaCTA from "@modules/layout/components/medusa-cta"
@@ -128,16 +129,55 @@ export default async function Footer() {
                     Ready to Order
                   </LocalizedClientLink>
                 </li>
+                <li>
+                  <LocalizedClientLink
+                    href="/bakers"
+                    className="hover:text-white transition-colors"
+                  >
+                    Local Bakers
+                  </LocalizedClientLink>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal. Its own column rather than buried in Help: a payment gateway, an app store
+                reviewer and a customer looking for the refund policy all expect to find these
+                from the footer, and all three go looking in the same place. */}
+            <div className="flex flex-col gap-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-grey-40 mb-1">
+                Legal
+              </span>
+              <ul className="grid grid-cols-1 gap-2 text-sm text-grey-30">
+                {LEGAL_PAGES.map((p) => (
+                  <li key={p.href}>
+                    <LocalizedClientLink
+                      href={p.href}
+                      className="hover:text-white transition-colors"
+                    >
+                      {p.label}
+                    </LocalizedClientLink>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
         </div>
 
         {/* Bottom bar */}
-        <div className="flex w-full mb-8 pt-6 border-t border-grey-80 justify-between text-grey-40">
-          <Text className="txt-compact-small">
-            © {new Date().getFullYear()} CrossFriend. All rights reserved.
-          </Text>
+        <div className="flex w-full flex-col gap-3 mb-8 pt-6 border-t border-grey-80 text-grey-40 small:flex-row small:items-center small:justify-between">
+          <div className="text-xs leading-relaxed">
+            <Text className="txt-compact-small">
+              © {new Date().getFullYear()} {ENTITY.brand}. All rights reserved.
+            </Text>
+            {/* The operating entity, named. A brand name alone does not tell a customer who they
+                have contracted with, and a payment gateway will ask for exactly this. */}
+            <p className="mt-1 text-grey-50">
+              {ENTITY.brand} is operated by {ENTITY.legalName}, {ENTITY.address}.
+            </p>
+            <p className="mt-1 text-grey-50">
+              {ENTITY.supportEmail} · {ENTITY.supportPhone}
+            </p>
+          </div>
           <MedusaCTA />
         </div>
       </div>

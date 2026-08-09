@@ -22,40 +22,19 @@ export const OCCASION_COLLECTIONS = [
 ] as const
 export type OccasionCollection = (typeof OCCASION_COLLECTIONS)[number]
 
-// --- Type → Occasion Map ---
+// --- Type → Occasion Map: MOVED TO POSTGRES ---
 
-/**
- * Defines which occasions each product type appears on by default.
+/*
+ * TYPE_OCCASION_MAP and OCCASION_TYPE_MAP lived here.
  *
- * HOW TO USE:
- *   - Add a new product type → add a row here listing its occasions.
- *   - Add a new occasion     → add it to the relevant type rows here.
- *   - Individual products can override this via metadata.occasions (Step 2).
+ * The occasion × product type matrix is now crossfriend.occasion_product_types, edited in OPS at
+ * /taxonomy and read through @lib/data/taxonomy. It was previously duplicated across this file,
+ * type-occasion-map.json, and OCCASIONS[].sectionOrder in constants.tsx — all three disagreed.
  *
- * This is the ONLY place you need to change when the taxonomy grows.
+ * PRODUCT_TYPES and OCCASION_COLLECTIONS above are NO LONGER a gate on navigation; the taxonomy
+ * decides what exists. They survive only as compile-time string unions for the quick-add kit
+ * config, which is a separate concern from the matrix.
  */
-export const TYPE_OCCASION_MAP: Record<ProductType, OccasionCollection[]> = {
-  cake:        ["birthday", "anniversary", "kids", "special", "festival"],
-  decor:       ["birthday", "anniversary", "kids", "special", "festival"],
-  costume:     ["kids", "festival", "special"],
-  gift:        ["birthday", "anniversary", "festival", "special"],
-  wellness:    ["anniversary", "festival", "special"],
-  toys:        ["kids", "special"],
-}
-
-/**
- * Reverse lookup — given an occasion, which product types appear on it?
- * Derived automatically from TYPE_OCCASION_MAP. Never edit this directly.
- */
-export const OCCASION_TYPE_MAP: Record<OccasionCollection, ProductType[]> = (() => {
-  const map = {} as Record<OccasionCollection, ProductType[]>
-  for (const occasion of OCCASION_COLLECTIONS) {
-    map[occasion] = (Object.entries(TYPE_OCCASION_MAP) as [ProductType, OccasionCollection[]][])
-      .filter(([, occasions]) => occasions.includes(occasion))
-      .map(([type]) => type)
-  }
-  return map
-})()
 
 // --- Product Metadata ---
 

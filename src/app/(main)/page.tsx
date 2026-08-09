@@ -2,6 +2,7 @@ import { Product } from "@medusajs/medusa"
 import { Metadata } from "next"
 
 import { getCollectionsList, getProductsList, getRegion } from "@lib/data"
+import { getOccasions } from "@lib/data/dynamic"
 import FeaturedProducts from "@modules/home/components/featured-products"
 import Hero from "@modules/home/components/hero"
 import TrustBar from "@modules/home/components/trust-bar"
@@ -10,7 +11,9 @@ import CategoryStrip from "@modules/home/components/category-strip"
 import HowItWorks from "@modules/home/components/how-it-works"
 import Testimonials from "@modules/home/components/testimonials"
 import CtaBanner from "@modules/home/components/cta-banner"
-import IntentPaths from "@modules/home/components/intent-paths"
+// IntentPaths is retired: the hero now carries both intents itself — the prompt bar is the Studio
+// path and "browse cakes ready to order" is the shop path. Two cards restating that immediately
+// below the hero asked the same question twice.
 import MarketplacePreview from "@modules/home/components/marketplace-preview"
 import LocalBakers from "@modules/home/components/local-bakers"
 import { ProductCollectionWithPreviews } from "types/global"
@@ -47,9 +50,29 @@ export const metadata: Metadata = {
 const getCollectionsWithProducts = cache(
   async (): Promise<ProductCollectionWithPreviews[] | null> => {
     try {
-      const { collections } = await getCollectionsList(0, 3)
+      // Occasion collections are excluded here, not merely ordered around.
+      //
+      // Occasions ARE Medusa collections (that is how the taxonomy stores them), so an unfiltered
+      // "first 3 collections" call returned Kids Events and Special Moments — which the occasion
+      // grid two sections above already shows. The same three names appeared twice on one page
+      // under two different headings.
+      //
+      // Featured means merchandising collections: Fancy Dresses, Corporate Gifting, Love.
+      const [{ collections: all }, occasions] = await Promise.all([
+        getCollectionsList(0, 20),
+        getOccasions(),
+      ])
 
-      if (!collections) {
+      if (!all) {
+        return null
+      }
+
+      const occasionHandles = new Set(occasions.map((o) => o.slug.toLowerCase()))
+      const collections = all
+        .filter((c) => !occasionHandles.has((c.handle ?? "").toLowerCase()))
+        .slice(0, 3)
+
+      if (collections.length === 0) {
         return null
     }
 
@@ -97,21 +120,38 @@ export default async function Home() {
 
   return (
     <>
-      {/* Hero — full-width immersive header */}
+      {/*
+        Order is the design here.
+
+        This page used to be nine sections of near-equal weight — hero, trust bar, intent cards,
+        occasions, categories, marketplace, bakers, featured, how-it-works, testimonials, CTA — so
+        nothing led and a visitor had no path through it. It now runs:
+
+          1. WHAT THIS IS      the Studio, shown rather than described
+          2. WHAT YOU CAN BUY  real products, ready to order
+          3. HOW TO NARROW     occasions, then categories
+          4. WHO MAKES IT      local bakers — trust, not navigation
+          5. REASSURANCE       how it works, then proof
+
+        Each async section streams inside its own Suspense boundary: without one, an async child
+        blocks the whole document and the hero — which needs no data — would wait behind a product
+        query before anything reached the browser.
+      */}
       <Hero />
 
-      {/* Trust signals — builds confidence immediately */}
+      {/* Deliberately directly under the hero and nowhere else. Delivery, payment and refund
+          promises answer the doubt created by the hero's claim, so they belong against it. */}
       <TrustBar />
 
-      {/* The two purchase intents, immediately after the hero. This is the first real decision the
-          page asks a visitor to make, so it sits above everything that assumes they have already
-          chosen. Needs no data, so it streams with the hero rather than waiting behind a fetch. */}
-      <IntentPaths />
+      {/* Real products, as high as the data allows. The hero sells the idea; this proves there is
+          a shop behind it. Renders nothing when empty, so an onboarding marketplace shows no
+          hollow heading. */}
+      <Suspense fallback={<div className="h-96" />}>
+        <MarketplacePreview />
+      </Suspense>
 
-      {/* Occasion grid and category strip both fetch on the server. Without a Suspense boundary an
-          async child blocks the whole document, so the hero — which needs no data at all — waits on
-          them before anything reaches the browser. Wrapped, the page streams: hero and trust bar
-          paint immediately and these fill in when their data lands. */}
+      {/* Now that they have seen product, help them narrow: first by occasion (why they came),
+          then by category (what they want). */}
       <Suspense fallback={<div className="h-96" />}>
         <OccasionGrid />
       </Suspense>
@@ -120,32 +160,24 @@ export default async function Home() {
         <CategoryStrip />
       </Suspense>
 
-      {/* Marketplace and bakers. Both hit the network, so both stream independently — one baker
-          query must not hold up the product grid, and neither should delay the hero. Each renders
-          nothing at all when empty, so a marketplace that is still onboarding shows no hollow
-          section headings. */}
-      <Suspense fallback={<div className="h-96" />}>
-        <MarketplacePreview />
-      </Suspense>
-
-      <Suspense fallback={<div className="h-80" />}>
-        <LocalBakers />
-      </Suspense>
-
-      {/* Featured product collections */}
-      <div className="bg-grey-5/50">
+      {/* Featured collections sit on a tinted band so the page has a seam here rather than one more
+          white section in a run of them. */}
+      <div className="bg-cf-warm/40">
         <ul className="flex flex-col">
           <FeaturedProducts collections={collections} region={region} />
         </ul>
       </div>
 
-      {/* How it works — 3 steps */}
+      {/* Bakers are supply, not navigation — one quiet row, well below the fold. Making them a peer
+          of the Studio and the shop would say CrossFriend is a directory, which it is not. */}
+      <Suspense fallback={<div className="h-80" />}>
+        <LocalBakers />
+      </Suspense>
+
       <HowItWorks />
 
-      {/* Customer testimonials */}
       <Testimonials />
 
-      {/* Bottom CTA banner */}
       <CtaBanner />
     </>
   )

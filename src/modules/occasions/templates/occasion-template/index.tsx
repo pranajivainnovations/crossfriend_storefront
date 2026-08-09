@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import type { DynamicOccasion } from "@lib/data/dynamic"
 import { getProductTypes } from "@lib/data/dynamic"
-import { getOccasionTypes } from "@lib/config/occasion-map.server"
+import { getOccasionTypeValues } from "@lib/data/taxonomy"
 import OccasionHero from "@modules/occasions/components/occasion-hero"
 import OccasionSection from "@modules/occasions/components/occasion-section"
 import QuickAddKit from "@modules/occasions/components/quick-add-kit"
@@ -25,14 +25,20 @@ export default async function OccasionTemplate({
 }: {
   occasion: DynamicOccasion
 }) {
-  // Fetch all crossfriend product types, then keep only those
-  // that type-occasion-map.json says belong on this occasion page.
-  // Edit src/lib/config/type-occasion-map.json + call /api/revalidate to update without redeployment.
-  const allTypes = await getProductTypes()
-  const mappedTypeValues = getOccasionTypes(occasion.slug)
-  const productTypes = allTypes.filter((pt) =>
-    mappedTypeValues.includes(pt.value as any)
-  )
+  // Which type sections this occasion shows, and in what order — both come from the taxonomy
+  // matrix (OPS → Taxonomy), so adding "Bouquets to Anniversary" is a checkbox, not a deploy.
+  //
+  // The matrix decides ORDER, so the sections are built by walking it rather than by filtering the
+  // type list: filtering would silently re-impose the type registry's own ordering and discard the
+  // per-occasion sequence ops set. Both calls share one taxonomy fetch (React cache).
+  const [allTypes, mappedValues] = await Promise.all([
+    getProductTypes(),
+    getOccasionTypeValues(occasion.slug),
+  ])
+  const byValue = new Map(allTypes.map((t) => [t.value, t]))
+  const productTypes = mappedValues
+    .map((v) => byValue.get(v))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t))
 
   return (
     <div>

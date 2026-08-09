@@ -49,19 +49,19 @@ const nextConfig = withStoreConfig({
   // Redirect trailing slashes for cleaner SEO URLs
   trailingSlash: false,
   /**
-   * /store was the old catalogue route; "Ready to Order" replaced it.
+   * /store previously 308'd to /ready-to-order. That was wrong and is removed.
    *
-   * Handled here rather than by a page calling permanentRedirect() so the redirect happens in the
-   * routing layer — no React render, no layout, and a real 308 that search engines and existing
-   * bookmarks follow. A redirect page had to render the whole app shell just to throw it away.
+   * The reasoning at the time — "two URLs for one catalogue splits search ranking" — assumed they
+   * were the same catalogue. They are not: /store is the whole CrossFriend catalogue sliced by
+   * occasion × product type, /ready-to-order is the baker marketplace sliced by the Ready-to-Order
+   * category tree. Collapsing them also silently destroyed type navigation, because ~30 links point
+   * at /store?type=… and the marketplace page never read that parameter.
    *
-   * Two URLs for one catalogue would also split search ranking and give customers two names for
-   * the same thing, which is why this is a redirect and not a second listing.
+   * /design-your-cake → /ai-cake-studio stays a real redirect (that one genuinely is one page under
+   * two names) and lives in its own page component.
    */
   async redirects() {
-    return [
-      { source: "/store", destination: "/ready-to-order", permanent: true },
-    ]
+    return []
   },
   // Headers for caching static assets
   async headers() {

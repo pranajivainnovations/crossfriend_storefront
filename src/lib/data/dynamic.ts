@@ -1,25 +1,25 @@
 /**
  * CrossFriend — Dynamic Data Layer
  *
- * This module fetches all "configuration" data dynamically from Medusa:
- * - Product types (cake, decor, gift, costume, wellness, toys, etc.)
- * - Occasion collections (birthday, anniversary, festival, etc.)
- * - Categories (parent & child)
+ * Product types and occasions come from the CrossFriend taxonomy (OPS → Taxonomy), which is a
+ * table with foreign keys rather than the JSON file + hardcoded map + frozen whitelist this used
+ * to read. Categories still come from Medusa directly.
  *
- * Nothing is hardcoded. Add/remove in Medusa admin and it appears/disappears
- * from the storefront automatically.
+ * Nothing is hardcoded. Adding a type or occasion in OPS makes it appear here within the cache
+ * window, with no deploy — which was the point: the previous PRODUCT_TYPES whitelist lived in a
+ * TypeScript array, so adding "Bouquets" required a code change, and the JSON silently discarded
+ * any key that array did not already contain.
  *
  * Convention:
- * - Occasions = collections with metadata.is_occasion = true
- * - Product types = Medusa product_types
- * - Categories = Medusa product_categories
+ * - Occasions     = crossfriend.occasions   (backed by a Medusa collection)
+ * - Product types = crossfriend.product_types (backed by a Medusa product_type)
+ * - Categories    = Medusa product_categories, filtered by metadata.brand
  */
 
 import { cache } from "react"
 import { ProductCollection } from "@medusajs/medusa"
-import { medusaClient } from "@lib/config"
-import { getCollectionsList, listCategories, getCategoriesList } from "@lib/data"
-import { loadConfiguredOccasions, loadConfiguredTypes } from "@lib/config/occasion-map.server"
+import { getCollectionsList, listCategories } from "@lib/data"
+import { getTaxonomy } from "@lib/data/taxonomy"
 
 // ============================================
 // Types
@@ -119,44 +119,30 @@ function getDefaultGradient(index: number): string {
 }
 
 // ============================================
-// Dynamic Occasions — JSON config is source of truth
+// Occasions — the CrossFriend taxonomy is source of truth
 // ============================================
 
 /**
- * Returns occasions in the order defined by `_occasions` in type-occasion-map.json.
- * Medusa collections are fetched to enrich with title/emoji/tagline metadata.
- * If a slug has no matching Medusa collection, sensible defaults are used.
+ * Active occasions, in the order set in OPS → Taxonomy.
  *
- * No metadata required in Medusa Admin — just create the collection with the
- * correct handle (e.g. "birthday") and it will be picked up automatically.
+ * Only occasions registered AND active in crossfriend.occasions are returned — a Medusa collection
+ * alone is not enough, which is what keeps Pranajiva's collections and CrossFriend's merchandising
+ * collections (Love, Corporate Gifting) out of occasion navigation.
  */
 export const getOccasions = cache(async function (): Promise<DynamicOccasion[]> {
-  try {
-    const configuredSlugs = loadConfiguredOccasions()
+  const { occasions } = await getTaxonomy()
 
-    const { collections } = await getCollectionsList(0, 100)
-    const collectionByHandle = new Map(
-      (collections ?? []).map((col) => [col.handle.toLowerCase(), col])
-    )
-
-    return configuredSlugs.map((slug, index) => {
-      const col = collectionByHandle.get(slug.toLowerCase())
-      return {
-        id: col?.id ?? slug,
-        slug,
-        label: col?.title ?? capitalizeFirst(slug),
-        tagline:
-          (col?.metadata?.tagline as string) ??
-          `Shop for your ${(col?.title ?? slug).toLowerCase()} celebration`,
-        emoji: (col?.metadata?.emoji as string) ?? getDefaultEmoji(slug),
-        gradient: (col?.metadata?.gradient as string) ?? getDefaultGradient(index),
-        priority: Number(col?.metadata?.priority) || index,
-      }
-    })
-  } catch (error) {
-    console.error("[CrossFriend] Failed to fetch occasions:", error)
-    return []
-  }
+  return occasions.map((o, index) => ({
+    id: o.id,
+    slug: o.handle,
+    label: o.label,
+    tagline: o.tagline ?? `Shop for your ${o.label.toLowerCase()} celebration`,
+    emoji: o.emoji ?? getDefaultEmoji(o.handle),
+    // Gradient is presentation the taxonomy may not carry for a newly added occasion; cycling the
+    // house palette is better than a missing background.
+    gradient: o.gradient ?? getDefaultGradient(index),
+    priority: o.order,
+  }))
 })
 
 /**
@@ -170,45 +156,27 @@ export const getOccasionBySlug = cache(async function (
 })
 
 // ============================================
-// Dynamic Product Types — JSON config is source of truth
+// Product Types — the CrossFriend taxonomy is source of truth
 // ============================================
 
 /**
- * Returns product types in the order defined by `_types` in type-occasion-map.json.
- * Medusa product_types are fetched to enrich with emoji/label metadata.
- * If a value has no matching Medusa product type, sensible defaults are used.
+ * Active product types, in the order set in OPS → Taxonomy.
  *
- * No metadata required in Medusa Admin — just create a product type whose
- * value matches a key in type-occasion-map.json (e.g. "cake").
+ * `href` points at /store?type=<value>, which filters the catalogue by that type. Every value here
+ * is guaranteed to exist as a real Medusa product_type, because the registry holds a foreign key to
+ * it — the previous config could name a type Medusa did not have, and five of six did.
  */
 export const getProductTypes = cache(async function (): Promise<DynamicProductType[]> {
-  try {
-    const configuredValues = loadConfiguredTypes()
+  const { types } = await getTaxonomy()
 
-    const { product_types } = await medusaClient.productTypes.list(
-      { limit: 100 },
-      { next: { tags: ["product-types"] } }
-    )
-
-    const typeByValue = new Map(
-      (product_types ?? []).map((pt: any) => [pt.value.toLowerCase(), pt])
-    )
-
-    return configuredValues.map((value, index) => {
-      const pt = typeByValue.get(value.toLowerCase())
-      return {
-        id: pt?.id ?? value,
-        value: value.toLowerCase(),
-        label: (pt?.metadata?.label as string) ?? capitalizeFirst(value),
-        emoji: (pt?.metadata?.emoji as string) ?? getDefaultEmoji(value),
-        href: `/store?type=${value.toLowerCase()}`,
-        priority: Number(pt?.metadata?.priority) || index,
-      }
-    })
-  } catch (error) {
-    console.error("[CrossFriend] Failed to fetch product types:", error)
-    return []
-  }
+  return types.map((t) => ({
+    id: t.id,
+    value: t.value,
+    label: t.label,
+    emoji: t.emoji ?? getDefaultEmoji(t.value),
+    href: `/store?type=${t.value}`,
+    priority: t.order,
+  }))
 })
 
 // ============================================
@@ -264,10 +232,5 @@ export const getRegularCollections = cache(async function (): Promise<ProductCol
   }
 })
 
-// ============================================
-// Utilities
-// ============================================
-
-function capitalizeFirst(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1)
-}
+// `capitalizeFirst` lived here to invent a label when the config named a type Medusa did not have.
+// The taxonomy always carries a real label, so there is nothing left to guess.

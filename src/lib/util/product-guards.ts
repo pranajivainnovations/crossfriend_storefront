@@ -14,7 +14,6 @@ import {
   ProductMetadata,
   OCCASION_COLLECTIONS,
   OccasionCollection,
-  TYPE_OCCASION_MAP,
 } from "@lib/types/product-contract"
 
 // --- Type Guards ---
@@ -88,44 +87,18 @@ export function getOccasions(product: PricedProduct): OccasionCollection[] {
   return []
 }
 
-/**
- * Resolve the full list of occasions this product should appear on.
+/*
+ * getProductOccasions() and isForOccasion() were removed here.
  *
- * Priority order:
- *   1. metadata.occasions  — per-product override set in Medusa Admin
- *                            (comma-separated, e.g. "special,anniversary")
- *   2. TYPE_OCCASION_MAP   — default rule for the product's type
- *   3. collection handle   — fallback: just the assigned collection
+ * They resolved a product's occasions from TYPE_OCCASION_MAP — one of four copies of the
+ * occasion × type mapping that had drifted apart from each other and from the database. That
+ * relationship now lives in Postgres and is read through @lib/data/taxonomy.
+ *
+ * Both had zero callers, so no behaviour depended on the second answer they produced. They are
+ * deleted rather than repointed because per-product occasion resolution is not something the
+ * storefront needs: the matrix places a product by its type, so a product carries no occasion data
+ * of its own beyond its one curated collection.
  */
-export function getProductOccasions(product: PricedProduct): OccasionCollection[] {
-  // 1. Per-product metadata override
-  const metaOccasions = getMetadata(product).occasions
-  if (metaOccasions) {
-    return metaOccasions
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter((s): s is OccasionCollection =>
-        (OCCASION_COLLECTIONS as readonly string[]).includes(s)
-      )
-  }
-
-  // 2. Type-level default from TYPE_OCCASION_MAP
-  const type = getProductType(product)
-  if (type && TYPE_OCCASION_MAP[type]) {
-    return TYPE_OCCASION_MAP[type]
-  }
-
-  // 3. Fallback: just the assigned collection
-  return getOccasions(product)
-}
-
-/** Check if a product should appear on a specific occasion page. */
-export function isForOccasion(
-  product: PricedProduct,
-  occasion: OccasionCollection
-): boolean {
-  return getProductOccasions(product).includes(occasion)
-}
 
 // --- Tag Guards ---
 
