@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 import OrderTracker from "@modules/order/components/order-tracker"
+import { getSiteSettings, whatsappUrl } from "@lib/data/site-settings"
 
 export const metadata: Metadata = {
   alternates: { canonical: "/order/track" },
@@ -7,7 +8,9 @@ export const metadata: Metadata = {
   description: "Track the status of your CrossFriend order in real-time.",
 }
 
-export default function OrderTrackPage() {
+export default async function OrderTrackPage() {
+  const settings = await getSiteSettings()
+
   // In production, this would fetch from API based on order ID / session
   // For now, show a demo tracker + search input
   return (
@@ -41,7 +44,15 @@ export default function OrderTrackPage() {
       {/* Help text */}
       <div className="mt-8 p-4 bg-cf-warm rounded-xl text-center">
         <p className="text-sm text-grey-60">
-          Can&apos;t find your order? <a href="https://wa.me/919876543210" target="_blank" rel="noopener noreferrer" className="text-cf-orange font-medium hover:underline">Chat with us on WhatsApp</a>
+          Can&apos;t find your order?{" "}
+          <a
+            href={whatsappUrl(settings.whatsappNumber, "Hi! I can't find my CrossFriend order.")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cf-orange font-medium hover:underline"
+          >
+            Chat with us on WhatsApp
+          </a>
         </p>
       </div>
     </div>

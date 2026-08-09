@@ -6,9 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # THIS is the one that decides canonical URLs — build args are baked in by the bundler.
-        # Changing it requires a rebuild (`docker compose up -d --build`); `up` alone reuses the
-        # existing image and silently keeps the old value.
+        # Build-time environment variables (NEXT_PUBLIC_* are baked into client JS)
+        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://api.pranajiva.in}
         NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://crossfriend.in}
         NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
     image: crossfriend-storefront:latest
@@ -16,20 +15,19 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Runtime environment variables — Medusa URL is ONLY set here (or .env)
+      # Runtime environment variables
       NODE_ENV: production
       PORT: 8000
-      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9001}
-      # Kept only so the value is visible when inspecting a running container. It has NO effect on
-      # rendered URLs — that was verified by building with one value and starting with another:
-      # the build-time value won. Do not expect changing this line to fix a canonical.
+      # Server-side URL (container → host) for SSR
+      MEDUSA_BACKEND_URL: https://api.pranajiva.in
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://api.pranajiva.in}
       NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://crossfriend.in}
       NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://crossfriend.in"]
       interval: 30s
       timeout: 10s
       retries: 3

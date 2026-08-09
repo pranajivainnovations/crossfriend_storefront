@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import { Inter, Poppins } from "next/font/google"
 import "styles/globals.css"
 
-import { SOCIAL_PROFILES } from "@lib/constants/legal"
+import { getSiteSettings } from "@lib/data/site-settings"
 import {
   BASE_URL,
   ORGANIZATION_ID,
@@ -71,7 +71,16 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout(props: { children: React.ReactNode }) {
+export default async function RootLayout(props: { children: React.ReactNode }) {
+  /**
+   * sameAs now comes from OPS site settings rather than a compiled-in list, so adding a social
+   * account is a form field instead of a deploy. This is the property that tells Google and AI
+   * answer engines that this site, the Instagram account and the Google Business Profile are one
+   * business — without it each mention is orphaned and none accumulate to the same brand.
+   */
+  const settings = await getSiteSettings()
+  const sameAs = settings.socialLinks.map((link) => link.url)
+
   /**
    * Site-wide identity. Every other page's structured data references these two by @id rather
    * than repeating the organisation inline, which is what lets Google treat "the seller of this
@@ -93,8 +102,9 @@ export default function RootLayout(props: { children: React.ReactNode }) {
       description:
         "Cakes, decorations, gifts and costumes for every celebration, from local bakers and makers.",
       areaServed: { "@type": "Country", name: "India" },
-      // Only when there is something to point at — see SOCIAL_PROFILES.
-      ...(SOCIAL_PROFILES.length ? { sameAs: SOCIAL_PROFILES } : {}),
+      // Only when there is something to point at: `sameAs: []` asserts "this brand exists nowhere
+      // else", which is a worse claim than saying nothing.
+      ...(sameAs.length ? { sameAs } : {}),
       address: {
         "@type": "PostalAddress",
         addressLocality: "Ghaziabad",
@@ -105,8 +115,10 @@ export default function RootLayout(props: { children: React.ReactNode }) {
       contactPoint: {
         "@type": "ContactPoint",
         contactType: "customer support",
-        email: "support@crossfriend.in",
-        telephone: "+91-9821101868",
+        // From settings, so a support number changed in OPS is corrected in the structured data
+        // too — otherwise the markup keeps telling search engines an old number indefinitely.
+        email: settings.supportEmail,
+        telephone: settings.supportPhone,
         areaServed: "IN",
         availableLanguage: ["en", "hi"],
       },

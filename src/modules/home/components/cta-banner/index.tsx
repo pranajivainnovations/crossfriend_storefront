@@ -3,7 +3,11 @@
 import { motion } from "framer-motion"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
-export default function CtaBanner() {
+/**
+ * The WhatsApp number arrives as a prop rather than being written into the markup — this file was
+ * one of three carrying the same placeholder literal.
+ */
+export default function CtaBanner({ whatsappNumber }: { whatsappNumber: string }) {
   return (
     <section className="content-container py-16">
       <motion.div
@@ -39,7 +43,7 @@ export default function CtaBanner() {
               </svg>
             </LocalizedClientLink>
             <a
-              href="https://wa.me/919876543210"
+              href={`https://wa.me/${whatsappNumber.replace(/\D/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/30 text-white font-semibold text-base hover:bg-white/20 transition-all duration-200"

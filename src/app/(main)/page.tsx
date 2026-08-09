@@ -11,6 +11,7 @@ import CategoryStrip from "@modules/home/components/category-strip"
 import HowItWorks from "@modules/home/components/how-it-works"
 import Testimonials from "@modules/home/components/testimonials"
 import CtaBanner from "@modules/home/components/cta-banner"
+import { getSiteSettings } from "@lib/data/site-settings"
 // IntentPaths is retired: the hero now carries both intents itself — the prompt bar is the Studio
 // path and "browse cakes ready to order" is the shop path. Two cards restating that immediately
 // below the hero asked the same question twice.
@@ -113,7 +114,11 @@ const getCollectionsWithProducts = cache(
 export default async function Home() {
   // Independent — collections/products and region resolution don't depend on each other, so there's
   // no reason for the remote-DB round trips to happen one after another.
-  const [collections, region] = await Promise.all([getCollectionsWithProducts(), getRegion()])
+  const [collections, region, settings] = await Promise.all([
+    getCollectionsWithProducts(),
+    getRegion(),
+    getSiteSettings(),
+  ])
 
   if (!collections || !region) {
     return null
@@ -179,7 +184,7 @@ export default async function Home() {
 
       <Testimonials />
 
-      <CtaBanner />
+      <CtaBanner whatsappNumber={settings.whatsappNumber} />
     </>
   )
 }

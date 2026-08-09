@@ -2,13 +2,22 @@
 
 import { useState } from "react"
 
-const WHATSAPP_NUMBER = "919876543210" // Replace with actual number
+/**
+ * The number is now a prop, resolved on the server from OPS site settings.
+ *
+ * It used to be a module constant reading `919876543210` — the standard dummy Indian number — with
+ * a "Replace with actual number" comment beside it. Every customer who tapped this button on any
+ * page was sent to a stranger, and nothing about the site looked wrong, so it survived to
+ * production. Contact details do not belong in component source.
+ */
 const DEFAULT_MESSAGE = "Hi! I need help with my order on CrossFriend."
 
-export default function WhatsAppWidget() {
+export default function WhatsAppWidget({ number }: { number: string }) {
   const [isHovered, setIsHovered] = useState(false)
 
-  const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(DEFAULT_MESSAGE)}`
+  const whatsappUrl = `https://wa.me/${number.replace(/\D/g, "")}?text=${encodeURIComponent(
+    DEFAULT_MESSAGE
+  )}`
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
