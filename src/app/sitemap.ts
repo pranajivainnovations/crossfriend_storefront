@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next"
 
-import { listBakers } from "@lib/data/bakers"
+import { listAllBakerSlugsOrThrow } from "@lib/data/bakers"
 import { getTaxonomy } from "@lib/data/taxonomy"
-import { getProductsList } from "@lib/data"
+import { getCollectionsList, getProductsList, listCategories } from "@lib/data"
 import { BASE_URL } from "@lib/util/seo"
 
 /**
@@ -10,10 +10,95 @@ import { BASE_URL } from "@lib/util/seo"
  * because the previous (never-running) next-sitemap config enumerated only static paths — it would
  * have shipped a sitemap containing no products and no bakers, which is close to shipping none.
  *
- * Regenerated hourly. Frequent enough that a baker's new product is discoverable the same day,
- * infrequent enough that a crawler cannot make the catalogue query run on every hit.
+ * Generated at runtime and held in memory for 15 minutes. Frequent enough that a baker's new
+ * product is discoverable the same day, infrequent enough that a crawler cannot make the full
+ * catalogue walk run on every hit.
  */
-export const revalidate = 3600
+/**
+ * Generated per request, never at build time.
+ *
+ * This was `export const revalidate = 3600`, which let Next prerender the sitemap during
+ * `npm run build` inside the Docker image. MEDUSA_BACKEND_URL does not exist at build time — it is
+ * supplied by compose when the container starts — so all three data fetches fell back to
+ * http://localhost:9000, failed, hit their catch blocks, and a sitemap containing only the 13
+ * static paths was baked into the image and served with `x-nextjs-cache: HIT` from then on.
+ * Products, bakers, occasions and type pages were all silently absent from what Google was told.
+ *
+ * It is the same class of bug as the localhost canonical: a value that only exists at runtime being
+ * read during the build. Rather than pass the backend URL as a build arg — which would make every
+ * image build depend on the production API being reachable, and fail just as silently when it is
+ * not — the route is simply excluded from static generation. A sitemap is fetched by crawlers a
+ * handful of times a day, so per-request generation costs almost nothing and cannot go stale.
+ */
+export const dynamic = "force-dynamic"
+
+/**
+ * force-dynamic keeps the route out of the build, but on its own it also means a full catalogue
+ * walk on every hit — and the sitemap is a public URL anyone can request in a loop. This module
+ * cache keeps the two properties apart: generation always happens at runtime with real env, and
+ * repeated requests inside the window are served from memory.
+ *
+ * In-memory and per-container by design. There is one container, the payload is small, and a cache
+ * that disappears on restart is exactly right for something derived entirely from upstream data.
+ */
+const CACHE_TTL_MS = 15 * 60 * 1000
+let cached: { at: number; entries: MetadataRoute.Sitemap } | null = null
+
+/** Paths that must never appear: private, infinite, or a redirect. Kept next to robots.ts intent. */
+const FORBIDDEN_SEGMENTS = [
+  "/account",
+  "/cart",
+  "/checkout",
+  "/order/confirmed",
+  "/search",
+  "/results/",
+  "/design-your-cake",
+]
+
+/**
+ * Last line of defence before the file is published.
+ *
+ * Every failure it checks for has actually happened in this project or is one edit away: a
+ * localhost URL from a build-time env miss, a duplicate from two sources emitting the same page, a
+ * redirect entry from someone adding a path without checking where it goes. A sitemap is trusted
+ * far more literally than a page, so it is worth refusing to serve a bad one.
+ */
+function validate(entries: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
+  const seen = new Set<string>()
+  const deduped: MetadataRoute.Sitemap = []
+
+  for (const entry of entries) {
+    const url = entry.url
+
+    // Only fatal in production. In development BASE_URL is http://localhost:8000 by design, and a
+    // dev sitemap full of localhost URLs is correct — it is never published. Guarding on NODE_ENV
+    // rather than on the string alone keeps the check meaningful where it matters and silent where
+    // it would just break local work.
+    if (
+      process.env.NODE_ENV === "production" &&
+      (url.includes("localhost") || url.includes("127.0.0.1"))
+    ) {
+      throw new Error(`[sitemap] refusing to publish a localhost URL: ${url}`)
+    }
+    if (!url.startsWith(BASE_URL)) {
+      throw new Error(`[sitemap] refusing to publish an off-site URL: ${url}`)
+    }
+
+    const path = url.slice(BASE_URL.length)
+    const forbidden = FORBIDDEN_SEGMENTS.find((segment) => path.startsWith(segment))
+    if (forbidden) {
+      throw new Error(`[sitemap] refusing to publish a private or redirecting URL: ${url}`)
+    }
+
+    // Duplicates are dropped rather than thrown on: two sources legitimately describing the same
+    // page is a modelling overlap, not corruption, and the first one wins deterministically.
+    if (seen.has(url)) continue
+    seen.add(url)
+    deduped.push(entry)
+  }
+
+  return deduped
+}
 
 const STATIC_PATHS: Array<{
   path: string
@@ -26,6 +111,17 @@ const STATIC_PATHS: Array<{
   { path: "/ready-to-order", priority: 0.8, changeFrequency: "daily" },
   { path: "/bakers", priority: 0.8, changeFrequency: "weekly" },
   { path: "/occasions", priority: 0.8, changeFrequency: "weekly" },
+  // A tool page rather than a product page, but it is the entry point for a whole class of
+  // informational queries, so it is ranked with the commercial pages rather than the legal ones.
+  { path: "/cake-size-calculator", priority: 0.7, changeFrequency: "monthly" },
+  // Original designs with original images — the one kind of page nobody else can publish.
+  { path: "/ai-cake-studio/gallery", priority: 0.8, changeFrequency: "daily" },
+  // Listing pages for the two browse hierarchies. Their individual pages are enumerated below.
+  { path: "/categories", priority: 0.7, changeFrequency: "weekly" },
+  { path: "/collections", priority: 0.7, changeFrequency: "weekly" },
+  // NOT listed: /design-your-cake redirects to /ai-cake-studio, and a sitemap entry that redirects
+  // wastes crawl budget and reports as an error in Search Console. /search, /cart, /account and
+  // /results/[query] are excluded for the same class of reason — private, or infinite URL space.
   // Legal pages carry little ranking weight but their absence is conspicuous to a reviewer
   // assessing whether a storefront is a real business.
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
@@ -79,66 +175,152 @@ async function collectProductEntries(now: Date): Promise<MetadataRoute.Sitemap> 
   return entries
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+/**
+ * Builds the entry list. Throws if any upstream source ERRORS.
+ *
+ * The distinction that matters is error versus legitimately empty. A marketplace with no products
+ * yet should publish a sitemap of its real pages — that is honest. A marketplace whose backend is
+ * down must publish nothing at all, because a 200 response listing 16 URLs tells Google those are
+ * the only pages that exist, and Google acts on it. A 500 is simply retried later.
+ *
+ * So nothing here is wrapped in a catch that substitutes an empty array. Failures propagate.
+ */
+async function buildEntries(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
 
-  // Independent sources, fetched together. Each is individually guarded below, because one
-  // unavailable backend must not produce an empty sitemap for the entire site — an empty sitemap
-  // is a positive statement that the site has no pages.
-  const [productEntries, bakerResult, taxonomy] = await Promise.all([
-    collectProductEntries(now).catch((error) => {
-      console.error("[sitemap] product listing failed", error)
-      return [] as MetadataRoute.Sitemap
-    }),
-    listBakers({ limit: 200 }).catch((error) => {
-      console.error("[sitemap] baker directory failed", error)
-      return null
-    }),
-    getTaxonomy().catch((error) => {
-      console.error("[sitemap] taxonomy failed", error)
-      return null
-    }),
-  ])
+  const [productEntries, bakerSlugs, taxonomy, collectionResult, categoryResult] =
+    await Promise.all([
+      collectProductEntries(now),
+      listAllBakerSlugsOrThrow(),
+      getTaxonomy(),
+      // Both are filtered to metadata.brand === "crossfriend" by the data layer, so Pranajiva's
+      // collections and categories cannot leak into this site's sitemap.
+      getCollectionsList(0, PAGE_SIZE),
+      listCategories(),
+    ])
 
+  // Verified against production: collections count 13, categories count 27, and the API honours
+  // limit=100 for both. Neither is near the ceiling, but silence at the boundary is how the baker
+  // truncation went unnoticed, so say something rather than nothing.
+  if (collectionResult.count > PAGE_SIZE) {
+    console.error(
+      `[sitemap] ${collectionResult.count} collections exceeds the ${PAGE_SIZE} fetched — sitemap is truncated, add pagination`
+    )
+  }
+  if (categoryResult.length >= PAGE_SIZE) {
+    console.error(
+      `[sitemap] category fetch hit the ${PAGE_SIZE} limit — crossfriend categories may be missing, add pagination`
+    )
+  }
+
+  // No lastModified. These change only when the site is redeployed, and there is no per-path date
+  // to report; stamping "now" would tell crawlers every page changed on every fetch, which is both
+  // untrue and self-defeating — a lastModified that is always current carries no information.
   const staticEntries: MetadataRoute.Sitemap = STATIC_PATHS.map(
     ({ path, priority, changeFrequency }) => ({
       url: `${BASE_URL}${path}`,
-      lastModified: now,
       changeFrequency,
       priority,
     })
   )
 
-  const bakerEntries: MetadataRoute.Sitemap = (bakerResult?.bakers ?? [])
-    .filter((baker) => Boolean(baker.slug))
-    .map((baker) => ({
-      url: `${BASE_URL}/bakers/${baker.slug}`,
-      lastModified: now,
-      changeFrequency: "weekly" as const,
-      priority: 0.7,
-    }))
+  // The baker payload carries no created_at or updated_at — confirmed against the live API — so
+  // lastModified is omitted rather than faked.
+  const bakerEntries: MetadataRoute.Sitemap = bakerSlugs.map((slug) => ({
+    url: `${BASE_URL}/bakers/${slug}`,
+    changeFrequency: "weekly" as const,
+    priority: 0.7,
+  }))
 
   // Occasion and type pages are the taxonomy's whole reason for existing — they are the landing
-  // pages for "birthday cake", which is what people actually search for.
+  // pages for "birthday cake", which is what people actually search for. The taxonomy payload is
+  // presentation data (handle, label, emoji, order) with no timestamps, so again no lastModified.
   const occasionEntries: MetadataRoute.Sitemap = (taxonomy?.occasions ?? []).map((occasion) => ({
     url: `${BASE_URL}/occasions/${occasion.handle}`,
-    lastModified: now,
     changeFrequency: "weekly" as const,
     priority: 0.8,
   }))
 
+  // Collection pages are the "birthday cakes", "chocolate cakes" landing pages — the phrases people
+  // actually type. Higher intent than a product page and far more durable, since a collection
+  // outlives any individual product in it.
+  const collectionEntries: MetadataRoute.Sitemap = (collectionResult?.collections ?? [])
+    .filter((collection) => Boolean(collection.handle))
+    .map((collection) => ({
+      url: `${BASE_URL}/collections/${collection.handle}`,
+      // Real updated_at, verified present on the live API. This is the one signal here worth
+      // sending, so it is sent honestly rather than defaulted to now.
+      ...(collection.updated_at ? { lastModified: new Date(collection.updated_at) } : {}),
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    }))
+
+  // Top-level categories only. The route is a catch-all ([...category]) where a child lives at
+  // /categories/parent/child, and emitting a guessed path that 404s is worse than omitting it —
+  // Search Console reports it as an error and it burns crawl budget. /categories/<handle> is the
+  // form the mega-menu already links, so these URLs are known to resolve.
+  const categoryEntries: MetadataRoute.Sitemap = (categoryResult ?? [])
+    .filter((category) => Boolean(category.handle) && !category.parent_category_id)
+    .map((category) => ({
+      url: `${BASE_URL}/categories/${category.handle}`,
+      ...(category.updated_at ? { lastModified: new Date(category.updated_at) } : {}),
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    }))
+
+  /**
+   * These parameterised URLs are intentional, indexable pages — not an oversight.
+   *
+   * `generateMetadata` in app/(main)/store/page.tsx sets `canonical: /store?<params>` for exactly
+   * this shape, deliberately: the filtered views were previously six URLs sharing one title, one
+   * description and no canonical, competing with each other as duplicates. Sort and page are
+   * excluded from that canonical, and are excluded here too, so the sitemap and the canonical agree
+   * on precisely one URL per filter.
+   *
+   * URLSearchParams and encodeURIComponent agree for every current type value (cake, decor, gift,
+   * …). If a value ever contains a character they encode differently, this and the canonical would
+   * disagree and the page would be self-referentially non-canonical.
+   */
   const typeEntries: MetadataRoute.Sitemap = (taxonomy?.types ?? []).map((type) => ({
     url: `${BASE_URL}/store?type=${encodeURIComponent(type.value)}`,
-    lastModified: now,
     changeFrequency: "weekly" as const,
     priority: 0.6,
   }))
 
-  return [
+  // Order is not a ranking signal, but it makes the file readable when someone opens it to check
+  // whether the dynamic sections are populated — the failure mode this sitemap has actually had.
+  return validate([
     ...staticEntries,
     ...occasionEntries,
+    ...collectionEntries,
+    ...categoryEntries,
     ...typeEntries,
     ...bakerEntries,
     ...productEntries,
-  ]
+  ])
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return cached.entries
+  }
+
+  try {
+    const entries = await buildEntries()
+    cached = { at: Date.now(), entries }
+    return entries
+  } catch (error) {
+    // Serving the previous good sitemap through a brief backend blip is strictly better than
+    // serving a truncated one, and better than a 500 Google might interpret as the file being gone.
+    if (cached) {
+      console.error("[sitemap] build failed — serving last known good sitemap", error)
+      return cached.entries
+    }
+
+    // Nothing cached and the backend is unreachable. Rethrowing produces a 5xx, which Google treats
+    // as "try again later" and leaves the existing index untouched. The alternative — returning the
+    // static paths alone — is a 200 that positively asserts this site has 16 pages.
+    console.error("[sitemap] build failed with no cached fallback — returning 5xx", error)
+    throw error
+  }
 }

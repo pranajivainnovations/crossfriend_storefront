@@ -13,7 +13,11 @@ import { usePlanning } from "@modules/planning/context/planning-context"
 
 const SideMenuItems = {
   Home: "/",
+  "AI Cake Studio": "/ai-cake-studio",
   "Ready to Order": "/ready-to-order",
+  // A tool page rather than a shopping page, but it is the entry point for a whole class of
+  // searches ("how much cake for 20 people") and needs to be reachable without hunting for it.
+  "Cake Size Calculator": "/cake-size-calculator",
   Search: "/search",
   Account: "/account",
   Cart: "/cart",

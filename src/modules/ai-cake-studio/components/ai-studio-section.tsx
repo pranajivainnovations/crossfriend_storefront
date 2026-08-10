@@ -578,6 +578,27 @@ export default function AiStudioSection({ customer }: Props) {
     !referenceUploading
   const cfMessage = CF_OCCASION_MESSAGES[sel.occasion] ?? CF_OCCASION_MESSAGES["Special"]
 
+  /**
+   * Keeps what the customer already chose, unless the loaded options no longer contain it.
+   *
+   * This used to be `options?.[0]?.value ?? prev.value`, which unconditionally replaced weight,
+   * style, occasion and flavour with the FIRST option the moment the config fetch resolved. The
+   * fetch races the customer: choose 1 kg before it lands and the selection was silently reset to
+   * 0.5 kg — the first weight in the list. Worse, the reset was invisible in the generator, so the
+   * design was made at one weight and the price panel opened at another, and the customer only
+   * noticed when correcting it changed the price.
+   *
+   * The `[0]` fallback still exists, but only for its real purpose: a value that came from the
+   * hardcoded fallback list and genuinely is not offered by the live config.
+   */
+  const keepIfStillOffered = <T extends { value: string }>(
+    current: string,
+    options: T[] | undefined
+  ): string => {
+    if (!options?.length) return current
+    return options.some((option) => option.value === current) ? current : options[0].value
+  }
+
   // Load selectors + AI model options from config
   useEffect(() => {
     fetch("/api/ai-cake-studio-config")
@@ -594,10 +615,10 @@ export default function AiStudioSection({ customer }: Props) {
           setSelectors(data.selectors)
           setSel((prev) => ({
             ...prev,
-            style: data.selectors!.styles?.[0]?.value ?? prev.style,
-            occasion: data.selectors!.occasions?.[0]?.value ?? prev.occasion,
-            flavor: data.selectors!.flavors?.[0]?.value ?? prev.flavor,
-            weight: data.selectors!.weights?.[0]?.value ?? prev.weight,
+            style: keepIfStillOffered(prev.style, data.selectors!.styles),
+            occasion: keepIfStillOffered(prev.occasion, data.selectors!.occasions),
+            flavor: keepIfStillOffered(prev.flavor, data.selectors!.flavors),
+            weight: keepIfStillOffered(prev.weight, data.selectors!.weights),
           }))
         }
         const fetchedOptions = data.aiImageModels?.options
@@ -819,6 +840,12 @@ export default function AiStudioSection({ customer }: Props) {
       style: sel.style,
       occasion: sel.occasion,
       flavor: sel.flavor,
+      // weight belongs here with tiers and shape — it is part of what the image depicts, not a
+      // later checkout choice. It was the one field of the three left out, so every design ever
+      // generated stored NULL for it. That NULL is why adopting a community cake did not carry its
+      // size over: the showcase response drops the key, the adopt handler sees nothing to apply,
+      // and the customer's own current weight silently priced someone else's cake.
+      weight: sel.weight,
       tiers: sel.tiers,
       shape: sel.shape,
       color: sel.color,

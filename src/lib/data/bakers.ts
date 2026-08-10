@@ -66,6 +66,44 @@ const EMPTY_LIST: BakerListResult = {
   pagination: { page: 1, limit: 24, total: 0, hasMore: false },
 }
 
+/**
+ * Every published baker slug, for the sitemap. Paginates, and THROWS on failure.
+ *
+ * Two things make this separate from `listBakers` below rather than an option on it.
+ *
+ * `listBakers` deliberately swallows errors and returns an empty list, because a directory page
+ * that throws takes a nav link down with it. That is right for a page and wrong for a sitemap: an
+ * empty result and a dead backend become indistinguishable, so an outage would publish a sitemap
+ * that omits every baker while still returning 200. Google believes a 200. It retries a 500.
+ *
+ * The backend also caps `limit` at 50 regardless of what is asked for — verified against
+ * production, which returned `"limit":50` for a request of 200 — so a single call silently
+ * truncates once there are more than 50 bakers. This walks `page` until `hasMore` is false.
+ */
+export async function listAllBakerSlugsOrThrow(): Promise<string[]> {
+  const slugs: string[] = []
+  // A ceiling, not an expectation: stops a broken `hasMore` contract from looping forever.
+  const MAX_PAGES = 100
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/bakers?page=${page}&limit=50`, {
+      cache: "no-store",
+    })
+    if (!res.ok) {
+      throw new Error(`baker directory returned ${res.status} on page ${page}`)
+    }
+
+    const result = (await res.json()) as BakerListResult
+    for (const baker of result.bakers ?? []) {
+      if (baker.slug) slugs.push(baker.slug)
+    }
+
+    if (!result.pagination?.hasMore) return slugs
+  }
+
+  throw new Error(`baker pagination exceeded ${MAX_PAGES} pages — refusing to build a partial list`)
+}
+
 export const listBakers = cache(async function listBakers(params: {
   q?: string
   city?: string

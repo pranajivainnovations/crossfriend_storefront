@@ -12,23 +12,18 @@ import {
   type SavedAiCakeProduct,
 } from "../actions"
 
-// ─── Pricing types (matches new config structure) ────────────────────────────
 
-interface PricingConfig {
-  currency: string
-  disclaimer: string
-  baseByWeight: Record<string, number>
-  tierMultiplier: Record<string, number>
-  shapeAdjustment: Record<string, number>
-  styleAdjustment: Record<string, number>
-  flavorAdjustment: Record<string, number>
-  options: {
-    expressDelivery: number
-    midnightDelivery: number
-    messageOnCake: number
-    photoOnCake: number
-  }
-}
+/**
+ * Copy, not configuration — the only pricing-adjacent string left in this file.
+ *
+ * Everything numeric now comes from the OPS pricing engine via /store/ai-studio/price. The static
+ * `pricing` block this component used to read (baseByWeight, tierMultiplier, shapeAdjustment,
+ * styleAdjustment, flavorAdjustment, options) is gone: it was a second implementation of the price,
+ * bundled with the storefront, that could not be changed from OPS and disagreed with the engine the
+ * moment either side was edited.
+ */
+const PRICE_DISCLAIMER =
+  "Indicative price only. Final price will be confirmed by your baker based on design complexity and location."
 
 interface SelectorOption {
   value: string
@@ -58,17 +53,6 @@ interface EstimatorSelections {
 }
 
 // ─── Fallback config ─────────────────────────────────────────────────────────
-
-const FALLBACK_PRICING: PricingConfig = {
-  currency: "₹",
-  disclaimer: "Indicative price only. Final price will be confirmed by your baker.",
-  baseByWeight: { "0.5": 500, "1": 900, "1.5": 1350, "2": 1800, "2.5": 2250, "3": 2700, "4": 3600, "5": 4500 },
-  tierMultiplier: { "1": 1.0, "2": 1.4, "3": 1.8, "4": 2.3 },
-  shapeAdjustment: { Round: 0, Square: 150, Heart: 200, Oval: 150 },
-  styleAdjustment: { Realistic: 0, Cartoon: 200, Luxury: 500, Minimal: 0, "3D Sculpted": 600, Wedding: 400, Kids: 200 },
-  flavorAdjustment: { Chocolate: 0, Vanilla: 0, "Red Velvet": 100, Strawberry: 100, Butterscotch: 50, "Salted Caramel": 150, Mango: 150, Blueberry: 200, Lemon: 100 },
-  options: { expressDelivery: 300, midnightDelivery: 200, messageOnCake: 50, photoOnCake: 150 },
-}
 
 const FALLBACK_SELECTORS: SelectorsConfig = {
   weights: [
@@ -121,56 +105,6 @@ const FALLBACK_ADDONS: Addon[] = [
 
 // ─── Price calculation ───────────────────────────────────────────────────────
 
-function computePrice(
-  sel: EstimatorSelections,
-  style: string,
-  pricing: PricingConfig
-): { total: number; breakdown: { label: string; amount: number }[] } {
-  const breakdown: { label: string; amount: number }[] = []
-
-  // Base price from weight
-  const base = pricing.baseByWeight[sel.weight] ?? 900
-  breakdown.push({ label: `Base (${sel.weight} kg)`, amount: base })
-
-  // Tier multiplier
-  const multiplier = pricing.tierMultiplier[sel.tiers] ?? 1.0
-  const tierExtra = Math.round(base * (multiplier - 1))
-  if (tierExtra > 0) {
-    breakdown.push({ label: `${sel.tiers === "1" ? "Single" : sel.tiers + " tier"} (×${multiplier})`, amount: tierExtra })
-  }
-
-  // Shape
-  const shapeExtra = pricing.shapeAdjustment[sel.shape] ?? 0
-  if (shapeExtra > 0) {
-    breakdown.push({ label: `${sel.shape} shape`, amount: shapeExtra })
-  }
-
-  // Style
-  const styleExtra = pricing.styleAdjustment[style] ?? 0
-  if (styleExtra > 0) {
-    breakdown.push({ label: `${style} style`, amount: styleExtra })
-  }
-
-  // Flavor
-  const flavorExtra = pricing.flavorAdjustment[sel.flavor] ?? 0
-  if (flavorExtra > 0) {
-    breakdown.push({ label: `${sel.flavor} flavor`, amount: flavorExtra })
-  }
-
-  // Options
-  if (sel.expressDelivery) {
-    breakdown.push({ label: "Express delivery", amount: pricing.options.expressDelivery })
-  }
-  if (sel.midnightDelivery) {
-    breakdown.push({ label: "Midnight delivery", amount: pricing.options.midnightDelivery })
-  }
-  if (sel.message.trim().length > 0) {
-    breakdown.push({ label: "Message on cake", amount: pricing.options.messageOnCake })
-  }
-
-  const total = breakdown.reduce((sum, item) => sum + item.amount, 0)
-  return { total, breakdown }
-}
 
 function suggestedAddons(allAddons: Addon[], occasion: string, style: string): Addon[] {
   const tags = [occasion, style].map((t) => t.toLowerCase())
@@ -356,7 +290,6 @@ export default function PriceEstimator({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const [pricing, setPricing] = useState<PricingConfig>(FALLBACK_PRICING)
   const [selectors, setSelectors] = useState<SelectorsConfig>(FALLBACK_SELECTORS)
   const [dbAddons, setDbAddons] = useState<Addon[] | null>(null)
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -410,7 +343,6 @@ export default function PriceEstimator({
     fetch("/api/ai-cake-studio-config")
       .then((r) => r.json())
       .then((data: any) => {
-        if (data.pricing) setPricing(data.pricing)
         if (data.selectors) setSelectors(data.selectors)
         setConfigLoaded(true)
       })
@@ -426,13 +358,13 @@ export default function PriceEstimator({
       .catch(() => {})
   }, [open, configLoaded])
 
-  // Real backend price — debounced so it doesn't fire the pricing engine on every keystroke/pill
-  // click. The instant local `computePrice()` estimate below still renders immediately so the panel
-  // never feels laggy; this overwrites it ~500ms after the last change with the true, OPS-configured
-  // number (the same one Save This Cake will actually charge), so nothing here can drift from the
-  // order price the way the old static-config-only estimator could. Requires a confirmed pincode now
-  // — price genuinely varies by region, so there's no honest number to show before that, and it stops
-  // altogether once locked since nothing can change anyway.
+  // The price. Not a preview of it — the only one this panel shows, and the same number Save This
+  // Cake charges. Debounced ~500ms so a rapid sequence of pill taps makes one request, not six.
+  //
+  // Runs before a pincode is entered as well as after: the engine prices fine without one, so the
+  // first number a customer sees is the real default price rather than a second formula's guess.
+  // Confirming a pincode re-requests with it, and the total only moves if that pincode resolves to
+  // a zone with an override. Stops once locked, since nothing can change after that.
   const [realPricing, setRealPricing] = useState<{ total: number; breakdown: { label: string; amount: number }[] } | null>(null)
   // Which option values the OPS-authored constraint rules currently allow. Arrives on the same
   // response as the price, so it costs no extra round trip.
@@ -440,7 +372,7 @@ export default function PriceEstimator({
   const [, startPricingTransition] = useTransition()
 
   useEffect(() => {
-    if (!generated || !pincodeConfirmed || locked) return
+    if (!generated || locked) return
     const timer = setTimeout(() => {
       startPricingTransition(async () => {
         const res = await estimateAiCakePrice({
@@ -452,14 +384,18 @@ export default function PriceEstimator({
           expressDelivery: sel.expressDelivery,
           midnightDelivery: sel.midnightDelivery,
           messageOnCake: sel.message.trim().length > 0,
-          pincode,
+          // Omitted until confirmed. The engine prices fine without one — it simply skips regional
+          // resolution — so the number shown before a pincode is the real default price, not a
+          // different formula's guess at it. Adding the pincode later only changes the total if it
+          // resolves to a zone with an override.
+          pincode: pincodeConfirmed ? pincode : undefined,
         })
         if (!("error" in res)) {
           setRealPricing(res)
           setConstraints(res.constraints ?? null)
         }
-        // On error, silently keep showing the local estimate — the existing "Indicative price
-        // only" disclaimer already covers this, and Save This Cake re-derives the real price anyway.
+        // On error the last good total stays on screen rather than flipping to a second formula's
+        // number. "Save This Cake" re-derives the real price server-side regardless.
       })
     }, 500)
     return () => clearTimeout(timer)
@@ -541,13 +477,24 @@ export default function PriceEstimator({
 
   const activeAddons: Addon[] = dbAddons ?? FALLBACK_ADDONS
 
-  // Compute price — instant local estimate as a placeholder, real backend number (once loaded) wins.
-  const localEstimate = useMemo(
-    () => computePrice(sel, cakeStyle, pricing),
-    [sel, cakeStyle, pricing]
-  )
-  const cakeTotal = realPricing?.total ?? localEstimate.total
-  const breakdown = realPricing?.breakdown ?? localEstimate.breakdown
+  /**
+   * One price, from one place: the OPS pricing engine.
+   *
+   * There used to be a second, independent implementation here — `computePrice()` reading a static
+   * `baseByWeight`/`styleAdjustment`/... table bundled with the storefront — that produced the
+   * number shown before a pincode was entered. Because it was a different formula from the engine,
+   * the total could change the moment a pincode was confirmed even when that pincode had no zone
+   * override at all, and no amount of editing OPS would move the first number.
+   *
+   * Now the engine answers both cases: without a pincode it returns the default price, with one it
+   * applies any regional override. Confirmed equal across the combinations checked before the
+   * switch, so the change is not supposed to move any customer's price — only make it consistent.
+   *
+   * `null` means the first response has not arrived. The panel shows a loading state rather than a
+   * placeholder number, because a placeholder is exactly what caused the original confusion.
+   */
+  const cakeTotal = realPricing?.total ?? null
+  const breakdown = realPricing?.breakdown ?? []
 
   // Addons
   const suggested = useMemo(
@@ -565,7 +512,10 @@ export default function PriceEstimator({
       .reduce((sum, a) => sum + a.price, 0)
   }, [activeAddons, selectedAddons])
 
-  const grandTotal = cakeTotal + addonTotal
+  // null until the engine has answered at least once — every display site below must handle that
+  // rather than render a zero, which would read as "free" instead of "not priced yet".
+  const grandTotal = cakeTotal === null ? null : cakeTotal + addonTotal
+  const priceLabel = grandTotal === null ? null : `₹${grandTotal.toLocaleString("en-IN")}`
 
   const toggleAddon = (id: string) => {
     setSelectedAddons((prev) => {
@@ -613,19 +563,21 @@ export default function PriceEstimator({
             </p>
             <p className="truncate text-xs text-slate-500">
               {locked
-                ? `${sel.weight} kg · ${sel.flavor} · ₹${grandTotal.toLocaleString("en-IN")}`
-                : !pincodeConfirmed
-                  ? "Enter your delivery pincode to see pricing"
+                ? `${sel.weight} kg · ${sel.flavor} · ${priceLabel ?? "—"}`
+                : priceLabel === null
+                  ? "Calculating price…"
                   : open
                     ? "Adjust options to see price change"
-                    : `Starting from ₹${grandTotal.toLocaleString("en-IN")}`}
+                    : !pincodeConfirmed
+                      ? `From ${priceLabel} · add pincode to confirm`
+                      : `Starting from ${priceLabel}`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {!open && pincodeConfirmed && (
+          {!open && priceLabel !== null && (
             <span className="rounded-xl bg-cf-purple-600 px-3 py-1 text-sm font-bold text-white">
-              ₹{grandTotal.toLocaleString("en-IN")}
+              {priceLabel}
             </span>
           )}
           <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.25 }} className="text-slate-400">
@@ -720,13 +672,13 @@ export default function PriceEstimator({
                     </p>
                   </div>
                   <motion.p
-                    key={grandTotal}
+                    key={grandTotal ?? "pending"}
                     initial={{ scale: 1.18, opacity: 0.6 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 380, damping: 24 }}
                     className="shrink-0 text-3xl font-black"
                   >
-                    ₹{grandTotal.toLocaleString("en-IN")}
+                    {priceLabel ?? "…"}
                   </motion.p>
                 </div>
               </div>
@@ -769,6 +721,30 @@ export default function PriceEstimator({
                 </div>
               )}
 
+              {/*
+                Says out loud what this panel has always done silently.
+
+                Everything below changes the order, not the picture — the baker scales the cake and
+                swaps the sponge; the design stays exactly as generated. Customers had no way to know
+                that, so anyone wanting a bigger version of a design they liked assumed they had to
+                start over and generate a new one. The capability existed; the sentence didn't.
+
+                The second line is the necessary other half: colour, style, shape and tiers ARE the
+                picture, which is why they are absent from this panel. Saying where they live stops
+                the first line reading as "you can change anything here".
+              */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+                <p className="text-xs font-semibold text-emerald-900">
+                  Your design stays exactly as it is
+                </p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-emerald-800">
+                  Size, flavour, message and delivery all change the price, never the picture — your
+                  baker handles them. To change the <strong>colour, style, shape or number of
+                  tiers</strong>, go back up and create a new design; those are part of the image
+                  itself.
+                </p>
+              </div>
+
               {/* Weight (main pricing lever) */}
               <div>
                 <SectionLabel>
@@ -808,7 +784,7 @@ export default function PriceEstimator({
                 />
                 <div className="mt-1 flex items-center justify-between">
                   {sel.message.trim().length > 0 ? (
-                    <span className="text-[11px] font-semibold text-cf-purple-600">+₹{pricing.options.messageOnCake}</span>
+                    <span className="text-[11px] font-semibold text-cf-purple-600">Added to total</span>
                   ) : <span />}
                   <p className="text-[10px] text-slate-400">{sel.message.length}/50</p>
                 </div>
@@ -819,9 +795,9 @@ export default function PriceEstimator({
                 <SectionLabel>Delivery Options</SectionLabel>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { key: "expressDelivery" as const, label: "⚡ Express (same day)", extra: pricing.options.expressDelivery },
-                    { key: "midnightDelivery" as const, label: "🌙 Midnight delivery", extra: pricing.options.midnightDelivery },
-                  ].map(({ key, label, extra }) => (
+                    { key: "expressDelivery" as const, label: "⚡ Express (same day)" },
+                    { key: "midnightDelivery" as const, label: "🌙 Midnight delivery" },
+                  ].map(({ key, label }) => (
                     <button
                       key={key}
                       type="button"
@@ -833,9 +809,10 @@ export default function PriceEstimator({
                       }`}
                     >
                       {label}
-                      <span className={sel[key] ? "ml-1 text-cf-purple-200" : "ml-1 text-cf-purple-400"}>
-                        +₹{extra}
-                      </span>
+                      {/* The surcharge amount is not printed here on purpose. It lives in OPS, and a
+                          hardcoded "+₹300" beside an option that OPS has since repriced is exactly
+                          the drift this panel was rebuilt to remove. Toggling shows the real amount
+                          as its own line in the breakdown below, straight from the engine. */}
                     </button>
                   ))}
                 </div>
@@ -902,17 +879,17 @@ export default function PriceEstimator({
                 <div className="mt-3 flex items-center justify-between border-t border-cf-purple-200 pt-3">
                   <p className="text-sm font-bold text-slate-900">Estimated Total</p>
                   <motion.p
-                    key={grandTotal}
+                    key={grandTotal ?? "pending"}
                     initial={{ scale: 1.12, opacity: 0.7 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 380, damping: 24 }}
                     className="text-2xl font-black text-cf-purple-700"
                   >
-                    ₹{grandTotal.toLocaleString("en-IN")}
+                    {priceLabel ?? "…"}
                   </motion.p>
                 </div>
                 <p className="mt-2 text-[11px] text-slate-400 italic">
-                  {pricing.disclaimer}
+                  {PRICE_DISCLAIMER}
                 </p>
               </div>
             </div>

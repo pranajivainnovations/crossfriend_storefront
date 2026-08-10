@@ -1,140 +1,240 @@
 {
   "_comment": "AI Cake Studio configuration. Edit here and call POST /api/revalidate to apply without redeployment.",
-
   "freeAttemptsLimit": 50,
-
-  "pricing": {
-    "currency": "₹",
-    "disclaimer": "Indicative price only. Final price will be confirmed by your baker based on design complexity and location.",
-
-    "_pricing_note": "Model: baseByWeight × tierMultiplier + shapeAdjustment + styleAdjustment + flavorAdjustment + options. All cakes are eggless by default (no extra charge).",
-
-    "baseByWeight": {
-      "0.5": 500,
-      "1": 900,
-      "1.5": 1350,
-      "2": 1800,
-      "2.5": 2250,
-      "3": 2700,
-      "4": 3600,
-      "5": 4500
-    },
-
-    "tierMultiplier": {
-      "1": 1.0,
-      "2": 1.4,
-      "3": 1.8,
-      "4": 2.3
-    },
-
-    "shapeAdjustment": {
-      "Round": 0,
-      "Square": 150,
-      "Heart": 200,
-      "Oval": 150
-    },
-
-    "styleAdjustment": {
-      "Realistic": 0,
-      "Cartoon": 200,
-      "Luxury": 500,
-      "Minimal": 0,
-      "3D Sculpted": 600,
-      "Wedding": 400,
-      "Kids": 200
-    },
-
-    "flavorAdjustment": {
-      "Chocolate": 0,
-      "Vanilla": 0,
-      "Red Velvet": 100,
-      "Strawberry": 100,
-      "Butterscotch": 50,
-      "Salted Caramel": 150,
-      "Mango": 150,
-      "Blueberry": 200,
-      "Lemon": 100
-    },
-
-    "options": {
-      "expressDelivery": 300,
-      "midnightDelivery": 200,
-      "messageOnCake": 50,
-      "photoOnCake": 150
-    },
-
-    "_location_note": "Future: GET /api/pricing?pincode=XXXXXX can return overrides for specific areas. Frontend applies override if available, else uses these defaults."
-  },
-
   "selectors": {
     "weights": [
-      { "value": "0.5", "label": "0.5 kg", "serves": "4–6" },
-      { "value": "1", "label": "1 kg", "serves": "8–10" },
-      { "value": "1.5", "label": "1.5 kg", "serves": "12–15" },
-      { "value": "2", "label": "2 kg", "serves": "16–20" },
-      { "value": "2.5", "label": "2.5 kg", "serves": "20–25" },
-      { "value": "3", "label": "3 kg", "serves": "25–30" },
-      { "value": "4", "label": "4 kg", "serves": "30–40" },
-      { "value": "5", "label": "5 kg", "serves": "40–50" }
+      {
+        "value": "0.5",
+        "label": "0.5 kg",
+        "serves": "4–6"
+      },
+      {
+        "value": "1",
+        "label": "1 kg",
+        "serves": "8–10"
+      },
+      {
+        "value": "1.5",
+        "label": "1.5 kg",
+        "serves": "12–15"
+      },
+      {
+        "value": "2",
+        "label": "2 kg",
+        "serves": "16–20"
+      },
+      {
+        "value": "2.5",
+        "label": "2.5 kg",
+        "serves": "20–25"
+      },
+      {
+        "value": "3",
+        "label": "3 kg",
+        "serves": "25–30"
+      },
+      {
+        "value": "4",
+        "label": "4 kg",
+        "serves": "30–40"
+      },
+      {
+        "value": "5",
+        "label": "5 kg",
+        "serves": "40–50"
+      }
     ],
     "tiers": [
-      { "value": "1", "label": "Single tier" },
-      { "value": "2", "label": "Two tiers" },
-      { "value": "3", "label": "Three tiers" },
-      { "value": "4", "label": "Four tiers" }
+      {
+        "value": "1",
+        "label": "Single tier"
+      },
+      {
+        "value": "2",
+        "label": "Two tiers"
+      },
+      {
+        "value": "3",
+        "label": "Three tiers"
+      },
+      {
+        "value": "4",
+        "label": "Four tiers"
+      }
     ],
     "shapes": [
-      { "value": "Round", "label": "Round" },
-      { "value": "Square", "label": "Square" },
-      { "value": "Heart", "label": "Heart" },
-      { "value": "Oval", "label": "Oval" }
+      {
+        "value": "Round",
+        "label": "Round"
+      },
+      {
+        "value": "Square",
+        "label": "Square"
+      },
+      {
+        "value": "Heart",
+        "label": "Heart"
+      },
+      {
+        "value": "Oval",
+        "label": "Oval"
+      }
     ],
     "flavors": [
-      { "value": "Chocolate", "label": "Chocolate", "emoji": "🍫" },
-      { "value": "Vanilla", "label": "Vanilla", "emoji": "🍦" },
-      { "value": "Red Velvet", "label": "Red Velvet", "emoji": "❤️" },
-      { "value": "Strawberry", "label": "Strawberry", "emoji": "🍓" },
-      { "value": "Butterscotch", "label": "Butterscotch", "emoji": "🧈" },
-      { "value": "Salted Caramel", "label": "Salted Caramel", "emoji": "🍮" },
-      { "value": "Mango", "label": "Mango", "emoji": "🥭" },
-      { "value": "Blueberry", "label": "Blueberry", "emoji": "🫐" },
-      { "value": "Lemon", "label": "Lemon", "emoji": "🍋" }
+      {
+        "value": "Chocolate",
+        "label": "Chocolate",
+        "emoji": "🍫"
+      },
+      {
+        "value": "Vanilla",
+        "label": "Vanilla",
+        "emoji": "🍦"
+      },
+      {
+        "value": "Red Velvet",
+        "label": "Red Velvet",
+        "emoji": "❤️"
+      },
+      {
+        "value": "Strawberry",
+        "label": "Strawberry",
+        "emoji": "🍓"
+      },
+      {
+        "value": "Butterscotch",
+        "label": "Butterscotch",
+        "emoji": "🧈"
+      },
+      {
+        "value": "Salted Caramel",
+        "label": "Salted Caramel",
+        "emoji": "🍮"
+      },
+      {
+        "value": "Mango",
+        "label": "Mango",
+        "emoji": "🥭"
+      },
+      {
+        "value": "Blueberry",
+        "label": "Blueberry",
+        "emoji": "🫐"
+      },
+      {
+        "value": "Lemon",
+        "label": "Lemon",
+        "emoji": "🍋"
+      }
     ],
     "styles": [
-      { "value": "Realistic", "label": "Realistic", "emoji": "🎂" },
-      { "value": "Cartoon", "label": "Cartoon", "emoji": "🎨" },
-      { "value": "Luxury", "label": "Luxury", "emoji": "✨" },
-      { "value": "Minimal", "label": "Minimal", "emoji": "🤍" },
-      { "value": "3D Sculpted", "label": "3D Sculpted", "emoji": "🏆" },
-      { "value": "Wedding", "label": "Wedding", "emoji": "💍" },
-      { "value": "Kids", "label": "Kids", "emoji": "🎠" }
+      {
+        "value": "Realistic",
+        "label": "Realistic",
+        "emoji": "🎂"
+      },
+      {
+        "value": "Cartoon",
+        "label": "Cartoon",
+        "emoji": "🎨"
+      },
+      {
+        "value": "Luxury",
+        "label": "Luxury",
+        "emoji": "✨"
+      },
+      {
+        "value": "Minimal",
+        "label": "Minimal",
+        "emoji": "🤍"
+      },
+      {
+        "value": "3D Sculpted",
+        "label": "3D Sculpted",
+        "emoji": "🏆"
+      },
+      {
+        "value": "Wedding",
+        "label": "Wedding",
+        "emoji": "💍"
+      },
+      {
+        "value": "Kids",
+        "label": "Kids",
+        "emoji": "🎠"
+      }
     ],
     "occasions": [
-      { "value": "Birthday", "label": "Birthday", "emoji": "🎂" },
-      { "value": "Anniversary", "label": "Anniversary", "emoji": "💍" },
-      { "value": "Wedding", "label": "Wedding", "emoji": "👰" },
-      { "value": "Festival", "label": "Festival", "emoji": "🎪" },
-      { "value": "Kids", "label": "Kids Party", "emoji": "👶" },
-      { "value": "Special", "label": "Special", "emoji": "🎁" }
+      {
+        "value": "Birthday",
+        "label": "Birthday",
+        "emoji": "🎂"
+      },
+      {
+        "value": "Anniversary",
+        "label": "Anniversary",
+        "emoji": "💍"
+      },
+      {
+        "value": "Wedding",
+        "label": "Wedding",
+        "emoji": "👰"
+      },
+      {
+        "value": "Festival",
+        "label": "Festival",
+        "emoji": "🎪"
+      },
+      {
+        "value": "Kids",
+        "label": "Kids Party",
+        "emoji": "👶"
+      },
+      {
+        "value": "Special",
+        "label": "Special",
+        "emoji": "🎁"
+      }
     ]
   },
-
   "aiImageModels": {
     "_note": "Which AI image models are offered in the 'Create Your Cake' picker, and which is used by default. Toggle 'enabled' to show/hide an option (e.g. disable Gemini for now) without deleting it — no rebuild needed, just edit here + POST /api/revalidate. 'provider' must match a provider implemented in the backend's src/services/ai-image/provider-factory.ts; 'model' must be on that provider's ALLOWED_REQUEST_MODELS allowlist there. To offer a second model from the SAME provider later (e.g. OpenAI's dall-e-3 alongside gpt-image-1), just add another entry with the same provider and a different model/label/id.",
     "options": [
-      { "id": "openai-gpt-image-1", "provider": "openai", "model": "gpt-image-1", "label": "GPT Image", "hint": "Best for on-cake text & detailed, multi-element scenes", "enabled": true, "default": true },
-      { "id": "replicate-flux", "provider": "replicate", "model": "black-forest-labs/flux-1.1-pro", "label": "FLUX", "hint": "Fast, photorealistic bakery-style shots", "enabled": true, "default": false },
-      { "id": "gemini-2.5-flash-image", "provider": "gemini", "model": "gemini-2.5-flash-image", "label": "Gemini", "hint": "Detailed, multi-element scenes", "enabled": false, "default": false }
+      {
+        "id": "openai-gpt-image-1",
+        "provider": "openai",
+        "model": "gpt-image-1",
+        "label": "GPT Image",
+        "hint": "Best for on-cake text & detailed, multi-element scenes",
+        "enabled": true,
+        "default": true
+      },
+      {
+        "id": "replicate-flux",
+        "provider": "replicate",
+        "model": "black-forest-labs/flux-1.1-pro",
+        "label": "FLUX",
+        "hint": "Fast, photorealistic bakery-style shots",
+        "enabled": true,
+        "default": false
+      },
+      {
+        "id": "gemini-2.5-flash-image",
+        "provider": "gemini",
+        "model": "gemini-2.5-flash-image",
+        "label": "Gemini",
+        "hint": "Detailed, multi-element scenes",
+        "enabled": false,
+        "default": false
+      }
     ]
   },
-
   "defaultsByTier": {
-    "_note": "Auto-suggest weight when user selects tiers (for Price Estimator default)",
     "1": "1",
     "2": "2",
     "3": "3",
-    "4": "4"
+    "4": "4",
+    "_note": "Auto-suggest weight when user selects tiers (for Price Estimator default)"
   },
-
   "_addons_note": "Add-ons are managed as Medusa products under the 'cake-addons' product category. Create products there with metadata: { emoji, suggestFor (comma-separated), price (optional ₹ override) }. They will be fetched live by /api/cake-addons and suggested automatically based on occasion and style."
 }

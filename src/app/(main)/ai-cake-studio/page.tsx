@@ -29,11 +29,66 @@ export const metadata: Metadata = {
     "local bakers",
     "bakery ready design",
   ],
+  // og:url and og:image were both absent. In India the practical consequence is WhatsApp: a shared
+  // link with no image renders as a bare grey row, and this is the page most likely to be shared.
+  // The image is a real file in public/ — never point og:image at a path that 404s, because the
+  // preview silently falls back to nothing and nobody notices.
   openGraph: {
-    title: "AI Cake Studio",
-    description: "Powered by AI + Local Bakers Near You",
+    title: "AI Cake Studio — Design Your Cake with AI",
+    description:
+      "Describe the cake you want and see it designed in seconds. Pick flavour, style, shape and size, get a price for your pincode, and order from a verified local baker.",
+    url: absoluteUrl("/ai-cake-studio"),
+    siteName: "CrossFriend",
+    type: "website",
+    locale: "en_IN",
+    images: [
+      {
+        url: absoluteUrl("/ai-cake-studio/hero/hero-cake.jpg"),
+        width: 1200,
+        height: 630,
+        alt: "A custom cake designed in the CrossFriend AI Cake Studio",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Cake Studio — Design Your Cake with AI",
+    description:
+      "Describe the cake you want and see it designed in seconds, then order it from a verified local baker.",
+    images: [absoluteUrl("/ai-cake-studio/hero/hero-cake.jpg")],
   },
 }
+
+/**
+ * The steps, as prose.
+ *
+ * The studio itself is an interactive widget: a crawler sees controls, not an explanation. Anyone
+ * asking "how does it work" — a person skimming, or an answer engine composing a reply — had
+ * nothing to read. These four steps are the same ones emitted as HowTo structured data, defined
+ * once here so the visible section and the markup cannot drift apart.
+ */
+const HOW_IT_WORKS = [
+  {
+    title: "Describe the cake you want",
+    detail:
+      "Write it the way you would say it out loud — 'two-tier chocolate cake for a 5th birthday, dinosaur theme'. No design skill and no account needed to start.",
+  },
+  {
+    title: "Choose the details",
+    detail:
+      "Pick the occasion, flavour, design style, shape, weight and number of tiers. Nine flavours, four shapes and seven styles, from 0.5 kg to 5 kg and one to four tiers.",
+  },
+  {
+    title: "See the design and the price",
+    detail:
+      "The studio generates the design and shows a live price estimate for your delivery pincode, so the cost is clear before you commit to anything.",
+  },
+  {
+    title: "Order it from a local baker",
+    detail:
+      "Send the design to a verified bakery near you. A real baker makes the cake and delivers it — the design is the brief they work from.",
+  },
+]
 
 export default async function AiCakeStudioPage() {
   let customer = null
@@ -86,6 +141,35 @@ export default async function AiCakeStudioPage() {
     publisher: { "@id": ORGANIZATION_ID },
   }
 
+  /**
+   * HowTo describes the studio as a process rather than a thing.
+   *
+   * It matters for a specific reason: when someone asks an assistant "how do I design a custom
+   * cake online", a numbered set of steps is the shape of answer it wants to give, and a page that
+   * supplies those steps gets quoted over one that only describes itself. The steps below match
+   * what the tool actually does and the section rendered further down the page — a HowTo that
+   * describes a flow the visitor cannot follow is invalid markup, not a shortcut.
+   */
+  const howToJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "@id": `${studioUrl}#howto`,
+    name: "How to design a custom cake with AI",
+    description:
+      "Turn a written description into a cake design, price it for your delivery area, and order it from a local bakery.",
+    totalTime: "PT2M",
+    estimatedCost: { "@type": "MonetaryAmount", currency: "INR", value: "0" },
+    supply: [],
+    tool: [{ "@type": "HowToTool", name: "A web browser" }],
+    step: HOW_IT_WORKS.map((entry, index) => ({
+      "@type": "HowToStep",
+      position: index + 1,
+      name: entry.title,
+      text: entry.detail,
+      url: `${studioUrl}#step-${index + 1}`,
+    })),
+  }
+
   const serviceJsonLd = {
     "@context": "https://schema.org",
     "@type": "Service",
@@ -101,7 +185,7 @@ export default async function AiCakeStudioPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#f9f6ff] via-white to-[#fcfaff]">
-      <script {...jsonLdScriptProps([applicationJsonLd, serviceJsonLd])} />
+      <script {...jsonLdScriptProps([applicationJsonLd, serviceJsonLd, howToJsonLd])} />
       <script {...jsonLdScriptProps(faqJsonLd(STUDIO_FAQ))} />
       <script
         {...jsonLdScriptProps(
@@ -115,6 +199,42 @@ export default async function AiCakeStudioPage() {
       <HeroSection />
       <AiStudioSection customer={customer} />
       <ShowcaseGallery customer={customer} />
+
+      {/* The visible half of howToJsonLd. Both come from HOW_IT_WORKS, so they cannot disagree. */}
+      <section
+        className="content-container py-12 small:py-16"
+        aria-labelledby="how-it-works-heading"
+      >
+        <h2
+          id="how-it-works-heading"
+          className="font-heading text-2xl font-semibold text-slate-900 small:text-3xl"
+        >
+          How the AI Cake Studio works
+        </h2>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600">
+          Four steps, about two minutes, and nothing to pay until you decide to order.
+        </p>
+
+        <ol className="mt-8 grid gap-6 small:grid-cols-2 large:grid-cols-4">
+          {HOW_IT_WORKS.map((entry, index) => (
+            <li
+              key={entry.title}
+              id={`step-${index + 1}`}
+              className="scroll-mt-24 rounded-2xl border border-cf-purple-100 bg-white p-6"
+            >
+              <span
+                aria-hidden="true"
+                className="text-sm font-bold tabular-nums text-cf-purple-600"
+              >
+                {index + 1}
+              </span>
+              <h3 className="mt-2 text-base font-semibold text-slate-900">{entry.title}</h3>
+              <p className="mt-2 text-base leading-relaxed text-slate-600">{entry.detail}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
       {/* The answers must render, not just appear in the markup above. */}
       <FaqSection entries={STUDIO_FAQ} title="Questions about the AI Cake Studio" />
       <BottomCta />

@@ -15,7 +15,11 @@ import { useState } from "react"
  */
 export default function ShareToCommunityToggle({
   designId,
-  initialIsPublic = false,
+  // Matches what the backend actually does: cake_designs rows are inserted with is_public = true,
+  // because the image is generated at CrossFriend's expense and the community gallery only exists if
+  // designs land in it. Defaulting this control to false would have shown "off" for a design that was
+  // already public — a toggle that misreports the current state is worse than no toggle.
+  initialIsPublic = true,
 }: {
   /** Server-side design id. Locally-generated designs that haven't been persisted have none. */
   designId?: string
@@ -80,12 +84,12 @@ export default function ShareToCommunityToggle({
         </span>
         <span className="min-w-0">
           <span className="block text-[11px] font-bold text-slate-800">
-            {isPublic ? "Shared with the community" : "Share to community gallery"}
+            {isPublic ? "Shared with the community" : "Kept private"}
           </span>
           <span className="block text-[10px] leading-snug text-slate-500">
             {isPublic
-              ? "Anyone can see this design and the prompt behind it."
-              : "Private to you. Sharing also shows the prompt, including any name in it."}
+              ? "Anyone can see this design and the prompt behind it. Turn off to keep it private."
+              : "Hidden from the gallery. Only you can see it."}
           </span>
         </span>
       </button>

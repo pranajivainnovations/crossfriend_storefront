@@ -90,3 +90,63 @@ export const BAKERS_FAQ: FaqEntry[] = [
       "CrossFriend is operated from Ghaziabad, Uttar Pradesh, and serves the pincodes where partner bakeries deliver. Coverage is opened one area at a time so that every listed bakery can genuinely reach the customers who see it.",
   },
 ]
+
+/**
+ * Cake size calculator page.
+ *
+ * These answers restate the same portion conventions the calculator computes with, so the tool and
+ * the structured data can never drift apart in a way a reader would notice. They are conventions,
+ * not measurements from our own orders, and each answer says so rather than implying precision we
+ * do not have.
+ */
+export const CAKE_SIZE_FAQ: FaqEntry[] = [
+  {
+    question: "How much cake do I need for 20 people?",
+    answer:
+      "For a celebration slice cut after the candles, allow about 75 g per person — roughly 1.5 kg for 20 people. If the cake is the dessert course, allow about 125 g per person, which is about 2.5 kg for 20. A square cake of the same weight serves around 25% more people than a round one, because it cuts into clean rectangles with no curved edge pieces.",
+  },
+  {
+    question: "How many people does a 1 kg cake serve?",
+    answer:
+      "A 1 kg cake serves about 8 people as a dessert portion, or about 13 as a celebration slice cut after the candles. The same 1 kg in a square shape stretches further — closer to 16 celebration slices — because there is no waste at the edges.",
+  },
+  {
+    question: "Does the shape of the cake change how many people it serves?",
+    answer:
+      "Yes, and it is the most commonly missed factor. A square or rectangular cake cuts into even rectangles with nothing left over, while a round cake of the same weight loses servings to curved edge pieces. The usual convention is that a square yields around 25% more servings than a round cake of identical weight.",
+  },
+  {
+    question: "Do tiered cakes serve more people per kilogram?",
+    answer:
+      "Slightly, because guests take a smaller slice from a tall tiered cake than from a single round one. Allow roughly 8% more servings per kilogram for a two-tier cake and around 15% more for three tiers or higher. Tiers are usually chosen for how the cake looks rather than for the number of servings.",
+  },
+  {
+    question: "How long can a cream cake stay out of the fridge in Delhi?",
+    answer:
+      "In Delhi NCR summer heat, a fresh cream or whipped cream cake should not sit out of refrigeration for more than about two hours, and less on the hottest days. Fondant and ganache finishes hold their shape far better in heat, which is why they are the usual choice for outdoor functions and long parties.",
+  },
+  {
+    question: "Should I order extra cake?",
+    answer:
+      "If the headcount is not final, or you want people to take a piece home, add about 20% to the calculated weight. Bakers sell in half-kilogram steps, so the practical choice is usually to round up to the next half kilo.",
+  },
+]
+
+/**
+ * Two more for the size calculator, kept separate because they answer questions people type
+ * verbatim into a search box rather than questions about our own service. Both are arithmetic or
+ * well-established food science, not house opinion — see CAKE_FACTS in the calculator page for the
+ * rest of the set and the reasoning about what was left out.
+ */
+export const CAKE_SIZE_EXTRA_FAQ: FaqEntry[] = [
+  {
+    question: "Is a 12 inch cake twice as big as a 6 inch cake?",
+    answer:
+      "No — it is four times as big. A round cake's area grows with the square of its radius, so doubling the diameter quadruples the amount of cake. An 8 inch round holds about 1.8 times as much as a 6 inch, and a 10 inch holds about 2.8 times as much. This is the single most common mistake when sizing a cake by inches rather than by weight.",
+  },
+  {
+    question: "Should I keep cake in the fridge?",
+    answer:
+      "Refrigerate it for the frosting's safety, not for the cake's freshness. Fresh cream, custard and cheese-based frostings must be kept cold. But sponge goes stale fastest at fridge temperature — starch retrogradation runs quickest just above freezing — so a plain or fondant-covered cake keeps better in a sealed box at room temperature. If you need to store cake for more than a couple of days, freezing is better than refrigerating, because it skips past the temperature range where staling is quickest.",
+  },
+]
