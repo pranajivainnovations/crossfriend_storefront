@@ -35,11 +35,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${title}`,
       description,
       alternates: {
-        canonical: `${params.category.join("/")}`,
+        /**
+         * Was `params.category.join("/")` — a relative value, resolved against metadataBase, so
+         * /categories/cakes/birthday declared its canonical as /cakes/birthday: a URL that has
+         * never existed on this site. A canonical pointing at a non-existent page is worse than
+         * none at all, because it tells Google the real content lives somewhere unreachable.
+         */
+        canonical: `/categories/${params.category.join("/")}`,
       },
     }
   } catch (error) {
-    notFound()
+    // Empty metadata, not notFound() — see the note in products/[handle]/page.tsx. notFound() here
+    // renders the 404 page with a 200 status, which Search Console files as a Soft 404. The page
+    // component below now performs the same check and sets a real 404.
+    return {}
   }
 }
 
@@ -50,7 +59,15 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     params.category
   ).then((product_categories) => product_categories)
 
-  if (!product_categories) {
+  /**
+   * `!product_categories` never fired, which is why the 404 status had to come from
+   * generateMetadata in the first place.
+   *
+   * getCategoryByHandle pushes one entry per requested handle and swallows its own errors, so an
+   * unknown handle yields `[undefined]` — an array, non-empty, and therefore truthy. Every segment
+   * has to resolve to a real category, so the check is per-entry rather than on the array.
+   */
+  if (!product_categories?.length || product_categories.some((category) => !category?.id)) {
     notFound()
   }
 

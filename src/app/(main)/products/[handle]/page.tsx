@@ -26,8 +26,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     (product) => product
   )
 
+  /**
+   * Returns empty metadata rather than calling notFound() here.
+   *
+   * notFound() inside generateMetadata renders the not-found UI but leaves the response status at
+   * 200, because metadata resolves after the status has been committed. The page then looks like a
+   * 404 to a human and reads as a normal page to a crawler — which is precisely Search Console's
+   * definition of a Soft 404, and was the site's single largest indexing bucket (231 pages).
+   *
+   * The status has to come from the page component below, which calls notFound() for the same
+   * condition and does produce a real 404. Metadata for a page that will not render is unused.
+   */
   if (!product) {
-    notFound()
+    return {}
   }
 
   /**

@@ -23,8 +23,11 @@ export const PRODUCT_LIMIT = 12
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const collection = await getCollectionByHandle(params.handle)
 
+  // Empty metadata, not notFound() — see the note in products/[handle]/page.tsx. notFound() here
+  // renders the 404 page with a 200 status, which Search Console files as a Soft 404. The page
+  // component below calls notFound() for the same condition and sets a real 404.
   if (!collection) {
-    notFound()
+    return {}
   }
 
   const metadata = {
