@@ -79,9 +79,12 @@ const EMPTY_LIST: BakerListResult = {
  * The backend also caps `limit` at 50 regardless of what is asked for — verified against
  * production, which returned `"limit":50` for a request of 200 — so a single call silently
  * truncates once there are more than 50 bakers. This walks `page` until `hasMore` is false.
+ *
+ * Returns whole summaries rather than slugs because the sitemap needs `productCount` to decide
+ * whether a baker profile has anything on it worth submitting to a search engine.
  */
-export async function listAllBakerSlugsOrThrow(): Promise<string[]> {
-  const slugs: string[] = []
+export async function listAllBakersOrThrow(): Promise<BakerSummary[]> {
+  const bakers: BakerSummary[] = []
   // A ceiling, not an expectation: stops a broken `hasMore` contract from looping forever.
   const MAX_PAGES = 100
 
@@ -95,10 +98,10 @@ export async function listAllBakerSlugsOrThrow(): Promise<string[]> {
 
     const result = (await res.json()) as BakerListResult
     for (const baker of result.bakers ?? []) {
-      if (baker.slug) slugs.push(baker.slug)
+      if (baker.slug) bakers.push(baker)
     }
 
-    if (!result.pagination?.hasMore) return slugs
+    if (!result.pagination?.hasMore) return bakers
   }
 
   throw new Error(`baker pagination exceeded ${MAX_PAGES} pages — refusing to build a partial list`)

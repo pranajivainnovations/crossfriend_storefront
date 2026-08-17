@@ -962,7 +962,7 @@ export const getProductsByCategoryHandle = cache(async function ({
  */
 const productTypeMap = new Map<string, string>() // value → id
 
-async function resolveProductTypeId(
+export async function resolveProductTypeId(
   typeValue: string
 ): Promise<string | null> {
   if (productTypeMap.size === 0) {

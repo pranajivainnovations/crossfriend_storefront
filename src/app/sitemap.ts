@@ -1,8 +1,15 @@
 import type { MetadataRoute } from "next"
 
-import { listAllBakerSlugsOrThrow } from "@lib/data/bakers"
+import type { StoreGetProductsParams } from "@medusajs/medusa"
+
+import { listAllBakersOrThrow } from "@lib/data/bakers"
 import { getTaxonomy } from "@lib/data/taxonomy"
-import { getCollectionsList, getProductsList, listCategories } from "@lib/data"
+import {
+  getCollectionsList,
+  getProductsList,
+  listCategories,
+  resolveProductTypeId,
+} from "@lib/data"
 import { BASE_URL } from "@lib/util/seo"
 
 /**
@@ -135,6 +142,22 @@ const STATIC_PATHS: Array<{
 const PAGE_SIZE = 100
 
 /**
+ * How many CrossFriend products match a filter.
+ *
+ * `limit: 1` because only the count is wanted — Medusa computes it server-side over the whole
+ * result set, so this costs one row rather than a page. Deliberately routed through
+ * getProductsList rather than the Medusa client directly, so it inherits the sales-channel filter:
+ * counting the raw catalogue would count Pranajiva's wellness products and declare a CrossFriend
+ * page populated on the strength of another brand's stock.
+ */
+async function countProducts(queryParams: StoreGetProductsParams): Promise<number> {
+  const { response } = await getProductsList({
+    queryParams: { ...queryParams, limit: 1 },
+  })
+  return response.count
+}
+
+/**
  * Walks the whole catalogue.
  *
  * `pageParam` is an OFFSET in rows, not a page number — passing 1, 2, 3 would re-request almost
@@ -188,10 +211,10 @@ async function collectProductEntries(now: Date): Promise<MetadataRoute.Sitemap> 
 async function buildEntries(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
 
-  const [productEntries, bakerSlugs, taxonomy, collectionResult, categoryResult] =
+  const [productEntries, bakers, taxonomy, collectionResult, categoryResult] =
     await Promise.all([
       collectProductEntries(now),
-      listAllBakerSlugsOrThrow(),
+      listAllBakersOrThrow(),
       getTaxonomy(),
       // Both are filtered to metadata.brand === "crossfriend" by the data layer, so Pranajiva's
       // collections and categories cannot leak into this site's sitemap.
@@ -213,6 +236,82 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
     )
   }
 
+  /**
+   * Only pages that have something on them get submitted.
+   *
+   * Search Console reported 218 URLs "Crawled — currently not indexed" against a catalogue of one
+   * product. The cause was this file: it enumerated every collection, category, occasion, type and
+   * baker that EXISTS, not every one that has stock. Google fetched /collections/birthday, found an
+   * empty grid, and declined to index it — and that judgement is sticky, so a page can go on being
+   * skipped after it fills up. Submitting an empty page is worse than not submitting it.
+   *
+   * Type counts are resolved first because they are needed twice: once for the /store?type= entries
+   * and once to decide which occasions have anything to show. Every count runs in parallel, and the
+   * whole result is held by the 15-minute cache above, so a crawl costs one round of counting.
+   */
+  const typeCounts = new Map<string, number>()
+  await Promise.all(
+    (taxonomy?.types ?? []).map(async (type) => {
+      const typeId = await resolveProductTypeId(type.value)
+      typeCounts.set(type.value, typeId ? await countProducts({ type_id: [typeId] }) : 0)
+    })
+  )
+
+  const collections = (collectionResult?.collections ?? []).filter((c) => Boolean(c.handle))
+  const collectionCounts = await Promise.all(
+    collections.map((collection) => countProducts({ collection_id: [collection.id] }))
+  )
+  const populatedCollections = collections.filter((_, index) => collectionCounts[index] > 0)
+
+  // Top-level only, for the reason given at categoryEntries below.
+  const categories = (categoryResult ?? []).filter(
+    (category) => Boolean(category.handle) && !category.parent_category_id
+  )
+  const categoryCounts = await Promise.all(
+    categories.map((category) => countProducts({ category_id: [category.id] }))
+  )
+  const populatedCategories = categories.filter((_, index) => categoryCounts[index] > 0)
+
+  /**
+   * An occasion page is not backed by a collection — it renders one section per product type mapped
+   * to it in the taxonomy matrix, and each section falls back to every product of that type when
+   * the occasion has no curated picks (see OccasionSection). So it has content whenever any mapped
+   * type has stock, which is a different question from whether a collection of the same name does.
+   */
+  const populatedOccasions = (taxonomy?.occasions ?? []).filter((occasion) =>
+    (taxonomy?.matrix?.[occasion.handle] ?? []).some((value) => (typeCounts.get(value) ?? 0) > 0)
+  )
+
+  // productCount comes from the directory API, which already counts only published products.
+  const populatedBakers = bakers.filter((baker) => baker.productCount > 0)
+
+  /**
+   * Say what was withheld, and why.
+   *
+   * A sitemap that silently shrinks is indistinguishable from one that broke — exactly the failure
+   * this file has already had twice. These lines make "12 pages held back because they are empty"
+   * a thing you can read in the logs rather than infer from a URL count.
+   */
+  const withheld = [
+    ["collections", collections.length - populatedCollections.length],
+    ["categories", categories.length - populatedCategories.length],
+    ["occasions", (taxonomy?.occasions ?? []).length - populatedOccasions.length],
+    [
+      "types",
+      (taxonomy?.types ?? []).length -
+        Array.from(typeCounts.values()).filter((n) => n > 0).length,
+    ],
+    ["bakers", bakers.length - populatedBakers.length],
+  ].filter(([, n]) => (n as number) > 0)
+
+  if (withheld.length > 0) {
+    console.info(
+      `[sitemap] withholding empty pages — ${withheld
+        .map(([kind, n]) => `${n} ${kind}`)
+        .join(", ")}. They return once they have products.`
+    )
+  }
+
   // No lastModified. These change only when the site is redeployed, and there is no per-path date
   // to report; stamping "now" would tell crawlers every page changed on every fetch, which is both
   // untrue and self-defeating — a lastModified that is always current carries no information.
@@ -226,8 +325,8 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
 
   // The baker payload carries no created_at or updated_at — confirmed against the live API — so
   // lastModified is omitted rather than faked.
-  const bakerEntries: MetadataRoute.Sitemap = bakerSlugs.map((slug) => ({
-    url: `${BASE_URL}/bakers/${slug}`,
+  const bakerEntries: MetadataRoute.Sitemap = populatedBakers.map((baker) => ({
+    url: `${BASE_URL}/bakers/${baker.slug}`,
     changeFrequency: "weekly" as const,
     priority: 0.7,
   }))
@@ -235,7 +334,7 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
   // Occasion and type pages are the taxonomy's whole reason for existing — they are the landing
   // pages for "birthday cake", which is what people actually search for. The taxonomy payload is
   // presentation data (handle, label, emoji, order) with no timestamps, so again no lastModified.
-  const occasionEntries: MetadataRoute.Sitemap = (taxonomy?.occasions ?? []).map((occasion) => ({
+  const occasionEntries: MetadataRoute.Sitemap = populatedOccasions.map((occasion) => ({
     url: `${BASE_URL}/occasions/${occasion.handle}`,
     changeFrequency: "weekly" as const,
     priority: 0.8,
@@ -244,8 +343,7 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
   // Collection pages are the "birthday cakes", "chocolate cakes" landing pages — the phrases people
   // actually type. Higher intent than a product page and far more durable, since a collection
   // outlives any individual product in it.
-  const collectionEntries: MetadataRoute.Sitemap = (collectionResult?.collections ?? [])
-    .filter((collection) => Boolean(collection.handle))
+  const collectionEntries: MetadataRoute.Sitemap = populatedCollections
     .map((collection) => ({
       url: `${BASE_URL}/collections/${collection.handle}`,
       // Real updated_at, verified present on the live API. This is the one signal here worth
@@ -259,8 +357,7 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
   // /categories/parent/child, and emitting a guessed path that 404s is worse than omitting it —
   // Search Console reports it as an error and it burns crawl budget. /categories/<handle> is the
   // form the mega-menu already links, so these URLs are known to resolve.
-  const categoryEntries: MetadataRoute.Sitemap = (categoryResult ?? [])
-    .filter((category) => Boolean(category.handle) && !category.parent_category_id)
+  const categoryEntries: MetadataRoute.Sitemap = populatedCategories
     .map((category) => ({
       url: `${BASE_URL}/categories/${category.handle}`,
       ...(category.updated_at ? { lastModified: new Date(category.updated_at) } : {}),
@@ -281,11 +378,13 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
    * …). If a value ever contains a character they encode differently, this and the canonical would
    * disagree and the page would be self-referentially non-canonical.
    */
-  const typeEntries: MetadataRoute.Sitemap = (taxonomy?.types ?? []).map((type) => ({
-    url: `${BASE_URL}/store?type=${encodeURIComponent(type.value)}`,
-    changeFrequency: "weekly" as const,
-    priority: 0.6,
-  }))
+  const typeEntries: MetadataRoute.Sitemap = (taxonomy?.types ?? [])
+    .filter((type) => (typeCounts.get(type.value) ?? 0) > 0)
+    .map((type) => ({
+      url: `${BASE_URL}/store?type=${encodeURIComponent(type.value)}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+    }))
 
   // Order is not a ranking signal, but it makes the file readable when someone opens it to check
   // whether the dynamic sections are populated — the failure mode this sitemap has actually had.
