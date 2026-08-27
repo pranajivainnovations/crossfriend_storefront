@@ -6,6 +6,8 @@ import { Button } from "@medusajs/ui"
 import { isEqual } from "lodash"
 import { useEffect, useMemo, useRef, useState } from "react"
 
+import { track } from "@lib/analytics"
+import { productToItem, toMajorUnits } from "@lib/analytics/ecommerce"
 import { useIntersection } from "@lib/hooks/use-in-view"
 import { addToCart } from "@modules/cart/actions"
 import Divider from "@modules/common/components/divider"
@@ -153,6 +155,27 @@ export default function ProductActions({
       variantId: variant.id,
       quantity: 1,
       metadata: metadata && Object.keys(metadata).length > 0 ? metadata : undefined,
+    })
+
+    /**
+     * Reported after the add succeeds, not on the click.
+     *
+     * addToCart throws on a rejected line — out of stock, an invalid variant, a backend refusal —
+     * and firing beforehand would count intents as adds. That inflates the top of the funnel and,
+     * worse, makes the add-to-cart→checkout drop-off look like a UX problem when it was a failure.
+     */
+    track("add_to_cart", {
+      currency: region.currency_code?.toUpperCase(),
+      value: toMajorUnits(variant.calculated_price ?? 0, region.currency_code),
+      items: [
+        {
+          ...productToItem(product, {
+            price: variant.calculated_price ?? undefined,
+            currencyCode: region.currency_code,
+          }),
+          ...(variant.title ? { item_variant: variant.title } : {}),
+        },
+      ],
     })
 
     setIsAdding(false)

@@ -172,12 +172,22 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section n={11} title="Cookies">
+      <Section n={11} title="Cookies and analytics">
         <p>
           We use cookies that are necessary for the site to work — keeping you signed in, remembering
-          your cart and your region. Blocking these will break checkout. We also use basic analytics
-          to understand which pages are used; you can block those in your browser without affecting
-          your ability to order.
+          your cart and your region. Blocking these will break checkout.
+        </p>
+        <p className="mt-3">
+          Separately, we use <strong>Google Analytics 4</strong> to understand which pages are used
+          and where people get stuck. This is off until you accept it. Until then the tag stores no
+          identifier on your device and only sends anonymous, aggregate signals; if you accept, it
+          sets a cookie that recognises your browser on future visits. We do not use it for
+          advertising, and we do not share it with ad networks.
+        </p>
+        <p className="mt-3">
+          You are asked once, in a banner at the bottom of the page, and either answer is honoured —
+          declining does not limit anything you can do here. To change your mind later, clear this
+          site&rsquo;s data in your browser and the choice will be offered again.
         </p>
       </Section>
 

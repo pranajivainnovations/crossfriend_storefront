@@ -39,9 +39,37 @@ COPY . .
 ARG NEXT_PUBLIC_BASE_URL=https://crossfriend.in
 ARG NEXT_PUBLIC_DEFAULT_REGION=in
 
+# docker-compose has always passed this as a build arg, but it was never declared here — and Docker
+# silently ignores an undeclared build arg. Server-side code falls back to the runtime
+# MEDUSA_BACKEND_URL so nothing broke visibly, which is exactly why it went unnoticed.
+ARG NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://api.pranajiva.in
+
+# Google Analytics 4. Defaulted to the real production property, like the variables above.
+#
+# It was left empty at first, on the reasoning that a build given no ID should fail closed. That
+# reasoning does not survive contact with how this app is actually deployed: deploy.sh builds the
+# image with explicit --build-arg flags and never reads docker-compose.yml, so an empty default here
+# is what every production build received. Failing closed only helps if somebody notices the
+# closure, and nobody did — it shipped silently twice. A measurement ID is not a secret either; it
+# is inlined into the client bundle and readable by anyone who opens DevTools. To build without
+# analytics, say so explicitly:
+#
+#   docker build --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID= .
+#
+# It must be declared as an ARG to have any effect. `environment:` in docker-compose sets variables
+# in the *runner* stage, which is far too late: NEXT_PUBLIC_* is inlined as a string literal during
+# `npm run build` below, in the *builder* stage. Without this line the value resolves to an empty
+# string, the `if (!id) return null` guard becomes statically true, and the minifier removes the
+# script tag entirely — leaving a bundle that mentions dataLayer and consent but never loads gtag.js.
+# That is precisely what happened on the first production build, and it is the same class of bug as
+# the localhost canonical URL described above.
+ARG NEXT_PUBLIC_GA_MEASUREMENT_ID=G-PGF5L9QMCQ
+
 # Set environment variables for build
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 ENV NEXT_PUBLIC_DEFAULT_REGION=$NEXT_PUBLIC_DEFAULT_REGION
+ENV NEXT_PUBLIC_MEDUSA_BACKEND_URL=$NEXT_PUBLIC_MEDUSA_BACKEND_URL
+ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 

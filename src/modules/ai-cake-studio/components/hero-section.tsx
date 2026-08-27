@@ -4,6 +4,7 @@ import { useState } from "react"
 import { motion, cubicBezier } from "framer-motion"
 import Image from "next/image"
 import { HERO_PROMPT_EXAMPLES } from "../data/mock-data"
+import { track } from "@lib/analytics"
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -70,6 +71,22 @@ export default function HeroSection() {
 
   const handleGenerate = () => {
     if (!prompt.trim()) return
+
+    /**
+     * A CrossFriend-specific event, not a GA4 standard one.
+     *
+     * This is the hero scroll-to-studio, several steps before a generation is actually requested.
+     * Named for where it happens so it is never mistaken for the Generate click — the pair that
+     * measures whether the AI delivers is studio_generate_clicked vs studio_design_generated.
+     * Prompt length is reported rather than the prompt itself —
+     * "are people writing real briefs or two words" is the question, and free text typed by a
+     * customer is not something to ship to a third party.
+     */
+    track("studio_hero_prompt_submitted", {
+      prompt_length: prompt.trim().length,
+      used_example: prompt.trim() === HERO_PROMPT_EXAMPLES[exampleIndex]?.trim(),
+    })
+
     document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })
   }
 

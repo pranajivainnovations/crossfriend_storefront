@@ -6,10 +6,27 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Build-time environment variables (NEXT_PUBLIC_* are baked into client JS)
+        # Build-time environment variables (NEXT_PUBLIC_* are baked into client JS).
+        # Every one of these must also be declared as an ARG in the Dockerfile's builder stage —
+        # Docker silently ignores a build arg the Dockerfile does not declare.
         NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://api.pranajiva.in}
         NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://crossfriend.in}
         NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
+        # Defaults to the real production property, like the two above.
+        #
+        # NOTE: production does not build from this file. deploy.sh builds the image locally with
+        # explicit --build-arg flags and ships only the image; the server's compose file is used
+        # for `up`, never for `build`. So the authoritative place for this value is deploy.sh, and
+        # the Dockerfile's ARG default behind it. This line only covers `docker compose build`,
+        # which is the local path.
+        #
+        # A GA4 measurement ID is not a secret — it is inlined into the client bundle and readable
+        # by anyone who opens DevTools. Hardcoding the production value here is the same call the
+        # repo already makes for the base URL, and for the same reason: an empty value fails
+        # silently, and silence is what cost two deploys.
+        #
+        # Override with `NEXT_PUBLIC_GA_MEASUREMENT_ID= docker compose build` to build without it.
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID:-G-PGF5L9QMCQ}
     image: crossfriend-storefront:latest
     container_name: crossfriend-storefront
     ports:

@@ -36,6 +36,9 @@ SERVICE_NAME="crossfriend-storefront"                 # the service key in the S
 IMAGE_NAME="crossfriend-storefront"
 BASE_URL="${NEXT_PUBLIC_BASE_URL:-https://crossfriend.in}"
 DEFAULT_REGION="${NEXT_PUBLIC_DEFAULT_REGION:-in}"
+# The GA4 property. Analytics renders nothing at all when this is empty — no tag, no page-view
+# tracker, no consent banner — so an omission here is invisible on the site rather than broken.
+GA_MEASUREMENT_ID="${NEXT_PUBLIC_GA_MEASUREMENT_ID:-G-PGF5L9QMCQ}"
 # ─────────────────────────────────────────────────────────────────────────────
 
 TARBALL="${IMAGE_NAME}.tgz"
@@ -56,18 +59,20 @@ case "$BASE_URL" in
     ;;
 esac
 
-echo "==> [1/6] Building ${IMAGE_NAME}:latest (--no-cache)"
-echo "         NEXT_PUBLIC_BASE_URL      = ${BASE_URL}"
-echo "         NEXT_PUBLIC_DEFAULT_REGION = ${DEFAULT_REGION}"
+echo "==> [1/7] Building ${IMAGE_NAME}:latest (--no-cache)"
+echo "         NEXT_PUBLIC_BASE_URL           = ${BASE_URL}"
+echo "         NEXT_PUBLIC_DEFAULT_REGION     = ${DEFAULT_REGION}"
+echo "         NEXT_PUBLIC_GA_MEASUREMENT_ID  = ${GA_MEASUREMENT_ID:-(empty - analytics off)}"
 docker build --no-cache \
   --build-arg "NEXT_PUBLIC_BASE_URL=${BASE_URL}" \
   --build-arg "NEXT_PUBLIC_DEFAULT_REGION=${DEFAULT_REGION}" \
+  --build-arg "NEXT_PUBLIC_GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID}" \
   -t "${IMAGE_NAME}:latest" .
 
 # Confirm the value actually landed in the compiled output rather than trusting that the build arg
 # was wired through. Advisory only — a miss here may just mean Next arranged the chunks differently,
 # so it warns rather than aborting. A hit on localhost is worth stopping to look at.
-echo "==> [2/6] Checking the baked-in base URL..."
+echo "==> [2/7] Checking the baked-in base URL..."
 BAKED="$(docker run --rm --entrypoint sh "${IMAGE_NAME}:latest" -c \
   "grep -rlo 'http://localhost:8000' .next/server 2>/dev/null | head -1" || true)"
 if [ -n "$BAKED" ]; then
@@ -77,14 +82,35 @@ else
   echo "    OK — no localhost base URL found in the compiled server output."
 fi
 
-echo "==> [3/6] Saving image to ${TARBALL}..."
+# Unlike the base URL check above, this one ABORTS. A missing measurement ID produces a site that
+# looks completely normal — the tag is simply absent, so there is no rendering fault to notice and
+# no error in any log. It shipped twice that way. The only moment it is cheap to catch is here,
+# before a 68MB image is copied over the wire.
+echo "==> [3/7] Checking the baked-in GA measurement ID..."
+if [ -z "${GA_MEASUREMENT_ID}" ]; then
+  echo "    SKIPPED — building with analytics off (NEXT_PUBLIC_GA_MEASUREMENT_ID was set empty)."
+else
+  GA_HITS="$(docker run --rm --entrypoint sh "${IMAGE_NAME}:latest" -c \
+    "grep -rl '${GA_MEASUREMENT_ID}' .next/static/chunks 2>/dev/null | wc -l" || echo 0)"
+  if [ "${GA_HITS}" -gt 0 ]; then
+    echo "    OK — ${GA_MEASUREMENT_ID} found in ${GA_HITS} client chunks."
+  else
+    echo "REFUSING TO DEPLOY: ${GA_MEASUREMENT_ID} is not in any client chunk."
+    echo "The build arg did not reach the bundler, so gtag.js will never load and GA4 will show"
+    echo "no traffic — with nothing visibly wrong on the site. Check that the Dockerfile's builder"
+    echo "stage still declares ARG NEXT_PUBLIC_GA_MEASUREMENT_ID; Docker ignores an undeclared one."
+    exit 1
+  fi
+fi
+
+echo "==> [4/7] Saving image to ${TARBALL}..."
 docker save -o "$TARBALL" "${IMAGE_NAME}:latest"
 
 # Verify the target BEFORE uploading, and never create it. A directory that isn't there means
 # REMOTE_DIR is wrong, not that a directory needs making: `mkdir -p` on a wrong path silently
 # produces an empty one, compose then finds no .env, every ${VAR} resolves to "", and the deploy
 # fails in confusing ways well after a long build has completed.
-echo "==> [4/6] Verifying ${REMOTE_DIR} on ${REMOTE_HOST}..."
+echo "==> [5/7] Verifying ${REMOTE_DIR} on ${REMOTE_HOST}..."
 ssh -i "$SSH_KEY" "$REMOTE_HOST" "test -f ${REMOTE_DIR}/docker-compose.yml" || {
   echo "ERROR: ${REMOTE_DIR} on ${REMOTE_HOST} has no docker-compose.yml."
   echo "Find the real path with:"
@@ -99,10 +125,10 @@ ssh -i "$SSH_KEY" "$REMOTE_HOST" "test -f ${REMOTE_DIR}/docker-compose.yml" || {
 # NEXT_PUBLIC_* variable there does nothing: those are build-time only, handled above.
 scp -i "$SSH_KEY" "$TARBALL" "${REMOTE_HOST}:${REMOTE_DIR}/"
 
-echo "==> [5/6] Loading image on the server..."
+echo "==> [6/7] Loading image on the server..."
 ssh -i "$SSH_KEY" "$REMOTE_HOST" "cd ${REMOTE_DIR} && docker load -i ${TARBALL}"
 
-echo "==> [6/6] Restarting ${SERVICE_NAME}..."
+echo "==> [7/7] Restarting ${SERVICE_NAME}..."
 # --no-deps in case this compose file gains a second service later; harmless when it has only one.
 ssh -i "$SSH_KEY" "$REMOTE_HOST" \
   "cd ${REMOTE_DIR} && docker compose up -d --no-deps --force-recreate ${SERVICE_NAME}"
@@ -138,6 +164,19 @@ if [ "$HEALTH_OK" = "1" ]; then
     echo "    WARNING: ${TOTAL_URLS} URLs and NONE are products, bakers or occasions."
     echo "    The backend fetches inside the container are failing. Check:"
     echo "      ssh -i ${SSH_KEY} ${REMOTE_HOST} \"docker exec ${SERVICE_NAME} sh -c 'wget -qO- \\\$MEDUSA_BACKEND_URL/store/crossfriend/taxonomy'\""
+  fi
+
+  # The chunk check at step [3/7] proves the ID reached the bundler; this proves the tag survived
+  # into what a browser is actually served, which is the thing GA4 DebugView reflects.
+  if [ -n "${GA_MEASUREMENT_ID}" ]; then
+    echo
+    echo "==> Checking gtag.js is in the served HTML..."
+    if curl -fsS --max-time 20 "${BASE_URL}" | grep -q "gtag/js?id=${GA_MEASUREMENT_ID}"; then
+      echo "    OK — the served page loads ${GA_MEASUREMENT_ID}. DebugView should now see traffic."
+    else
+      echo "    WARNING: the image carries ${GA_MEASUREMENT_ID} but the served page does not load it."
+      echo "    The container is probably still running the previous image, or nginx is caching."
+    fi
   fi
 
   echo

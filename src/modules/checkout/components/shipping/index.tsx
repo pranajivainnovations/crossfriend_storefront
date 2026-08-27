@@ -14,6 +14,8 @@ import ErrorMessage from "@modules/checkout/components/error-message"
 import { setShippingMethod } from "@modules/checkout/actions"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
+import { track } from "@lib/analytics"
+import { cartToPayload } from "@lib/analytics/ecommerce"
 
 type ShippingProps = {
   cart: Omit<Cart, "refundable_amount" | "refunded_total">
@@ -39,6 +41,12 @@ const Shipping: React.FC<ShippingProps> = ({
 
   const handleSubmit = () => {
     setIsLoading(true)
+    // Fired on continue rather than on selection: people try several options before settling, and
+    // each change would otherwise register as another step completed.
+    track("add_shipping_info", {
+      ...cartToPayload(cart),
+      shipping_tier: cart.shipping_methods?.[0]?.shipping_option?.name ?? undefined,
+    })
     router.push(pathname + "?step=payment", { scroll: false })
   }
 

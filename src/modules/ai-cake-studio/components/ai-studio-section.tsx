@@ -32,6 +32,7 @@ import {
   MAX_UPLOAD_BYTES,
   type ReferencePurpose,
 } from "@lib/data/ai-studio"
+import { track } from "@lib/analytics"
 
 const FREE_ATTEMPTS_LIMIT = 3
 
@@ -809,6 +810,24 @@ export default function AiStudioSection({ customer }: Props) {
 
   const handleGenerate = async () => {
     if (!canGenerate) return
+
+    /**
+     * The intent half of the pair, fired here rather than on the hero button.
+     *
+     * The hero's event (`studio_hero_prompt_submitted`) is a scroll-to-studio, several steps earlier
+     * — comparing that against completed designs would measure "did they scroll", not "did the AI
+     * deliver". This is the click that actually asks for a generation, so this is what
+     * `studio_design_generated` should be read against.
+     */
+    const startedAt = Date.now()
+    track("studio_generate_clicked", {
+      prompt_length: prompt.trim().length,
+      style: sel.style,
+      occasion: sel.occasion,
+      has_reference_image: Boolean(referenceUploadId),
+      attempts_left: attemptsLeft,
+    })
+
     setGenerating(true)
     setGenerationError(null)
     setSelectedDesignId(null)
@@ -860,9 +879,44 @@ export default function AiStudioSection({ customer }: Props) {
     setGenerating(false)
 
     if (!result.success || !result.designs?.length) {
+      /**
+       * The failure counter is what explains the gap between clicks and designs.
+       *
+       * Without it, `studio_generate_clicked` minus `studio_design_generated` is an unexplained
+       * drop that looks like people changing their minds — when it may be the image provider timing
+       * out. The error text comes from our own action, not from user input, so it is safe to send.
+       */
+      track("studio_generation_failed", {
+        duration_ms: Date.now() - startedAt,
+        reason: result.error || "unknown",
+        model: selectedModel?.model,
+      })
       setGenerationError(result.error || "Something went wrong. Please try again.")
       return
     }
+
+    /**
+     * The completion half of the pair.
+     *
+     * Deliberately not fired in the USE_MOCK_AI_STUDIO branch above: mock designs are canned data
+     * that never touched an image provider, and reporting them would make generation look faster
+     * and far more reliable than it is in any environment where the mock is switched on.
+     *
+     * duration_ms is the number to watch — "how long will people wait" is answerable from it, and
+     * it is the one thing the funnel counts alone cannot tell you.
+     */
+    track("studio_design_generated", {
+      duration_ms: Date.now() - startedAt,
+      design_count: result.designs.length,
+      style: sel.style,
+      occasion: sel.occasion,
+      flavor: sel.flavor,
+      tiers: sel.tiers,
+      shape: sel.shape,
+      has_reference_image: Boolean(referenceUploadId),
+      model: selectedModel?.model,
+      provider: selectedModel?.provider,
+    })
 
     // Append new design(s) to whatever's already there — a regenerate click
     // adds another card instead of replacing the previous one.

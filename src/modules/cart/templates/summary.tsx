@@ -2,6 +2,8 @@
 
 import { Button, Heading } from "@medusajs/ui"
 
+import { track } from "@lib/analytics"
+import { cartToPayload } from "@lib/analytics/ecommerce"
 import CartTotals from "@modules/common/components/cart-totals"
 import Divider from "@modules/common/components/divider"
 import { CartWithCheckoutStep } from "types/global"
@@ -21,7 +23,19 @@ const Summary = ({ cart }: SummaryProps) => {
       <DiscountCode cart={cart} />
       <Divider />
       <CartTotals data={cart} />
-      <LocalizedClientLink href={"/checkout?step=" + cart.checkout_step} data-testid="checkout-button">
+      {/*
+        begin_checkout fires on the click, not on the checkout page mounting.
+
+        The checkout route can be reached without passing through here — a resumed session, a
+        bookmarked step URL, a back-navigation from payment — so tracking it on arrival would count
+        one visitor several times and make the cart→checkout rate exceed 100%. The click is the
+        intent, and it happens exactly once.
+      */}
+      <LocalizedClientLink
+        href={"/checkout?step=" + cart.checkout_step}
+        data-testid="checkout-button"
+        onClick={() => track("begin_checkout", cartToPayload(cart))}
+      >
         <Button className="w-full h-10">Go to checkout</Button>
       </LocalizedClientLink>
     </div>

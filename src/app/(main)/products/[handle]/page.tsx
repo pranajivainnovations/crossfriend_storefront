@@ -9,6 +9,8 @@ import {
   retrievePricedProductById,
 } from "@lib/data"
 import { Region } from "@medusajs/medusa"
+import { productToItem, toMajorUnits } from "@lib/analytics/ecommerce"
+import TrackEvent from "@modules/analytics/components/track-event"
 import ProductTemplate from "@modules/products/templates"
 import { buildProductJsonLd } from "@lib/util/product-jsonld"
 import { breadcrumbJsonLd, jsonLdScriptProps, plainText } from "@lib/util/seo"
@@ -130,6 +132,25 @@ export default async function ProductPage({ params }: Props) {
     <>
       {productJsonLd && <script {...jsonLdScriptProps(productJsonLd)} />}
       <script {...jsonLdScriptProps(breadcrumbs)} />
+      {/* Keyed on the handle so navigating between two products reports both, while a re-render of
+          the same one does not. */}
+      <TrackEvent
+        name="view_item"
+        dedupeKey={pricedProduct.handle ?? undefined}
+        payload={{
+          currency: region.currency_code?.toUpperCase(),
+          value: toMajorUnits(
+            pricedProduct.variants?.[0]?.calculated_price ?? 0,
+            region.currency_code
+          ),
+          items: [
+            productToItem(pricedProduct, {
+              price: pricedProduct.variants?.[0]?.calculated_price ?? undefined,
+              currencyCode: region.currency_code,
+            }),
+          ],
+        }}
+      />
       <ProductTemplate product={pricedProduct} region={region} />
     </>
   )

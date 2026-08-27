@@ -3,6 +3,7 @@
 import { LineItem, Region } from "@medusajs/medusa"
 import { Table, Text, clx } from "@medusajs/ui"
 
+import { lineItemToItem, toMajorUnits } from "@lib/analytics/ecommerce"
 import CartItemSelect from "@modules/cart/components/cart-item-select"
 import DeleteButton from "@modules/common/components/delete-button"
 import LineItemOptions from "@modules/common/components/line-item-options"
@@ -79,7 +80,18 @@ const Item = ({ item, region, type = "full" }: ItemProps) => {
       {type === "full" && (
         <Table.Cell>
           <div className="flex gap-2 items-center w-28">
-            <DeleteButton id={item.id} data-testid="product-delete-button" />
+            <DeleteButton
+              id={item.id}
+              data-testid="product-delete-button"
+              analytics={{
+                currency: region.currency_code.toUpperCase(),
+                value: toMajorUnits(
+                  (item.unit_price ?? 0) * (item.quantity ?? 1),
+                  region.currency_code
+                ),
+                items: [lineItemToItem(item as any, region.currency_code)],
+              }}
+            />
             <CartItemSelect
               value={item.quantity}
               onChange={(value) => changeQuantity(parseInt(value.target.value))}

@@ -1,6 +1,11 @@
 import { Metadata } from "next"
 import { Inter, Poppins } from "next/font/google"
+import { Suspense } from "react"
 import "styles/globals.css"
+
+import AnalyticsScripts from "@modules/analytics/components/analytics-scripts"
+import CookieBanner from "@modules/analytics/components/cookie-banner"
+import PageViewTracker from "@modules/analytics/components/page-view-tracker"
 
 import { getSiteSettings } from "@lib/data/site-settings"
 import {
@@ -140,9 +145,24 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
     <html lang="en" data-mode="light">
       <head>
         <script {...jsonLdScriptProps(jsonLd)} />
+        {/* Consent defaults and gtag.js. Renders nothing at all unless a measurement ID is
+            configured, which is what keeps local and preview builds out of production reporting. */}
+        <AnalyticsScripts />
       </head>
       <body className={`${inter.variable} ${poppins.variable} font-sans`}>
         <main className="relative">{props.children}</main>
+
+        {/*
+          useSearchParams() opts a route out of static rendering unless it sits inside a Suspense
+          boundary. Every page here is already dynamic, but the boundary keeps that a property of
+          this component rather than something the tracker imposes on the whole tree — and it means
+          adding a static page later does not silently become dynamic because of analytics.
+        */}
+        <Suspense fallback={null}>
+          <PageViewTracker />
+        </Suspense>
+
+        <CookieBanner />
       </body>
     </html>
   )

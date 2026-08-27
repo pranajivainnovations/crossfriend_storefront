@@ -2,6 +2,8 @@ import { Order } from "@medusajs/medusa"
 import { Heading } from "@medusajs/ui"
 import { cookies } from "next/headers"
 
+import { orderToPurchase } from "@lib/analytics/ecommerce"
+import PurchaseTracker from "@modules/analytics/components/purchase-tracker"
 import CartTotals from "@modules/common/components/cart-totals"
 import Help from "@modules/order/components/help"
 import Items from "@modules/order/components/items"
@@ -21,6 +23,10 @@ export default function OrderCompletedTemplate({
 
   return (
     <div className="py-6 min-h-[calc(100vh-64px)]">
+      {/* The one event that must be exactly right — see PurchaseTracker for the two guards that
+          stop a refresh of this page being counted as a second sale. */}
+      <PurchaseTracker payload={orderToPurchase(order)} />
+
       <div className="content-container flex flex-col justify-center items-center gap-y-10 max-w-4xl h-full w-full">
         {isOnboarding && <OnboardingCta orderId={order.id} />}
         <div className="flex flex-col gap-4 max-w-4xl h-full bg-white w-full py-10" data-testid="order-complete-container">

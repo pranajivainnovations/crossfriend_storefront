@@ -16,6 +16,8 @@ import PaymentContainer from "@modules/checkout/components/payment-container"
 import { setPaymentMethod } from "@modules/checkout/actions"
 import { paymentInfoMap } from "@lib/constants"
 import { StripeContext } from "@modules/checkout/components/payment-wrapper"
+import { track } from "@lib/analytics"
+import { cartToPayload } from "@lib/analytics/ecommerce"
 
 const Payment = ({
   cart,
@@ -93,6 +95,15 @@ const Payment = ({
 
   const handleSubmit = () => {
     setIsLoading(true)
+    // Same reasoning as shipping: on continue, not on selection, so switching between UPI and card
+    // does not report the step twice. `cart` is nullable on this component, and a step reported
+    // with no basket would be a zero-value event polluting the funnel — skip rather than guess.
+    if (cart) {
+      track("add_payment_info", {
+        ...cartToPayload(cart),
+        payment_type: cart.payment_session?.provider_id ?? undefined,
+      })
+    }
     router.push(pathname + "?" + createQueryString("step", "review"), {
       scroll: false,
     })
