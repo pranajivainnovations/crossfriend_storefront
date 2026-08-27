@@ -153,6 +153,10 @@ async function write(target, element, size) {
 
 /** Every route that gets its own card, and what it says. */
 const ROUTES = [
+  // The route group root. Covers "/" and becomes the fallback card for every page in (main)
+  // that does not define its own, which is how the homepage came to have no og:image at all: the
+  // per-route cards were added one by one and the most-shared URL on the site was never one of them.
+  ["", "", "Make every celebration unforgettable", "Cakes, decorations, gifts and more"],
   ["occasions", "Browse", "Shop by occasion", "Birthdays, anniversaries, festivals and more"],
   ["occasions/[occasion]", "Occasion", "Cakes for the occasion", "From bakers near you"],
   ["collections", "Browse", "Collections", "Curated picks for every celebration"],

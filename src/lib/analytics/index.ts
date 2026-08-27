@@ -102,12 +102,37 @@ export function updateConsent(state: ConsentState): void {
  *
  * Sent manually because the App Router navigates on the client without a document load, so gtag's
  * automatic `page_view` fires once and then never again for the rest of the session.
+ *
+ * `url` arrives as a root-relative path ("/store?type=cake") because that is what the App Router
+ * hooks give us. GA4 wants the two fields in different shapes, and gets them wrong quietly rather
+ * than loudly if you hand it the same string twice:
+ *
+ *   page_location — an ABSOLUTE URL. It is what GA4 derives the hostname from, so a relative value
+ *                   leaves reports showing "(not set)" for hostname and mangled page URLs. This is
+ *                   the field the automatic page view would have populated from document.location.
+ *   page_path     — root-relative, which is what it is already.
+ *
+ * The absolute form is rebuilt from the passed path rather than read from window.location.href, so
+ * the event describes the route the tracker actually observed. Those can differ: the effect runs
+ * after navigation commits, and a redirect landing between the two would otherwise report the
+ * destination under the previous route's identity.
  */
 export function trackPageView(url: string, title?: string): void {
   if (!analyticsEnabled) return
   try {
+    let pageLocation = url
+    if (typeof window !== "undefined") {
+      // Guarded separately from the outer try: a URL that fails to parse should cost us the
+      // absolute form, not the entire page view.
+      try {
+        pageLocation = new URL(url, window.location.origin).href
+      } catch {
+        pageLocation = url
+      }
+    }
+
     push("event", "page_view", {
-      page_location: url,
+      page_location: pageLocation,
       page_path: url,
       ...(title ? { page_title: title } : {}),
     })
