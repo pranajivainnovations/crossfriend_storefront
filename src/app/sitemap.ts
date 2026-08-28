@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next"
+import { collectDesignEntries } from "./sitemap-designs"
 
 import type { StoreGetProductsParams } from "@medusajs/medusa"
 
@@ -388,6 +389,8 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
 
   // Order is not a ranking signal, but it makes the file readable when someone opens it to check
   // whether the dynamic sections are populated — the failure mode this sitemap has actually had.
+  const designEntries = await collectDesignEntries()
+
   return validate([
     ...staticEntries,
     ...occasionEntries,
@@ -396,6 +399,7 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
     ...typeEntries,
     ...bakerEntries,
     ...productEntries,
+    ...designEntries,
   ])
 }
 

@@ -25,7 +25,12 @@ export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
-  title: "CrossFriend — Make Every Celebration Unforgettable",
+  // `absolute` bypasses the root layouts `%s | CrossFriend` template. Without it this title,
+  // which already opens with the brand, renders as
+  //   CrossFriend - Make Every Celebration Unforgettable | CrossFriend
+  // at 64 characters - past the ~60 Google shows, and spending the overflow on the brand name a
+  // second time. Every other page title is bare and correctly gets the suffix appended.
+  title: { absolute: "CrossFriend — Make Every Celebration Unforgettable" },
   description:
     "Plan your perfect celebration. Shop cakes, decorations, gifts, costumes and more — all in one place. Same-day delivery available.",
   keywords: [

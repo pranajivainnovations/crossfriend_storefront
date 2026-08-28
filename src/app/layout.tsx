@@ -141,8 +141,11 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
     },
   ]
 
+  // en-IN rather than bare `en`: the regional variant is what marks this as an Indian site, and it
+  // has to agree with the "inLanguage": "en-IN" already asserted in the WebSite schema above. The
+  // two disagreeing is a contradiction that resolves in nobody's favour.
   return (
-    <html lang="en" data-mode="light">
+    <html lang="en-IN" data-mode="light">
       <head>
         <script {...jsonLdScriptProps(jsonLd)} />
         {/* Consent defaults and gtag.js. Renders nothing at all unless a measurement ID is

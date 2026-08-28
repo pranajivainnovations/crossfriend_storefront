@@ -4,6 +4,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import Link from "next/link"
+import { designSlug } from "@lib/util/design-slug"
 import type { Customer } from "@medusajs/medusa"
 import DesignLightbox from "@modules/ai-cake-studio/components/design-lightbox"
 import LikeButton from "@modules/ai-cake-studio/components/like-button"
@@ -349,9 +350,18 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
                     )}
                   </div>
 
-                  <p className="line-clamp-2 text-xs text-slate-500 leading-relaxed">
+                  {/* The prompt is the link, so the anchor text IS the search phrase — "unicorn
+                      birthday cake for a 5 year old" pointing at the page about exactly that. A
+                      generic "View design" link would waste the one piece of text on this card
+                      that matches what somebody would type into a search box. This is also the
+                      only crawl path to the design pages: the lightbox above is script-driven, so
+                      without a real anchor here nothing would ever be discovered. */}
+                  <Link
+                    href={`/ai-cake-studio/gallery/${designSlug(design)}`}
+                    className="line-clamp-2 block text-xs leading-relaxed text-slate-500 hover:text-cf-purple-700 hover:underline"
+                  >
                     {design.prompt}
-                  </p>
+                  </Link>
 
                   {/* Use this prompt / Use this cake — side by side on
                       larger screens, compact icon+word pair on mobile */}
