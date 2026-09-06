@@ -18,6 +18,10 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [resendIn, setResendIn] = useState(0)
+  // How many digits to expect. Configurable per flow in OPS, so it is read from the send
+  // response rather than assumed — a hardcoded 6 here would silently disagree with the server
+  // the first time someone changes it, rejecting valid codes in the browser before they are sent.
+  const [otpLength, setOtpLength] = useState(6)
   const [isNewUser, setIsNewUser] = useState(false)
   const otpInputRef = useRef<HTMLInputElement>(null)
 
@@ -44,10 +48,17 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? "Failed to send OTP. Please try again.")
+        // A 429 carries the server's own remaining cooldown. Running the countdown from that
+        // rather than a local guess means the button re-enables when the backend will actually
+        // accept the next request, instead of a few seconds early into another rejection.
+        if (typeof data.retryAfterSeconds === "number") setResendIn(data.retryAfterSeconds)
         return
       }
+      if (typeof data.otpLength === "number") setOtpLength(data.otpLength)
       setStep("otp")
-      setResendIn(30)
+      // Server-driven: the cooldown is configurable per flow in OPS, so hardcoding 30 here would
+      // silently disagree with it the first time someone changes it.
+      setResendIn(data.resendAfterSeconds ?? 30)
       setTimeout(() => otpInputRef.current?.focus(), 80)
     } finally {
       setLoading(false)
@@ -56,8 +67,8 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
 
   const verifyOtp = async () => {
     setError("")
-    if (!/^\d{6}$/.test(otp)) {
-      setError("Enter the 6-digit OTP sent to your mobile")
+    if (!new RegExp(`^\\d{${otpLength}}$`).test(otp)) {
+      setError(`Enter the ${otpLength}-digit OTP sent to your mobile`)
       return
     }
     setLoading(true)
@@ -169,17 +180,17 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
                 ref={otpInputRef}
                 type="tel"
                 inputMode="numeric"
-                maxLength={6}
+                maxLength={otpLength}
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, otpLength))}
                 onKeyDown={(e) => e.key === "Enter" && verifyOtp()}
-                placeholder="6-digit OTP"
+                placeholder={`${otpLength}-digit OTP`}
                 className="flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm tracking-[0.4em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200"
               />
               <button
                 type="button"
                 onClick={verifyOtp}
-                disabled={loading || otp.length !== 6}
+                disabled={loading || otp.length !== otpLength}
                 className="rounded-xl bg-gradient-to-r from-cf-purple-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-cf-purple-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
