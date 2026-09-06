@@ -7,6 +7,7 @@ import AnalyticsScripts from "@modules/analytics/components/analytics-scripts"
 import CookieBanner from "@modules/analytics/components/cookie-banner"
 import PageViewTracker from "@modules/analytics/components/page-view-tracker"
 
+import { ENTITY } from "@lib/constants/legal"
 import { getSiteSettings } from "@lib/data/site-settings"
 import {
   BASE_URL,
@@ -103,6 +104,27 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
       "@type": "Organization",
       "@id": ORGANIZATION_ID,
       name: "CrossFriend",
+      /**
+       * The brand-to-entity link, in the form a machine reads.
+       *
+       * The footer, /about and the Terms all state this in prose; these fields are the same claim
+       * as structured data, and it earns its place twice over. A knowledge graph needs it to
+       * resolve CrossFriend and PRANAJIVA INNOVATIONS as one entity rather than two — the exact
+       * problem that got a DLT header application refused. And "Cross Friend" as two words is a
+       * spelling Google still holds from an earlier version of this site; alternateName is how that
+       * orphaned variant gets reattached to this entity instead of quietly competing with it.
+       *
+       * legalName is the CIN-registered spelling, character for character. identifier carries the
+       * CIN, which is the only globally unique handle this company has.
+       */
+      legalName: ENTITY.legalName,
+      alternateName: ["Cross Friend", "CrossFriend.in"],
+      foundingDate: "2026-03-27",
+      identifier: {
+        "@type": "PropertyValue",
+        propertyID: "CIN",
+        value: ENTITY.cin,
+      },
       url: BASE_URL,
       description:
         "Cakes, decorations, gifts and costumes for every celebration, from local bakers and makers.",

@@ -127,6 +127,12 @@ const STATIC_PATHS: Array<{
   // Listing pages for the two browse hierarchies. Their individual pages are enumerated below.
   { path: "/categories", priority: 0.7, changeFrequency: "weekly" },
   { path: "/collections", priority: 0.7, changeFrequency: "weekly" },
+  // Ranked above the legal pages, below the commercial ones. These are where "who operates this
+  // site" is answered — for a customer, for an answer engine asked about the company, and for a
+  // verifier checking that CrossFriend and PRANAJIVA INNOVATIONS are the same entity. A page that
+  // exists to be found by someone checking up on you is worth crawling promptly.
+  { path: "/about", priority: 0.6, changeFrequency: "monthly" },
+  { path: "/contact", priority: 0.6, changeFrequency: "monthly" },
   // NOT listed: /design-your-cake redirects to /ai-cake-studio, and a sitemap entry that redirects
   // wastes crawl budget and reports as an error in Search Console. /search, /cart, /account and
   // /results/[query] are excluded for the same class of reason — private, or infinite URL space.

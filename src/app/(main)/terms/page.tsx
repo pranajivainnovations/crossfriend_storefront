@@ -18,11 +18,28 @@ export default function TermsPage() {
       summary="CrossFriend is a marketplace. When you order, your contract for the food itself is with the baker who makes it — we run the platform, take the payment and support the order."
     >
       <Section n={1} title="Who we are">
+        {/*
+          States the brand-to-entity relationship explicitly rather than implying it.
+
+          "CrossFriend is operated by X" leaves room for a reader — or a verifier — to think
+          CrossFriend is itself a company. It is not: it is a brand, and the only legal person here
+          is PRANAJIVA INNOVATIONS (OPC) PRIVATE LIMITED. Saying so plainly matters for a customer
+          who needs to know who they contracted with, and it is the exact assertion TRAI DLT,
+          payment gateways and the MCA register look for.
+        */}
         <p>
-          {ENTITY.brand} is operated by {ENTITY.legalName}, registered at {ENTITY.address}.
+          {ENTITY.brand} is a brand and online platform owned and operated by {ENTITY.legalName}, a
+          company incorporated in India on {ENTITY.incorporatedOn} and registered at{" "}
+          {ENTITY.address}.
+        </p>
+        <p>
+          References to &ldquo;{ENTITY.brand}&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo; or
+          &ldquo;our&rdquo; on this website refer to {ENTITY.legalName}, the legal entity
+          responsible for operating the {ENTITY.brand} platform and providing its associated
+          services.
         </p>
         <p className="text-grey-50">
-          GST: {ENTITY.gst} · CIN: {ENTITY.cin}
+          CIN: {ENTITY.cin} · GST: {ENTITY.gst}
         </p>
         <p>
           By using {ENTITY.website} you agree to these terms. If you do not agree with them, please

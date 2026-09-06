@@ -166,14 +166,26 @@ export default async function Footer() {
         {/* Bottom bar */}
         <div className="flex w-full flex-col gap-3 mb-8 pt-6 border-t border-grey-80 text-grey-40 small:flex-row small:items-center small:justify-between">
           <div className="text-xs leading-relaxed">
-            <Text className="txt-compact-small">
+            {/*
+              The ownership statement sits ABOVE the copyright line, and says "brand and online
+              platform owned and operated by" rather than a looser "operated by".
+
+              That phrasing is doing a specific job. A brand name alone does not tell a customer who
+              they contracted with, and more immediately: TRAI DLT registration, payment gateways and
+              the MCA register all need to see that CrossFriend and the company are one entity. A DLT
+              header application was rejected precisely because nothing publicly connected the two.
+              The CIN is included because that is the string a verifier looks up.
+
+              Every value renders from ENTITY, so the spelling here can never drift from the legal
+              pages — which is the whole point when the thing being asserted is an exact-match claim.
+            */}
+            <p className="text-grey-50">
+              {ENTITY.brand} is a brand and online platform owned and operated by{" "}
+              {ENTITY.legalName}, Uttar Pradesh, India. CIN: {ENTITY.cin}
+            </p>
+            <Text className="txt-compact-small mt-1">
               © {new Date().getFullYear()} {ENTITY.brand}. All rights reserved.
             </Text>
-            {/* The operating entity, named. A brand name alone does not tell a customer who they
-                have contracted with, and a payment gateway will ask for exactly this. */}
-            <p className="mt-1 text-grey-50">
-              {ENTITY.brand} is operated by {ENTITY.legalName}, {ENTITY.address}.
-            </p>
             <p className="mt-1 text-grey-50">
               {ENTITY.supportEmail} · {ENTITY.supportPhone}
             </p>

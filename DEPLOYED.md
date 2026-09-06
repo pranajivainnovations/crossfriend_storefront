@@ -25,3 +25,19 @@ Do not edit by hand, and do not delete — it is the only record of what is live
 - image:   crossfriend-storefront:latest
 - target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
 - by:      crossfriend2025
+---
+- when:    2026-09-06 11:42:08 UTC  /  2026-09-06 17:12 IST
+- outcome: FAILED (exit 1)
+- commit:  a027856 (main)
+- tree:    dirty
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
+---
+- when:    2026-09-06 11:47:32 UTC  /  2026-09-06 17:17 IST
+- outcome: SUCCESS
+- commit:  a027856 (main)
+- tree:    dirty
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
