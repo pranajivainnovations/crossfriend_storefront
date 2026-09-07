@@ -85,6 +85,26 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=8000
 
+# ── OTP sign-in ───────────────────────────────────────────────────────────────
+# Required at RUNTIME, supplied by docker-compose's `environment:` block:
+#
+#   OTP_PASSWORD_SALT   min 32 chars; /api/auth/otp/verify returns 503 without it
+#   MEDUSA_BACKEND_URL  already set in compose; the OTP routes proxy to it
+#
+# Not declared as an ARG or ENV here, deliberately. Note the contrast with the
+# NEXT_PUBLIC_* block in the builder stage above: those MUST be build args
+# because the bundler inlines them into the client JS at compile time. This one
+# is the mirror image — it has no NEXT_PUBLIC_ prefix, is never sent to the
+# browser, and is read from process.env by the server route on each request. So
+# a value set in compose takes effect on `up -d` with no rebuild, and a build
+# arg would bake a secret into the image while still not being read at runtime.
+#
+# No empty ENV placeholder either: compose overrides it regardless, so it would
+# only serve as an invitation to paste a secret into a layer that ships.
+#
+# Once set, do not change it — every existing customer's Medusa password is
+# derived from this salt, and rotating it locks all of them out.
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

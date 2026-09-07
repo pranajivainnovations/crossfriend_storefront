@@ -40,6 +40,25 @@ services:
       NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://api.pranajiva.in}
       NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://crossfriend.in}
       NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-in}
+
+      # ── OTP sign-in ─────────────────────────────────────────────────────────
+      # Salt for the derived Medusa password behind mobile sign-in.
+      #
+      # This one genuinely belongs here, unlike the NEXT_PUBLIC_* values above.
+      # It has no NEXT_PUBLIC_ prefix, so the bundler never inlines it and the
+      # /api/auth/otp/verify route reads it from process.env per request — a
+      # value set here takes effect on `up -d`, with no rebuild. Adding it as a
+      # build arg instead would bake a secret into the image and still not be
+      # read at runtime, which is the worst of both.
+      #
+      # Deliberately no `:-default`. Compose turns an absent ${VAR} into an
+      # empty string, and the route treats empty as fatal (503) rather than
+      # falling back — the previous hardcoded fallback shipped to production and
+      # made every customer's password derivable from the source.
+      #
+      # Once set, do not change it: every existing customer's password is
+      # derived from this value.
+      OTP_PASSWORD_SALT: ${OTP_PASSWORD_SALT}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
