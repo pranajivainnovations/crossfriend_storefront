@@ -50,20 +50,40 @@ const FONTS = [
 ]
 
 const PURPLE = "#7B2FF7"
+
+/**
+ * The hero cake, inlined as a data URI.
+ *
+ * satori has no network access and no filesystem resolution for <img src>, so a path or URL renders
+ * as nothing — silently, with the layout still succeeding. Embedding the bytes is the only reliable
+ * way to get a photograph into these cards.
+ *
+ * A photo rather than another gradient because a share card competes in a feed against real
+ * photographs. The abstract gradient version this replaces was legible but anonymous: nothing in it
+ * said "cake", which is the one thing a stranger seeing the link needs to understand in the half
+ * second before they scroll past.
+ */
+const HERO_CAKE = fs.readFileSync(
+  path.join(ROOT, "public", "ai-cake-studio", "hero", "hero-cake.jpg")
+)
+const HERO_CAKE_URI = `data:image/jpeg;base64,${HERO_CAKE.toString("base64")}`
 const el = (type, style, ...children) => React.createElement(type, { style }, ...children)
 
 /** Facebook and WhatsApp both crop toward 1.91:1; 1200×630 is the size everything agrees on. */
 const OG_SIZE = { width: 1200, height: 630 }
 
-function ogCard({ eyebrow, title, subtitle }) {
+function ogCard({ eyebrow, title, subtitle, photo }) {
   // Long titles shrink rather than wrap indefinitely — otherwise the text pushes the wordmark off
   // the bottom of the card, which reads as a broken image rather than a long title.
-  const titleSize = title.length > 46 ? 62 : title.length > 28 ? 76 : 92
+  // The text column is narrower when a photo shares the card, so the thresholds tighten with it.
+  const titleSize = photo
+    ? title.length > 34 ? 54 : title.length > 22 ? 64 : 74
+    : title.length > 46 ? 62 : title.length > 28 ? 76 : 92
 
-  return el(
+  const textPanel = el(
     "div",
     {
-      width: "100%",
+      width: photo ? 700 : "100%",
       height: "100%",
       display: "flex",
       flexDirection: "column",
@@ -121,6 +141,40 @@ function ogCard({ eyebrow, title, subtitle }) {
       el("div", { display: "flex", fontSize: 34, marginLeft: 16 }, "crossfriend.in")
     )
   )
+
+  if (!photo) return textPanel
+
+  /**
+   * A clean vertical split rather than a photo bleeding under the text.
+   *
+   * satori supports absolute positioning but not the blend modes or blurred masks that would make
+   * an overlap look deliberate, and a half-faded photo behind white text is the exact effect that
+   * reads as a rendering bug. A hard edge at least looks chosen — and it keeps the text on flat
+   * colour, which is what survives WhatsApp's aggressive recompression.
+   */
+  return el(
+    "div",
+    { width: "100%", height: "100%", display: "flex", fontFamily: "Noto Sans" },
+    textPanel,
+    el(
+      "div",
+      { display: "flex", width: 500, height: "100%", overflow: "hidden" },
+      /**
+       * Built with React.createElement directly, not the el() helper.
+       *
+       * el() forwards its second argument as `style` only — fine for divs, but an <img> needs src,
+       * width and height as real props. Passing them through el() puts them in the style object,
+       * where satori silently ignores them and then throws "Image source is not provided" from deep
+       * inside the renderer, naming nothing that points back to the call site.
+       */
+      React.createElement("img", {
+        src: photo,
+        width: 500,
+        height: 630,
+        style: { objectFit: "cover" },
+      })
+    )
+  )
 }
 
 function markCard({ size, background, radius, fontSize }) {
@@ -156,7 +210,7 @@ const ROUTES = [
   // The route group root. Covers "/" and becomes the fallback card for every page in (main)
   // that does not define its own, which is how the homepage came to have no og:image at all: the
   // per-route cards were added one by one and the most-shared URL on the site was never one of them.
-  ["", "", "Make every celebration unforgettable", "Cakes, decorations, gifts and more"],
+  ["", "", "Make every celebration unforgettable", "Cakes, decorations, gifts and more", HERO_CAKE_URI],
   ["occasions", "Browse", "Shop by occasion", "Birthdays, anniversaries, festivals and more"],
   ["occasions/[occasion]", "Occasion", "Cakes for the occasion", "From bakers near you"],
   ["collections", "Browse", "Collections", "Curated picks for every celebration"],
@@ -191,8 +245,34 @@ await write(
 )
 
 console.log("Open Graph cards:")
-for (const [route, eyebrow, title, subtitle] of ROUTES) {
-  await write(path.join(APP, route, "opengraph-image.png"), ogCard({ eyebrow, title, subtitle }), OG_SIZE)
+for (const [route, eyebrow, title, subtitle, photo] of ROUTES) {
+  await write(
+    path.join(APP, route, "opengraph-image.png"),
+    ogCard({ eyebrow, title, subtitle, photo }),
+    OG_SIZE
+  )
 }
+
+/**
+ * Site-wide fallbacks at src/app root, covering two gaps the per-route cards do not.
+ *
+ * The repo shipped with the Medusa starter's own artwork here — a "Next.js Starter Template" card
+ * showing the Next.js and Medusa logos and a demo store screenshot. opengraph-image.jpg was masked
+ * for most pages by the (main) group's card, but twitter-image.jpg had no override anywhere, so
+ * every page on the site offered that image to any platform preferring twitter:image over og:image.
+ * Anyone sharing crossfriend.in on X or LinkedIn was advertising the framework.
+ *
+ * Both are regenerated here so the fallback is a CrossFriend card rather than absent — a route
+ * outside (main) with no card of its own should still preview as this brand.
+ */
+console.log("Site-wide fallbacks:")
+const fallback = ogCard({
+  eyebrow: "",
+  title: "Make every celebration unforgettable",
+  subtitle: "Cakes, decorations, gifts and more",
+  photo: HERO_CAKE_URI,
+})
+await write(path.join(ROOT, "src", "app", "opengraph-image.png"), fallback, OG_SIZE)
+await write(path.join(ROOT, "src", "app", "twitter-image.png"), fallback, OG_SIZE)
 
 console.log(`\nDone — ${ROUTES.length + 2} images.`)

@@ -12,6 +12,7 @@ import HowItWorks from "@modules/home/components/how-it-works"
 import Testimonials from "@modules/home/components/testimonials"
 import CtaBanner from "@modules/home/components/cta-banner"
 import { getSiteSettings } from "@lib/data/site-settings"
+import { BASE_URL } from "@lib/util/seo"
 // IntentPaths is retired: the hero now carries both intents itself — the prompt bar is the Studio
 // path and "browse cakes ready to order" is the shop path. Two cards restating that immediately
 // below the hero asked the same question twice.
@@ -46,11 +47,28 @@ export const metadata: Metadata = {
     "kids party",
     "same day delivery",
   ],
+  /**
+   * url, siteName and locale are repeated here even though the root layout already sets them.
+   *
+   * Next does NOT deep-merge openGraph: a page-level block replaces the parent's outright. So
+   * declaring only title/description/type here silently dropped og:site_name and og:locale from the
+   * most-shared page on the site, and og:url was never set anywhere. The live HTML confirmed it —
+   * neither tag was present on the homepage.
+   *
+   * They matter for what a share card looks like: og:site_name is the small "CrossFriend" label
+   * above the headline in a Facebook or LinkedIn preview, and without it the platform falls back to
+   * printing the bare domain. og:url is what a scraper treats as the canonical identity of the
+   * thing being shared, which keeps likes and shares of crossfriend.in and www.crossfriend.in
+   * accumulating to one page rather than two.
+   */
   openGraph: {
     title: "CrossFriend — Make Every Celebration Unforgettable",
     description:
       "Plan your perfect celebration. Shop cakes, decorations, gifts, costumes and more — all in one place.",
     type: "website",
+    url: BASE_URL,
+    siteName: "CrossFriend",
+    locale: "en_IN",
   },
 }
 
