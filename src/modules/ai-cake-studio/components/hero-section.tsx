@@ -40,9 +40,6 @@ function CakeHeroVisual() {
             className="object-cover"
             priority
           />
-          <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-cf-purple-700">
-            AI Cake Preview
-          </div>
         </div>
       </motion.div>
 
@@ -55,12 +52,6 @@ function CakeHeroVisual() {
         />
       ))}
 
-      <div className="pointer-events-none absolute -left-4 bottom-8 rounded-2xl border border-cf-purple-100 bg-white/90 px-3 py-2 text-xs font-semibold text-cf-purple-700 shadow-md backdrop-blur-sm">
-        ✨ AI Generated
-      </div>
-      <div className="pointer-events-none absolute -right-3 top-10 rounded-2xl border border-purple-100 bg-white/90 px-3 py-2 text-xs font-semibold text-purple-700 shadow-md backdrop-blur-sm">
-        🛵 Fast Delivery
-      </div>
     </div>
   )
 }
@@ -130,24 +121,23 @@ export default function HeroSection() {
             </h1>
           </motion.div>
 
+          {/* One line, not two.
+              What was here said the same thing twice — "Powered by AI + Local Bakers near you" and
+              then "Describe your cake, pick style, and get real baker-ready designs instantly" —
+              and the studio section immediately below opens with "Describe, choose style and let AI
+              do the magic". Three restatements of one sentence, and on a phone they cost most of the
+              first screen before anybody can type anything.
+
+              What survives is the half neither the icons nor the heading already carry: that a real
+              local baker makes it. */}
           <motion.p
             variants={fadeUp}
             initial="hidden"
             animate="visible"
             custom={0.2}
-            className="text-lg font-medium leading-7 text-slate-700 sm:text-xl xl:text-2xl"
+            className="text-base leading-7 text-slate-600 sm:text-lg"
           >
-            Powered by AI + Local Bakers near you
-          </motion.p>
-
-          <motion.p
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            custom={0.22}
-            className="text-base leading-7 text-slate-500 sm:text-lg"
-          >
-            Describe your cake, pick style, and get real baker-ready designs instantly.
+            Describe it, and a verified baker near you makes it.
           </motion.p>
 
           <motion.div

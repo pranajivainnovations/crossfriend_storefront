@@ -1267,7 +1267,10 @@ export default function AiStudioSection({ customer }: Props) {
                 wrong as a signal about what this page is for. Size is set by classes, so nothing
                 moves visually. */}
             <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">Create Your Cake with AI</h2>
-            <p className="text-xs text-slate-500">Describe, choose style and let AI do the magic ✨</p>
+            {/* Was "Describe, choose style and let AI do the magic" — a third restatement of the hero's
+                subtitle, sitting directly under it. Replaced with the one fact a person actually
+                wants before starting: what it costs them to try. */}
+            <p className="text-xs text-slate-500">Free to try · about a minute</p>
           </div>
 
           {/* Where the customer is in the real four-step journey. See StudioProgressRail for why the
