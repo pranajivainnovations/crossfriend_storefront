@@ -20,10 +20,22 @@ export default function ShareToCommunityToggle({
   // designs land in it. Defaulting this control to false would have shown "off" for a design that was
   // already public — a toggle that misreports the current state is worse than no toggle.
   initialIsPublic = true,
+  onVisibilityChange,
 }: {
   /** Server-side design id. Locally-generated designs that haven't been persisted have none. */
   designId?: string
   initialIsPublic?: boolean
+  /**
+   * Reports the confirmed state upward, so the share sheet knows where it may point.
+   *
+   * A private design's gallery page stops resolving, so sharing a link to it would send a friend to
+   * a 404. Only the parent can make that call, and it cannot without knowing this state — hence a
+   * callback rather than leaving the answer inside this component.
+   *
+   * Called on the optimistic change and again on a revert, so the parent tracks whatever this button
+   * is currently showing rather than briefly disagreeing with it.
+   */
+  onVisibilityChange?: (designId: string, isPublic: boolean) => void
 }) {
   const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [saving, setSaving] = useState(false)
@@ -39,6 +51,7 @@ export default function ShareToCommunityToggle({
     // Optimistic — this is a low-stakes preference and the round trip is slow enough to feel broken
     // otherwise. Reverted below if the server disagrees.
     setIsPublic(next)
+    onVisibilityChange?.(designId, next)
 
     try {
       const res = await fetch(`/api/ai-studio/designs/${designId}/visibility`, {
@@ -52,6 +65,7 @@ export default function ShareToCommunityToggle({
       }
     } catch (e) {
       setIsPublic(!next)
+      onVisibilityChange?.(designId, !next)
       setError(e instanceof Error ? e.message : "Could not update this design.")
     } finally {
       setSaving(false)

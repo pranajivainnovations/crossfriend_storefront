@@ -3,7 +3,7 @@
 import DesignLightbox from "./design-lightbox"
 
 import Image from "next/image"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import type { Customer } from "@medusajs/medusa"
 import type { GeneratedDesign } from "../types"
@@ -19,6 +19,15 @@ import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
 import StudioProgressRail, { type StudioStep } from "./studio-progress-rail"
 import ShareToCommunityToggle from "./share-to-community-toggle"
+import {
+  designFileName,
+  designImageProxyUrl,
+  designPageUrl,
+  designShareText,
+  fetchDesignImageFile,
+  shareDesign,
+  type ShareableDesign,
+} from "@lib/util/design-share"
 import {
   fetchAiCakeConstraints,
   type ConstraintState,
@@ -346,10 +355,12 @@ function DesignCard({
   design,
   selected,
   onExpand,
+  onVisibilityChange,
 }: {
   design: GeneratedDesign
   selected: boolean
   onExpand: (e: React.MouseEvent) => void
+  onVisibilityChange?: (designId: string, isPublic: boolean) => void
 }) {
   const hasImage = Boolean(design.imageUrl)
 
@@ -403,7 +414,10 @@ function DesignCard({
         <p className="mt-1 line-clamp-2 text-xs text-slate-500">{design.description}</p>
         {/* Designs are private now; this is how a customer chooses to publish one. Only renders for
             designs that exist server-side — a locally-generated card has nothing to toggle yet. */}
-        <ShareToCommunityToggle designId={design.designId} />
+        <ShareToCommunityToggle
+          designId={design.designId}
+          onVisibilityChange={onVisibilityChange}
+        />
       </div>
     </div>
   )
@@ -946,6 +960,10 @@ export default function AiStudioSection({ customer }: Props) {
   const handleSelectDesign = (id: string) => {
     setSelectedDesignId(id)
     setShowUsePanel(true)
+    // Selecting a design is what reveals the Share button, so this is the last moment before it can
+    // be tapped — and on iOS the file has to already be in hand by then. See prefetchShareFile.
+    const design = designs.find((d) => d.id === id)
+    if (design) void prefetchShareFile(design)
   }
 
   /**
@@ -1095,20 +1113,120 @@ export default function AiStudioSection({ customer }: Props) {
 
   // Share logic
   const [showShareSheet, setShowShareSheet] = useState(false)
+  const [sharing, setSharing] = useState(false)
+
+  /**
+   * Designs the customer has actively made private, by server-side id.
+   *
+   * Only exceptions are tracked, not every design's state. Designs are created public, so an empty
+   * set is the correct starting picture rather than an unknown one — and this way a design the
+   * customer never touched needs no entry.
+   */
+  const [privateDesignIds, setPrivateDesignIds] = useState<Set<string>>(new Set())
+
+  const handleVisibilityChange = (designId: string, isPublic: boolean) => {
+    setPrivateDesignIds((current) => {
+      const next = new Set(current)
+      if (isPublic) next.delete(designId)
+      else next.add(designId)
+      return next
+    })
+  }
+
+  /**
+   * What a given design should be shared as.
+   *
+   * `designPageUrl` returns null for a design with no server id or one the customer has made
+   * private, and in both cases the Studio is the honest destination — it is a real page about the
+   * thing being shared, where a 404 or a leaked private prompt is not.
+   */
+  const shareTargetFor = (design: GeneratedDesign) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    const shareable: ShareableDesign = {
+      designId: design.designId,
+      title: design.title,
+      // The card's description is the prompt for designs adopted from the showcase, and the
+      // design's own descriptive line otherwise. Either spells a better URL than the title, and the
+      // gallery page resolves on the trailing id regardless of the prose.
+      prompt: design.description,
+      imageUrl: design.imageUrl,
+      isPublic: design.designId ? !privateDesignIds.has(design.designId) : undefined,
+    }
+
+    const designUrl = designPageUrl(shareable, origin)
+    return {
+      shareable,
+      url: designUrl ?? `${origin}/ai-cake-studio`,
+      /** True when the link lands on this design rather than on the generator. */
+      isDesignUrl: Boolean(designUrl),
+    }
+  }
+
+  /**
+   * The design image, as a File, fetched ahead of the tap that shares it.
+   *
+   * Keyed by image URL and held in a ref rather than state: nothing renders from it, and a re-render
+   * on every prefetch would be pure cost. Failures are cached as null so a broken image is not
+   * re-fetched on every open — the share still works, just without the picture attached.
+   */
+  const shareFilesRef = useRef<Map<string, File | null>>(new Map())
+
+  const prefetchShareFile = async (design: GeneratedDesign) => {
+    const key = design.imageUrl
+    if (!key || shareFilesRef.current.has(key)) return
+    const file = await fetchDesignImageFile({ title: design.title, imageUrl: key })
+    shareFilesRef.current.set(key, file)
+  }
 
   const handleShare = async (design: GeneratedDesign) => {
-    const url = typeof window !== "undefined" ? window.location.href : ""
-    const text =
-      `🎂 Check out this "${design.title}" I designed on CrossFriend!\n\n` +
-      `✨ ${sel.occasion} · ${sel.style} style\n` +
-      `🎉 Generate your own cake design for free → ${url}`
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: design.title, text, url })
-      } catch {}
-      return
+    if (sharing) return
+    const { shareable, url } = shareTargetFor(design)
+
+    /**
+     * Deliberately synchronous when the file is already cached.
+     *
+     * `has()` distinguishes "prefetched and failed" (null — share without a picture) from "never
+     * prefetched" (undefined — let shareDesign fetch it). Only the second awaits, and only on
+     * platforms that tolerate it.
+     */
+    const cached = design.imageUrl ? shareFilesRef.current.get(design.imageUrl) : undefined
+    const hasCached = Boolean(design.imageUrl && shareFilesRef.current.has(design.imageUrl))
+
+    setSharing(true)
+    try {
+      const outcome = await shareDesign(
+        shareable,
+        {
+          text: designShareText(shareable, { occasion: sel.occasion, style: sel.style }),
+          url,
+        },
+        hasCached ? cached ?? null : undefined
+      )
+
+      // Cancelled means the customer saw the sheet and dismissed it. Opening our own sheet on top of
+      // that would be reopening something they just closed.
+      if (outcome === "shared" || outcome === "cancelled") return
+      setShowShareSheet(true)
+    } finally {
+      setSharing(false)
     }
-    setShowShareSheet(true)
+  }
+
+  /**
+   * The fallback path, for browsers with no native share sheet — desktop, mostly.
+   *
+   * Saving the picture matters as much here as it does on a phone: a desktop customer showing a
+   * design to a baker still needs the file, and "right-click, save image as" on a Next-optimised
+   * `<img>` yields a webp at whatever size the layout asked for.
+   */
+  const handleDownloadImage = (design: GeneratedDesign) => {
+    if (!design.imageUrl) return
+    const link = document.createElement("a")
+    link.href = designImageProxyUrl(design.imageUrl)
+    link.download = designFileName({ title: design.title })
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
   }
 
   return (
@@ -1725,6 +1843,7 @@ export default function AiStudioSection({ customer }: Props) {
                           design={design}
                           selected={selectedDesignId === design.id}
                           onExpand={(e) => handleExpandDesign(index, e)}
+                          onVisibilityChange={handleVisibilityChange}
                         />
                       </div>
                       <button
@@ -1772,16 +1891,21 @@ export default function AiStudioSection({ customer }: Props) {
 
                         <button
                           type="button"
+                          disabled={sharing}
                           onClick={() => {
                             const d = designs.find((x) => x.id === selectedDesignId)
                             if (d) handleShare(d)
                           }}
-                          className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+                          className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100 disabled:opacity-60"
                         >
                           <span className="mt-0.5 text-base">📤</span>
                           <div>
-                            <p className="text-sm font-semibold text-slate-700">Share this design</p>
-                            <p className="text-xs text-slate-500">WhatsApp · copy link · or any app on your device</p>
+                            <p className="text-sm font-semibold text-slate-700">
+                              {sharing ? "Opening…" : "Share this design"}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Sends the picture, so it survives being forwarded
+                            </p>
                           </div>
                         </button>
                       </div>
@@ -1826,11 +1950,15 @@ export default function AiStudioSection({ customer }: Props) {
       <AnimatePresence>
         {showShareSheet && selectedDesignId && (() => {
           const design = designs.find((x) => x.id === selectedDesignId)
-          const url = typeof window !== "undefined" ? window.location.href : ""
-          const text =
-            `🎂 Check out this "${design?.title ?? "cake design"}" I created on CrossFriend!\n\n` +
-            `✨ ${sel.occasion} · ${sel.style} style\n` +
-            `🎉 Generate your own → ${url}`
+          if (!design) return null
+
+          const { shareable, url, isDesignUrl } = shareTargetFor(design)
+          // wa.me carries no separate url field, so here the link has to live inside the text.
+          const text = designShareText(
+            shareable,
+            { occasion: sel.occasion, style: sel.style },
+            { includeUrl: url }
+          )
           const waHref = `https://wa.me/?text=${encodeURIComponent(text)}`
           return (
             <motion.div
@@ -1851,6 +1979,20 @@ export default function AiStudioSection({ customer }: Props) {
               >
                 <p className="mb-1 text-base font-bold text-slate-900">Share this design</p>
                 <p className="mb-4 text-xs text-slate-500">Share with family, friends or your baker</p>
+
+                {/* Saving the picture is listed first because it is the only option that still works
+                    after the message is forwarded — a link preview is regenerated by whoever
+                    receives it, and disappears entirely once someone screenshots the chat. */}
+                {design.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadImage(design)}
+                    className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-cf-purple-200 bg-cf-purple-50 px-5 py-3 text-sm font-semibold text-cf-purple-800 transition hover:bg-cf-purple-100"
+                  >
+                    <span className="text-base">📷</span>
+                    Save the picture
+                  </button>
+                )}
 
                 <a
                   href={waHref}
@@ -1873,8 +2015,19 @@ export default function AiStudioSection({ customer }: Props) {
                   className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                 >
                   <span className="text-base">🔗</span>
-                  Copy link
+                  {isDesignUrl ? "Copy link to this cake" : "Copy link"}
                 </button>
+
+                {/* Said plainly rather than silently linking elsewhere. A customer who turned
+                    sharing off did so because the prompt names someone, and finding out later that
+                    the link went to the Studio instead is better than finding out it did not. */}
+                {!isDesignUrl && (
+                  <p className="mb-3 text-[11px] leading-snug text-slate-400">
+                    {design.designId
+                      ? "This design is private, so the link opens the Studio. Turn on sharing to link straight to the cake."
+                      : "The link opens the Studio — this design has not been saved yet."}
+                  </p>
+                )}
 
                 <button
                   type="button"
