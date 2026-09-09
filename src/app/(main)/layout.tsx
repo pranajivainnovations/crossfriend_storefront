@@ -8,6 +8,8 @@ import { WishlistProvider } from "@lib/context/wishlist-context"
 import { ReviewsProvider } from "@lib/context/reviews-context"
 import PlanningWizard from "@modules/planning/components/planning-wizard"
 import WhatsAppWidget from "@modules/common/components/whatsapp-widget"
+import BottomBar from "@modules/layout/components/bottom-bar"
+import { retrieveCart } from "@modules/cart/actions"
 import { getSiteSettings } from "@lib/data/site-settings"
 import { BASE_URL } from "@lib/util/seo"
 
@@ -27,6 +29,17 @@ export const metadata: Metadata = {
 export default async function PageLayout(props: { children: React.ReactNode }) {
   const settings = await getSiteSettings()
 
+  /**
+   * Cart count for the mobile bar's badge.
+   *
+   * Read here rather than inside the bar because the bar is a client component and the cart lives
+   * behind an httpOnly cookie. Every page under this layout is force-dynamic and the nav already
+   * retrieves the cart in the same request, so Next's fetch deduplication makes this free rather
+   * than a second round trip.
+   */
+  const cart = await retrieveCart().catch(() => null)
+  const cartCount = cart?.items?.reduce((n, item) => n + (item.quantity ?? 0), 0) ?? 0
+
   return (
     <PincodeProvider>
       <WishlistProvider>
@@ -37,6 +50,10 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
             <Footer />
             <PlanningWizard />
             <WhatsAppWidget number={settings.whatsappNumber} />
+            <BottomBar cartCount={cartCount} whatsappNumber={settings.whatsappNumber} />
+            {/* Reserves the height the fixed bar occupies. Without it the bar sits on top of
+                whatever each page ends with — most visibly the footer's last row. */}
+            <div className="h-14 small:hidden" aria-hidden="true" />
           </PlanningProvider>
         </ReviewsProvider>
       </WishlistProvider>

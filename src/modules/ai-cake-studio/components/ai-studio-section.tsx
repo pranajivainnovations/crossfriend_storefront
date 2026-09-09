@@ -1039,9 +1039,34 @@ export default function AiStudioSection({ customer }: Props) {
     }
 
     setDesigns((prev) => [...prev, adopted])
-    document.getElementById("ai-studio")?.scrollIntoView({ behavior: "smooth" })
-    // Wait a tick for the card to actually exist before selecting/scrolling to it.
-    setTimeout(() => handleAcceptDesign(adopted.id), 250)
+
+    /**
+     * Land on the design, not on the price estimator.
+     *
+     * This used to call handleAcceptDesign, which scrolls to `[data-price-estimator]` — correct when
+     * somebody has just pressed "Use This Design" and asked for a price, wrong here. Arriving from
+     * the gallery, the customer has not asked for anything yet: they tapped a cake they liked. The
+     * estimator is *below* the card, so they landed past their own cake with the pincode field in
+     * front of them and no visible sign of what else they could do.
+     *
+     * "Share this design" is the casualty. It sits in the panel beside the card, above where they
+     * were dropped, and nothing on screen suggests scrolling back up — so the feature is invisible to
+     * exactly the person most likely to use it, someone who just found a cake they liked enough to
+     * click.
+     *
+     * The estimator still opens, so it is ready and waiting one scroll down.
+     */
+    setSelectedDesignId(adopted.id)
+    setShowUsePanel(true)
+    setPriceEstimatorOpenSignal((n) => n + 1)
+    void prefetchShareFile(adopted)
+
+    // The card does not exist until React has painted the new designs array.
+    setTimeout(() => {
+      document
+        .getElementById(`design-card-${adopted.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 250)
   }
 
   const applyPendingCakeSettings = () => {
@@ -1821,7 +1846,8 @@ export default function AiStudioSection({ customer }: Props) {
                 {/* Design cards — horizontal grid */}
                 <div className="grid gap-4 sm:grid-cols-3">
                   {designs.map((design, index) => (
-                    <div key={design.id}>
+                    // Anchored so a design adopted from the gallery can be scrolled to directly.
+                    <div key={design.id} id={`design-card-${design.id}`}>
                       {/* Not a <button> — DesignCard renders its own "view full
                           size" button internally, and a button can't nest
                           inside another button (invalid HTML, breaks click/

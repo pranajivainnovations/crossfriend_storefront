@@ -123,7 +123,7 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
             className="space-y-2"
           >
             <div className="flex gap-2">
-              <span className="flex items-center rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-500 select-none">
+              <span className="flex shrink-0 items-center rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-500 select-none">
                 +91
               </span>
               <input
@@ -134,13 +134,13 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
                 onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 onKeyDown={(e) => e.key === "Enter" && sendOtp()}
                 placeholder="Mobile number"
-                className="flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200"
+                className="min-w-0 flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200"
               />
               <button
                 type="button"
                 onClick={sendOtp}
                 disabled={loading || mobile.length !== 10}
-                className="rounded-xl bg-gradient-to-r from-cf-purple-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-cf-purple-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-cf-purple-600 to-purple-600 px-3 py-2.5 text-sm font-bold text-white transition hover:from-cf-purple-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -185,13 +185,13 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, otpLength))}
                 onKeyDown={(e) => e.key === "Enter" && verifyOtp()}
                 placeholder={`${otpLength}-digit OTP`}
-                className="flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm tracking-[0.4em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200"
+                className="min-w-0 flex-1 rounded-xl border border-cf-purple-200 bg-white px-3 py-2.5 text-sm tracking-[0.4em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200"
               />
               <button
                 type="button"
                 onClick={verifyOtp}
                 disabled={loading || otp.length !== otpLength}
-                className="rounded-xl bg-gradient-to-r from-cf-purple-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-cf-purple-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-cf-purple-600 to-purple-600 px-3 py-2.5 text-sm font-bold text-white transition hover:from-cf-purple-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

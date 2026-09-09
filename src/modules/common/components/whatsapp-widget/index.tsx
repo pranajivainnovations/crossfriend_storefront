@@ -20,7 +20,15 @@ export default function WhatsAppWidget({ number }: { number: string }) {
   )}`
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    /**
+     * Desktop only now.
+     *
+     * On a phone this floating button sat in the same corner the bottom bar occupies, and two
+     * WhatsApp entry points a thumb's width apart is one too many — the bar's Help slot is the
+     * mobile route to the same conversation. Hidden rather than deleted because desktop has no
+     * bottom bar and would otherwise lose the only direct way to reach a person.
+     */
+    <div className="fixed bottom-6 right-6 z-50 hidden flex-col items-end gap-2 small:flex">
       {isHovered && (
         <div className="bg-white rounded-lg shadow-lg px-4 py-2 text-sm text-grey-80 animate-in fade-in slide-in-from-bottom-2 duration-200">
           Need help? Chat with us!

@@ -365,22 +365,40 @@ export default function GalleryClient({ initialDesigns, initialTotal, customer }
 
                   {/* Use this prompt / Use this cake — side by side on
                       larger screens, compact icon+word pair on mobile */}
-                  <div className="mt-2 flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleUsePrompt(design)}
-                      className="flex-1 rounded-xl border border-cf-purple-200 bg-cf-purple-50 py-1.5 text-[11px] font-semibold text-cf-purple-700 transition hover:bg-cf-purple-100"
-                    >
-                      <span className="hidden sm:inline">✨ Use this prompt</span>
-                      <span className="sm:hidden">✨ Prompt</span>
-                    </button>
+                  {/* Stacked on phones, side by side from sm up.
+
+                      The mobile labels used to shorten to "Prompt" and "Cake", which said nothing —
+                      a card showed a picture and the word "Cake", and nothing explained that either
+                      button did anything. The truncation was not even buying space: this grid is a
+                      single full-width column on mobile, so there was always room for the real words.
+
+                      Each action now carries a line saying what it does, which is the affordance an
+                      app would give with an icon and a caption. Ordering the cake action first is
+                      deliberate — it is the one that skips work. */}
+                  <div className="mt-2 flex flex-col gap-1.5 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => handleUseCake(design)}
-                      className="flex-1 rounded-xl border border-emerald-200 bg-emerald-50 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                      className="flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-left transition hover:bg-emerald-100 sm:py-1.5 sm:text-center"
                     >
-                      <span className="hidden sm:inline">🎂 Use this cake</span>
-                      <span className="sm:hidden">🎂 Cake</span>
+                      <span className="block text-[12px] font-semibold text-emerald-700 sm:text-[11px]">
+                        🎂 Use this cake
+                      </span>
+                      <span className="block text-[10px] leading-tight text-emerald-600/80 sm:hidden">
+                        Skip designing — price this exact cake
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUsePrompt(design)}
+                      className="flex-1 rounded-xl border border-cf-purple-200 bg-cf-purple-50 px-3 py-2 text-left transition hover:bg-cf-purple-100 sm:py-1.5 sm:text-center"
+                    >
+                      <span className="block text-[12px] font-semibold text-cf-purple-700 sm:text-[11px]">
+                        ✨ Use this prompt
+                      </span>
+                      <span className="block text-[10px] leading-tight text-cf-purple-600/80 sm:hidden">
+                        Edit the description and make your own
+                      </span>
                     </button>
                   </div>
 

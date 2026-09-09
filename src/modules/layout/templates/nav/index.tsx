@@ -21,7 +21,10 @@ export default async function Nav() {
       <header className="relative h-16 mx-auto border-b duration-200 bg-white border-ui-border-base">
         <nav className="content-container flex items-center justify-between w-full h-full text-small-regular">
           {/* Left: Hamburger (mobile) + Logo + MegaMenu (desktop) */}
-          <div className="flex items-center gap-x-4 h-full flex-1 basis-0">
+          {/* min-w-0 so this group can shrink below its content width. Without it a flex item refuses
+              to go under its intrinsic size, and on a narrow phone the Studio pill pushed straight
+              through the cart on the right instead of the row adapting. */}
+          <div className="flex min-w-0 items-center gap-x-2 h-full flex-1 basis-0 small:gap-x-4">
             {/* Mobile hamburger */}
             <div className="h-full small:hidden">
               <SideMenu regions={regions} occasions={occasions} productTypes={productTypes} />
@@ -49,7 +52,12 @@ export default async function Nav() {
               data-testid="nav-ai-studio-link"
             >
               <span aria-hidden="true">✨</span>
-              <span>AI Cake Studio</span>
+              {/* Shortened on phones, not hidden. The full name is still in the DOM for crawlers, and
+                  the link keeps working — but "AI Cake Studio" beside the wordmark is wider than a
+                  360px screen can hold, and something had to give. The label was the right thing to
+                  give rather than the link. */}
+              <span className="small:hidden">AI Studio</span>
+              <span className="hidden small:inline">AI Cake Studio</span>
             </LocalizedClientLink>
 
             {/* Desktop mega-menu */}
@@ -59,7 +67,7 @@ export default async function Nav() {
           </div>
 
           {/* Right: Start Planning CTA + Search + Account + Cart */}
-          <div className="flex items-center gap-x-4 h-full flex-1 basis-0 justify-end">
+          <div className="flex min-w-0 shrink-0 items-center gap-x-4 h-full flex-1 basis-0 justify-end">
             {/* Start Planning CTA — desktop only */}
             <PlanningTrigger className="hidden medium:inline-flex btn-cf-primary !py-2 !px-5 text-xs">
               🎉 Start Planning
