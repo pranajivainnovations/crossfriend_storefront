@@ -19,6 +19,7 @@ import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
 import StudioProgressRail, { type StudioStep } from "./studio-progress-rail"
 import ShareToCommunityToggle from "./share-to-community-toggle"
+import PushOptIn from "@modules/common/components/push-opt-in"
 import {
   designFileName,
   designImageProxyUrl,
@@ -1932,6 +1933,14 @@ export default function AiStudioSection({ customer }: Props) {
                       the whole grid. */}
                   {generating && <CakeBuildingAnimation compact />}
                 </div>
+
+                {/* The one moment worth asking at: they described a cake and watched it appear.
+                    Never on load — see the component for why one badly-timed prompt is permanent. */}
+                {!generating && (
+                  <div className="mt-4">
+                    <PushOptIn context="studio_design_generated" />
+                  </div>
+                )}
 
                 {/* Action panel */}
                 <AnimatePresence>

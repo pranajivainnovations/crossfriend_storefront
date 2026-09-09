@@ -59,6 +59,21 @@ services:
       # Once set, do not change it: every existing customer's password is
       # derived from this value.
       OTP_PASSWORD_SALT: ${OTP_PASSWORD_SALT}
+
+      # ── Browser notifications ───────────────────────────────────────────────
+      # The PUBLIC half of the VAPID pair only. The private key lives in OPS,
+      # which is what actually sends; the storefront needs this solely so a
+      # browser can subscribe.
+      #
+      # No NEXT_PUBLIC_ prefix on purpose, even though the value reaches the
+      # browser. NEXT_PUBLIC_* is inlined at build time inside the Docker
+      # builder stage, so it would have to be a build arg — and a missing one
+      # builds cleanly and fails silently at runtime. A server action reads this
+      # per request instead, so setting it here takes effect on `up -d`.
+      #
+      # Leave it unset and the opt-in card simply never renders. Nothing else
+      # on the site changes.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

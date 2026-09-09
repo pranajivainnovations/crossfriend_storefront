@@ -5,6 +5,7 @@ import { getOccasions, getProductTypes } from "@lib/data/dynamic"
 import { ENTITY, LEGAL_PAGES } from "@lib/constants/legal"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import PushOptIn from "@modules/common/components/push-opt-in"
 import MedusaCTA from "@modules/layout/components/medusa-cta"
 
 export default async function Footer() {
@@ -189,6 +190,14 @@ export default async function Footer() {
             <p className="mt-1 text-grey-50">
               {ENTITY.supportEmail} · {ENTITY.supportPhone}
             </p>
+            {/* The permanent off switch.
+                The opt-in is offered once, after somebody generates a design — but turning it off
+                must never require reproducing the moment that turned it on. It renders nothing at
+                all unless this browser can actually receive notifications, so it stays invisible to
+                everyone it would only confuse. */}
+            <div className="mt-2">
+              <PushOptIn context="footer" compact />
+            </div>
           </div>
           <MedusaCTA />
         </div>
