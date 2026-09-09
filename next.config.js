@@ -45,6 +45,48 @@ const nextConfig = withStoreConfig({
   // Enable scroll restoration
   experimental: {
     scrollRestoration: true,
+    /**
+     * Packages the bundler must leave alone and let Node require at runtime.
+     *
+     * satori shapes text with a harfbuzz WebAssembly module and lays it out with yoga, and it loads
+     * both by resolving a path relative to its own file. Bundled into a route, that path becomes the
+     * route's own output directory — which does not contain hb.wasm, so the first request aborts
+     * with an ENOENT from inside the wasm loader. It builds cleanly and fails only when called,
+     * which is the worst shape a failure can take.
+     *
+     * sharp is here for the ordinary reason: it is a native binding and cannot be bundled at all.
+     *
+     * This is the same family of problem that scripts/generate-og-images.mjs documents for
+     * @vercel/og — a library resolving its own wasm through a path that does not survive the trip.
+     * Externalising is the fix that keeps working, because the package is then loaded from
+     * node_modules where its own layout is intact.
+     */
+    serverComponentsExternalPackages: ["satori", "sharp"],
+    /**
+     * Files the standalone build must carry that nothing imports by name.
+     *
+     * Externalising satori fixes the path it resolves the wasm *through*; it does not make the wasm
+     * exist. Next builds `output: "standalone"` by tracing `require`/`import` statements, and both of
+     * satori's WebAssembly modules are loaded from a computed path — so the tracer never sees them,
+     * `harfbuzzjs` is left out of the standalone tree entirely, and `satori/yoga.wasm` is dropped
+     * while `satori/dist` is copied.
+     *
+     * The result builds clean and then throws ENOENT on the first request in production. It was
+     * caught here only by listing the standalone output; nothing about the build says a word.
+     *
+     * The font is included for the same reason — render.ts reads it off disk from `public/`, which
+     * the Dockerfile does copy, but naming it here means the route stops depending on that staying
+     * true.
+     */
+    outputFileTracingIncludes: {
+      "/api/ai-studio/designs/[id]/share-card": [
+        "./node_modules/satori/*.wasm",
+        "./node_modules/harfbuzzjs/*.wasm",
+        "./node_modules/harfbuzzjs/*.js",
+        "./node_modules/harfbuzzjs/package.json",
+        "./public/fonts/noto-sans-regular.ttf",
+      ],
+    },
   },
   // Redirect trailing slashes for cleaner SEO URLs
   trailingSlash: false,

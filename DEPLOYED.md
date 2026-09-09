@@ -73,3 +73,27 @@ Do not edit by hand, and do not delete — it is the only record of what is live
 - image:   crossfriend-storefront:latest
 - target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
 - by:      crossfriend2025
+---
+- when:    2026-09-09 05:13:08 UTC  /  2026-09-09 10:43 IST
+- outcome: FAILED (exit 1)
+- commit:  44ad392 (main)
+- tree:    clean
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
+---
+- when:    2026-09-09 05:19:31 UTC  /  2026-09-09 10:49 IST
+- outcome: SUCCESS
+- commit:  44ad392 (main)
+- tree:    dirty
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
+---
+- when:    2026-09-09 06:13:57 UTC  /  2026-09-09 11:43 IST
+- outcome: SUCCESS
+- commit:  44ad392 (main)
+- tree:    dirty
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025

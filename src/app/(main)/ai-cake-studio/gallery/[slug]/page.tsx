@@ -4,6 +4,7 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 
 import { designSlug, idFragmentFromSlug } from "@lib/util/design-slug"
+import DesignShareButton from "@modules/ai-cake-studio/components/design-share-button"
 import {
   absoluteUrl,
   breadcrumbJsonLd,
@@ -128,15 +129,30 @@ export async function generateMetadata({
       description: describe(design),
       url: absoluteUrl(canonical),
       type: "article",
-      // The design itself is the share image. Nothing generic would be a better card than the thing
-      // the page is about.
-      images: [{ url: design.imageUrl, width: 1024, height: 1024, alt: title }],
+      /**
+       * The branded card, not the bare image.
+       *
+       * The design is still the picture — the card is the design with a spec strip beside it. What
+       * that buys is a preview that survives being screenshotted: the raw file said nothing about
+       * size, flavour or who made it, so the moment somebody photographed the chat rather than
+       * forwarding it, every trace of us was gone.
+       *
+       * 1200×630 because that is what the platforms crop toward; the route renders that variant.
+       */
+      images: [
+        {
+          url: absoluteUrl(`/api/ai-studio/designs/${design.id}/share-card?variant=og`),
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description: describe(design),
-      images: [design.imageUrl],
+      images: [absoluteUrl(`/api/ai-studio/designs/${design.id}/share-card?variant=og`)],
     },
   }
 }
@@ -220,6 +236,22 @@ export default async function DesignPage({ params }: { params: { slug: string } 
           <h1 className="font-heading text-2xl font-bold text-grey-90 small:text-3xl">{title}</h1>
 
           <p className="mt-3 text-grey-60">{describe(design)}</p>
+
+          {/* Most visitors here arrived from somebody else's share, which makes them the readiest
+              person on the site to send it on — and until now this page gave them no way to. */}
+          <div className="mt-5">
+            <DesignShareButton
+              design={{
+                id: design.id,
+                title,
+                prompt: design.prompt,
+                imageUrl: design.imageUrl,
+              }}
+              canonicalUrl={absoluteUrl(path)}
+              occasion={design.occasion}
+              style={design.style}
+            />
+          </div>
 
           {/* Visible spec, not just markup. An answer engine quotes rendered text; a table that
               exists only in JSON-LD gives a reader nothing. */}

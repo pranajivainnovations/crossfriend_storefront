@@ -117,6 +117,36 @@ export function designImageProxyUrl(imageUrl: string): string {
 }
 
 /**
+ * The branded card, when there is one to be had.
+ *
+ * Null for a design with no server id or one the customer has made private — the same two cases that
+ * suppress the design link, and for the same reason. The strip's entire purpose is to point back at
+ * a page; a QR to a page that will not load is worse than no strip, and branding a private design
+ * would put its specs onto an image about to be sent to somebody.
+ *
+ * So a private design still shares — just the raw picture, exactly as before.
+ */
+export function designCardUrl(
+  design: ShareableDesign,
+  variant: "story" | "og" = "story"
+): string | null {
+  if (!design.designId || design.isPublic === false) return null
+  return `/api/ai-studio/designs/${design.designId}/share-card?variant=${variant}`
+}
+
+/**
+ * What to send as the file: the branded card if the design has one, the raw image otherwise.
+ *
+ * Falling back rather than failing is the point. Card rendering composites a remote image through a
+ * native binding, and when that goes wrong the customer should still be able to send their cake.
+ */
+export function designShareImageUrl(design: ShareableDesign): string | null {
+  const card = designCardUrl(design)
+  if (card) return card
+  return design.imageUrl ? designImageProxyUrl(design.imageUrl) : null
+}
+
+/**
  * Turn a design's image into a File the native share sheet will accept.
  *
  * Returns null rather than throwing on every failure path — an image that cannot be fetched is a
@@ -126,19 +156,32 @@ export function designImageProxyUrl(imageUrl: string): string {
 export async function fetchDesignImageFile(
   design: ShareableDesign
 ): Promise<File | null> {
-  if (!design.imageUrl || typeof fetch === "undefined") return null
+  if (typeof fetch === "undefined") return null
 
-  try {
-    const res = await fetch(designImageProxyUrl(design.imageUrl), { cache: "force-cache" })
-    if (!res.ok) return null
+  /**
+   * The branded card first, the raw image as the safety net.
+   *
+   * Two requests in the worst case, but only when card rendering has actually failed — and the
+   * alternative is a customer who taps share and gets nothing because a composite timed out.
+   */
+  const sources = [designCardUrl(design), design.imageUrl && designImageProxyUrl(design.imageUrl)]
+    .filter((url): url is string => Boolean(url))
 
-    const blob = await res.blob()
-    if (!blob.size || !blob.type.startsWith("image/")) return null
+  for (const url of sources) {
+    try {
+      const res = await fetch(url, { cache: "force-cache" })
+      if (!res.ok) continue
 
-    return new File([blob], designFileName(design), { type: blob.type })
-  } catch {
-    return null
+      const blob = await res.blob()
+      if (!blob.size || !blob.type.startsWith("image/")) continue
+
+      return new File([blob], designFileName(design), { type: blob.type })
+    } catch {
+      // Try the next source rather than giving up — that is what the list is for.
+    }
   }
+
+  return null
 }
 
 /**
