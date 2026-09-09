@@ -26,9 +26,9 @@ function CakeHeroVisual() {
       <motion.div
         animate={{ y: [0, -6, 0] }}
         transition={{ repeat: Infinity, duration: 4.6, ease: "easeInOut" }}
-        className="relative overflow-hidden rounded-[36px] border border-cf-purple-100 bg-gradient-to-br from-[#f3ebff] via-white to-[#f9f3ff] p-5 shadow-[0_24px_70px_rgba(124,58,237,0.2)]"
+        className="relative overflow-hidden rounded-[36px] border border-cf-purple-100 bg-gradient-to-br from-[#f3ebff] via-white to-[#f9f3ff] p-3 shadow-[0_24px_70px_rgba(124,58,237,0.2)] lg:p-5"
       >
-        <div className="relative aspect-[4/3] overflow-hidden rounded-[28px] border border-cf-purple-100 bg-gradient-to-br from-cf-purple-100 via-purple-100 to-fuchsia-100">
+        <div className="relative aspect-[16/10] overflow-hidden rounded-[28px] border border-cf-purple-100 bg-gradient-to-br from-cf-purple-100 via-purple-100 to-fuchsia-100 lg:aspect-[4/3]">
           <Image
             src="/ai-cake-studio/hero/hero-cake.jpg"
             alt="AI cake studio hero cake"
@@ -155,33 +155,32 @@ export default function HeroSection() {
             initial="hidden"
             animate="visible"
             custom={0.25}
-            className="grid gap-2 sm:grid-cols-2"
+            /* Four across, always.
+
+               These were one card per row on a phone — four bordered boxes, roughly a third of the
+               first screen, spent on four words nobody reads before they have seen what the product
+               does. As a row of icons they say the same thing in a quarter of the height, and the
+               hero stops pushing the actual studio below the fold.
+
+               The boxes are gone with them. Four small cards stacked is a list; four icons in a row
+               is a summary, and a summary is what this is. */
+            className="grid grid-cols-4 gap-1 sm:gap-3"
           >
             {[
-              { label: "AI Generated", icon: "🤖" },
-              { label: "Multiple Styles", icon: "🎨" },
-              { label: "Local Bakers", icon: "🏪" },
-              { label: "Order Easily", icon: "🛍️" },
+              { label: "AI made", icon: "🤖" },
+              { label: "Any style", icon: "🎨" },
+              { label: "Local bakers", icon: "🏪" },
+              { label: "Easy order", icon: "🛍️" },
             ].map((f) => (
-              <div key={f.label} className="flex items-center gap-2 rounded-xl border border-cf-purple-100 bg-white px-3 py-2.5 shadow-sm">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-cf-purple-100 text-sm">
+              <div key={f.label} className="flex flex-col items-center gap-1.5 text-center">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-base shadow-sm ring-1 ring-cf-purple-100">
                   {f.icon}
                 </span>
-                <span className="text-xs font-semibold text-slate-700">{f.label}</span>
+                <span className="text-[10px] font-semibold leading-tight text-slate-600 sm:text-xs">
+                  {f.label}
+                </span>
               </div>
             ))}
-          </motion.div>
-
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            custom={0.35}
-            className="overflow-hidden rounded-3xl border border-cf-purple-100 bg-white shadow-[0_14px_35px_rgba(109,40,217,0.12)]"
-          >
-            
-
-            
           </motion.div>
         </div>
 

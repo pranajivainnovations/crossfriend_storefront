@@ -59,9 +59,20 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   return (
     <>
       <div
-        className={clx("lg:hidden inset-x-0 bottom-0 fixed", {
-          "pointer-events-none": !show,
-        })}
+        /**
+         * Sits directly above the mobile bottom bar, not underneath it.
+         *
+         * Both are `fixed bottom-0` below 1024px. This one carried no z-index, so the nav bar's z-40
+         * painted straight over it — on a phone the add-to-cart bar was behind the navigation, which
+         * is the worst possible thing to hide. The padding lifts it by exactly the bar's height plus
+         * whatever the device reserves for its home indicator, so the two stack instead of fighting.
+         */
+        className={clx(
+          "lg:hidden inset-x-0 bottom-0 fixed z-40 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]",
+          {
+            "pointer-events-none": !show,
+          }
+        )}
       >
         <Transition
           as={Fragment}

@@ -1261,7 +1261,12 @@ export default function AiStudioSection({ customer }: Props) {
 
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">Create Your Cake with AI</h3>
+            {/* h2, not h3. The page goes h1 (hero) then straight to this, and everything after it — how it
+                works, the FAQ, the closing CTA — is an h2. The studio was sitting a level below
+                sections that matter less, which is wrong for a screen reader walking the outline and
+                wrong as a signal about what this page is for. Size is set by classes, so nothing
+                moves visually. */}
+            <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">Create Your Cake with AI</h2>
             <p className="text-xs text-slate-500">Describe, choose style and let AI do the magic ✨</p>
           </div>
 
@@ -1306,52 +1311,102 @@ export default function AiStudioSection({ customer }: Props) {
             </div>
           )}
 
-          {/* Prompt textarea */}
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <label className="block text-sm font-semibold text-slate-700">
-              Describe your cake idea...
-            </label>
-            <div
-              role="radiogroup"
-              aria-label="AI model"
-              className="flex items-center gap-1 rounded-full border border-cf-purple-100 bg-cf-purple-50/60 p-1"
-            >
-              {aiModelOptions.filter((opt) => opt.enabled).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={aiModelId === opt.id}
-                  title={opt.hint}
+          {/* ── The composer ──────────────────────────────────────────────────────────────────
+              This is the only thing on the page a customer must use, and it used to be the
+              quietest element on it: a 1px border in cf-purple-100 over a 30%-opacity tint, while
+              the template chips below carried a darker border and coloured text. The input read as
+              disabled and the suggestions read as the primary control, so people looked past the
+              box they were meant to type in.
+
+              Rebuilt as a single composer surface, the shape everybody already knows from every
+              messaging app they use: one bordered card that owns the text, the attachment and the
+              model choice, and lights up as a whole when focused. The attachment moved in here from
+              a separate dashed panel further down the page — a paperclip in a composer needs no
+              heading to explain it, and the panel below now only appears once a photo exists. */}
+          <label
+            htmlFor="cake-prompt"
+            className="mb-2 block text-sm font-semibold text-slate-700"
+          >
+            Describe your cake idea
+          </label>
+
+          <div className="rounded-2xl border-2 border-cf-purple-200 bg-white shadow-[0_2px_10px_rgba(123,47,247,0.06)] transition focus-within:border-cf-purple-500 focus-within:shadow-[0_4px_18px_rgba(123,47,247,0.14)]">
+            <textarea
+              id="cake-prompt"
+              value={prompt}
+              onChange={(e) => {
+                setPrompt(e.target.value.slice(0, 320))
+                // Editing the description answers the question implicitly — withdraw the offer.
+                if (pendingTemplate) setPendingTemplate(null)
+              }}
+              rows={3}
+              disabled={generating}
+              placeholder="A two tier princess cake with pink roses and a golden crown…"
+              className="w-full resize-none rounded-t-2xl border-0 bg-transparent p-4 text-[15px] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+
+            {/* The composer's own toolbar. Everything that acts on the prompt lives on this row. */}
+            <div className="flex items-center gap-2 border-t border-cf-purple-100 px-2.5 py-2">
+              <label
+                title="Add a reference photo"
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-semibold text-cf-purple-700 transition hover:bg-cf-purple-50 ${
+                  generating ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                </svg>
+                <span>Photo</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleReferenceFileSelect}
                   disabled={generating}
-                  onClick={() => setAiModelId(opt.id)}
-                  className={`rounded-full px-3 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    aiModelId === opt.id
-                      ? "bg-cf-purple-600 text-white shadow-sm"
-                      : "text-cf-purple-500 hover:bg-cf-purple-100"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+                />
+              </label>
+
+              <div
+                role="radiogroup"
+                aria-label="AI model"
+                className="flex items-center gap-1 rounded-full bg-cf-purple-50 p-0.5"
+              >
+                {aiModelOptions.filter((opt) => opt.enabled).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={aiModelId === opt.id}
+                    title={opt.hint}
+                    disabled={generating}
+                    onClick={() => setAiModelId(opt.id)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      aiModelId === opt.id
+                        ? "bg-cf-purple-600 text-white shadow-sm"
+                        : "text-cf-purple-500 hover:bg-cf-purple-100"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Only once it starts to matter. A counter sitting at 0/320 beside an empty box reads
+                  as a limit to worry about rather than a help. */}
+              <span
+                className={`ml-auto shrink-0 pr-1 text-[11px] tabular-nums ${
+                  prompt.length > 280 ? "font-semibold text-amber-600" : "text-slate-400"
+                }`}
+              >
+                {prompt.length > 200 ? `${prompt.length}/320` : ""}
+              </span>
             </div>
           </div>
-          <textarea
-            value={prompt}
-            onChange={(e) => {
-              setPrompt(e.target.value.slice(0, 320))
-              // Editing the description answers the question implicitly — withdraw the offer.
-              if (pendingTemplate) setPendingTemplate(null)
-            }}
-            rows={3}
-            disabled={generating}
-            placeholder="e.g. A two tier princess cake with pink roses and golden crown"
-            className="w-full resize-none rounded-2xl border border-cf-purple-100 bg-cf-purple-50/30 p-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cf-purple-400 focus:outline-none focus:ring-2 focus:ring-cf-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <p className="mt-1 text-right text-[11px] text-slate-400">{prompt.length}/320</p>
 
-          {/* Prompt templates — see handleTemplateClick for why these don't overwrite blindly. */}
-          <div className="mt-3">
+          {/* Prompt templates — see handleTemplateClick for why these don't overwrite blindly.
+              Anchored because the page's closing CTA offers to show them, and its link previously
+              pointed at a section that is not rendered on this page at all. */}
+          <div id="prompt-templates" className="mt-3">
             <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-xs font-semibold text-slate-500">
                 {prompt.trim() ? "Or start from a template:" : "Not sure what to type? Pick a template:"}
@@ -1405,33 +1460,18 @@ export default function AiStudioSection({ customer }: Props) {
             </div>
           </div>
 
-          {/* Reference image upload */}
-          <div className="mt-4 rounded-2xl border border-dashed border-cf-purple-200 bg-cf-purple-50/20 p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-              📷 Reference photo (optional)
-            </p>
+          {/* Reference image — the attached state only.
 
-            {!referenceFile && (
-              <>
-                <label
-                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-cf-purple-200 bg-white px-4 py-3 text-center text-xs font-semibold text-cf-purple-700 transition hover:bg-cf-purple-50 ${
-                    generating ? "cursor-not-allowed opacity-60" : ""
-                  }`}
-                >
-                  + Add a photo — theme inspiration, or a cake to recreate
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handleReferenceFileSelect}
-                    disabled={generating}
-                  />
-                </label>
-                <p className="mt-1.5 text-center text-[11px] text-slate-400">
-                  JPEG, PNG or WEBP · up to {MAX_UPLOAD_MB}MB
-                </p>
-              </>
-            )}
+              The "+ Add a photo" empty state that used to live here is gone: it was a dashed panel
+              with its own heading, sitting below the templates, competing with the thing it belongs
+              to. Adding a photo is now the paperclip inside the composer. What remains here is what
+              a paperclip cannot express — the preview, and the choice between "inspire me with this"
+              and "recreate this cake", which changes what the model is asked to do. */}
+          {referenceFile && (
+          <div className="mt-4 rounded-2xl border border-cf-purple-200 bg-cf-purple-50/40 p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+              📷 Your reference photo
+            </p>
             {referenceFile && (
               <div className="flex items-start gap-3">
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-cf-purple-200 bg-white">
@@ -1518,6 +1558,7 @@ export default function AiStudioSection({ customer }: Props) {
               </div>
             )}
           </div>
+          )}
 
           {/* ── Primary — the fields that decide size/shape/price, always visible ── */}
           <div className="mt-5 space-y-4 rounded-2xl border-2 border-cf-purple-200 bg-white p-4 shadow-sm">

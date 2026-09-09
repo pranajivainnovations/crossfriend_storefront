@@ -55,7 +55,13 @@ export default function BottomCta() {
             </motion.button>
             <button
               type="button"
-              onClick={() => document.getElementById("inspiration-templates")?.scrollIntoView({ behavior: "smooth" })}
+              /* #inspiration-templates lives in inspiration-cards, which this page does not render — the
+                 button was silently doing nothing. The studio's own template chips are the thing
+                 being offered here. */
+              onClick={() =>
+                (document.getElementById("prompt-templates") ??
+                  document.getElementById("ai-studio"))?.scrollIntoView({ behavior: "smooth" })
+              }
               className="rounded-xl border border-white/50 bg-transparent px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
             >
               View Templates
