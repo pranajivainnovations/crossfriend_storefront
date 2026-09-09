@@ -62,15 +62,45 @@ export default function AnnouncementBanner({ announcement }: { announcement: Ann
     }
   }
 
+  /**
+   * One button, rendered in one of two places depending on the width.
+   *
+   * On a desktop row it belongs at the end of the line, beside the dismiss control. On a phone the
+   * line is four or five lines tall, and a button squeezed into that column shrinks the message to a
+   * ribbon of two-word rows — so it goes underneath the text instead, full-width enough to hit.
+   * Declared once and placed twice, rather than written twice with two sets of classes to keep in
+   * step.
+   */
+  const cta =
+    announcement.ctaLabel && announcement.ctaUrl ? (
+      <a
+        href={announcement.ctaUrl}
+        className="inline-block rounded-lg bg-white/95 px-3.5 py-1.5 text-xs font-bold text-slate-900 transition hover:bg-white"
+      >
+        {announcement.ctaLabel}
+      </a>
+    ) : null
+
   return (
     <div className={theme}>
-      <div className="content-container flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
+      {/* items-start on a phone so the close button sits at the top of a tall block rather than
+          floating in the middle of the message; centred again once the row is one line high. */}
+      <div className="content-container flex items-start gap-3 py-3 small:items-center small:py-2.5">
         {announcement.imageUrl && (
+          /**
+           * Deliberately larger on a phone than on a desktop, which is the opposite of the usual
+           * instinct.
+           *
+           * At 36px beside five wrapped lines of text it read as an icon — present in the markup,
+           * invisible as a picture, and the thing somebody chose to upload was the one part of the
+           * banner nobody could see. On a desktop the same 36px sits beside a single line and is in
+           * proportion, so the small size stays where it works.
+           */
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={announcement.imageUrl}
             alt=""
-            className="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/40"
+            className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-white/40 small:h-9 small:w-9 small:rounded-lg"
             loading="lazy"
           />
         )}
@@ -80,22 +110,16 @@ export default function AnnouncementBanner({ announcement }: { announcement: Ann
           {announcement.body && (
             <p className="mt-0.5 text-xs leading-snug opacity-90">{announcement.body}</p>
           )}
+          {cta && <div className="mt-2 small:hidden">{cta}</div>}
         </div>
 
-        {announcement.ctaLabel && announcement.ctaUrl && (
-          <a
-            href={announcement.ctaUrl}
-            className="shrink-0 rounded-lg bg-white/95 px-3.5 py-1.5 text-xs font-bold text-slate-900 transition hover:bg-white"
-          >
-            {announcement.ctaLabel}
-          </a>
-        )}
+        {cta && <div className="hidden shrink-0 small:block">{cta}</div>}
 
         <button
           type="button"
           onClick={dismiss}
           aria-label="Dismiss announcement"
-          className="shrink-0 rounded-full p-1.5 text-white/80 transition hover:bg-white/20 hover:text-white"
+          className="-mr-1.5 shrink-0 rounded-full p-1.5 text-white/80 transition hover:bg-white/20 hover:text-white small:mr-0"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
             <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
