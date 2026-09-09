@@ -11,6 +11,8 @@ import WhatsAppWidget from "@modules/common/components/whatsapp-widget"
 import BottomBar from "@modules/layout/components/bottom-bar"
 import { retrieveCart } from "@modules/cart/actions"
 import { getSiteSettings } from "@lib/data/site-settings"
+import { getAnnouncement } from "@lib/data/announcement"
+import AnnouncementBanner from "@modules/layout/components/announcement-banner"
 import { BASE_URL } from "@lib/util/seo"
 
 // Force ALL pages under (main) to render at request time — no build-time Medusa calls
@@ -27,7 +29,9 @@ export const metadata: Metadata = {
 }
 
 export default async function PageLayout(props: { children: React.ReactNode }) {
-  const settings = await getSiteSettings()
+  /* Fetched alongside settings rather than after it. Both sit above every page, and serialising
+     two independent backend calls would put their latency end to end on first paint. */
+  const [settings, announcement] = await Promise.all([getSiteSettings(), getAnnouncement()])
 
   /**
    * Cart count for the mobile bar's badge.
@@ -45,6 +49,10 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
       <WishlistProvider>
         <ReviewsProvider>
           <PlanningProvider>
+            {/* Above the nav, because a banner below it reads as page content and gets scrolled
+                past. Renders nothing at all when there is no announcement — no reserved space, no
+                layout shift. */}
+            {announcement && <AnnouncementBanner announcement={announcement} />}
             <Nav />
             {props.children}
             <Footer />
