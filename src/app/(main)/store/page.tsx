@@ -4,7 +4,7 @@ import StoreTemplate from "@modules/store/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import { getTaxonomy } from "@lib/data/taxonomy"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 60
 
 type StoreSearchParams = {
   sortBy?: SortOptions

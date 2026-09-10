@@ -2,7 +2,7 @@ import { Metadata } from "next"
 
 import MarketplaceTemplate from "@modules/marketplace/templates"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 60
 
 export const metadata: Metadata = {
   alternates: { canonical: "/ready-to-order" },

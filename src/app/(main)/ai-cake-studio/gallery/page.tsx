@@ -4,7 +4,7 @@ import { getCustomer } from "@lib/data"
 import { absoluteUrl, breadcrumbJsonLd, jsonLdScriptProps } from "@lib/util/seo"
 import GalleryClient from "./gallery-client"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export const metadata: Metadata = {
   alternates: { canonical: "/ai-cake-studio/gallery" },

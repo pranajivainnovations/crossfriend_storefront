@@ -21,8 +21,10 @@ import LocalBakers from "@modules/home/components/local-bakers"
 import { ProductCollectionWithPreviews } from "types/global"
 import { cache, Suspense } from "react"
 
-// Never prerender — always fetch fresh from Medusa at request time
-export const dynamic = "force-dynamic"
+/* Fresh within a minute rather than never cached. The homepage reads collections and products
+   that change when a baker publishes, not second by second, and the previous force-dynamic also
+   disabled the Data Cache for every call the layout and nav make above it. */
+export const revalidate = 60
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },

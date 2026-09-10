@@ -8,7 +8,7 @@ import {
 import CollectionTemplate from "@modules/collections/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 type Props = {
   params: { handle: string }

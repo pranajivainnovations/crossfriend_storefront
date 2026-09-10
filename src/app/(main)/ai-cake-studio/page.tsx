@@ -13,8 +13,12 @@ import HeroSection from "@modules/ai-cake-studio/components/hero-section"
 import AiStudioSection from "@modules/ai-cake-studio/components/ai-studio-section"
 import ShowcaseGallery from "@modules/ai-cake-studio/components/showcase-gallery"
 import BottomCta from "@modules/ai-cake-studio/components/bottom-cta"
+import StudioSkeleton from "@modules/ai-cake-studio/components/studio-skeleton"
+import { Suspense } from "react"
 
-export const dynamic = "force-dynamic"
+/* Almost all of this page is fixed copy, FAQ and JSON-LD; the studio itself is a client
+   component that fetches its own data. Five minutes is generous for the showcase strip. */
+export const revalidate = 300
 
 export const metadata: Metadata = {
   alternates: { canonical: "/ai-cake-studio" },
@@ -95,13 +99,30 @@ const HOW_IT_WORKS = [
   },
 ]
 
-export default async function AiCakeStudioPage() {
+/**
+ * The two panels that need to know who is signed in.
+ *
+ * Split out so the customer lookup sits behind a Suspense boundary instead of in front of the whole
+ * page. Everything a crawler or an answer engine reads — the hero, how-it-works, the FAQ and all the
+ * JSON-LD — is now rendered without waiting on it.
+ */
+async function StudioPanels() {
   let customer = null
   try {
     customer = await getCustomer()
   } catch {
     customer = null
   }
+
+  return (
+    <>
+      <AiStudioSection customer={customer} />
+      <ShowcaseGallery customer={customer} />
+    </>
+  )
+}
+
+export default function AiCakeStudioPage() {
 
   /**
    * Until now this page carried a title and nothing else machine-readable. A crawler — and more to
@@ -202,8 +223,9 @@ export default async function AiCakeStudioPage() {
       />
 
       <HeroSection />
-      <AiStudioSection customer={customer} />
-      <ShowcaseGallery customer={customer} />
+      <Suspense fallback={<StudioSkeleton />}>
+        <StudioPanels />
+      </Suspense>
 
       {/* The visible half of howToJsonLd. Both come from HOW_IT_WORKS, so they cannot disagree. */}
       <section

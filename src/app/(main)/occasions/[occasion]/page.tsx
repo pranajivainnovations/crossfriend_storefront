@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { getOccasions, getOccasionBySlug } from "@lib/data/dynamic"
 import OccasionTemplate from "@modules/occasions/templates/occasion-template"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 type Props = {
   params: { occasion: string }

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { MARKETPLACE_CATEGORIES } from "@lib/data/marketplace"
 import MarketplaceTemplate from "@modules/marketplace/templates"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 60
 
 type Props = {
   params: { category: string }

@@ -15,8 +15,30 @@ import { getAnnouncement } from "@lib/data/announcement"
 import AnnouncementBanner from "@modules/layout/components/announcement-banner"
 import { BASE_URL } from "@lib/util/seo"
 
-// Force ALL pages under (main) to render at request time — no build-time Medusa calls
-export const dynamic = "force-dynamic"
+/**
+ * Deliberately NOT force-dynamic.
+ *
+ * ── What force-dynamic was doing here ──────────────────────────────────────────────────────────
+ * It was added to stop Next calling Medusa during the build, and it did that. But in Next 14
+ * `dynamic = "force-dynamic"` also sets the segment's default `fetchCache` to `"force-no-store"`,
+ * and because this is the layout, that applied to every fetch on every page beneath it. The result
+ * was that getSiteSettings and getAnnouncement — both written with `next: { revalidate: 60 }` —
+ * never cached anything, and neither did the four catalogue calls in Nav.
+ *
+ * That is expensive here in a way it would not be in most deployments: the storefront runs in
+ * Mumbai and the backend in Stockholm, so each of those calls is a round trip of roughly 6,000 km.
+ * Eight of them, uncached, on every single page view, is most of a three-second first byte.
+ *
+ * ── Why removing it does not reintroduce build-time Medusa calls ───────────────────────────────
+ * These pages are still rendered per request: retrieveCart below reads an httpOnly cookie, and so
+ * does CartButton inside Nav, which opts the whole route into dynamic rendering on its own. What
+ * changes is only that the fetch Data Cache is allowed to work again — dynamic rendering and the
+ * Data Cache are independent, and it was the implicit force-no-store, not the rendering mode, that
+ * was costing the time.
+ *
+ * If the cart ever moves to a client-side fetch, these pages become statically renderable and this
+ * comment stops being true — check both call sites before assuming it still is.
+ */
 
 /**
  * BASE_URL comes from the shared seo module. This file previously declared its own copy defaulting

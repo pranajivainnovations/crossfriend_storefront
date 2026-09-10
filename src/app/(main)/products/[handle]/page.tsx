@@ -15,7 +15,7 @@ import ProductTemplate from "@modules/products/templates"
 import { buildProductJsonLd } from "@lib/util/product-jsonld"
 import { breadcrumbJsonLd, jsonLdScriptProps, plainText } from "@lib/util/seo"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 type Props = {
   params: { handle: string }

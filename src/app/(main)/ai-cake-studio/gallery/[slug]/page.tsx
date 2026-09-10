@@ -111,12 +111,28 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const data = await fetchDesign(params.slug)
 
-  // A missing design must not produce a 200 with fallback metadata — that is a soft 404, which
-  // Google indexes as a real page. Returning bare metadata lets the component below call notFound()
-  // and send a genuine 404 status.
-  if (!data) return { title: "Design not found", robots: { index: false, follow: false } }
+  /**
+   * notFound() here, in generateMetadata, rather than only in the component below.
+   *
+   * ── Why the component's own notFound() was not enough ──────────────────────────────────────────
+   * `ai-cake-studio/loading.tsx` sits one segment above this route, and in the App Router a
+   * loading file creates a Suspense boundary for that segment *and everything nested under it* —
+   * this page included. That makes Next stream the response: the shell goes out, with its HTTP 200,
+   * before the page component has finished. By the time notFound() runs down there the status is
+   * already on the wire, so it swaps the UI and leaves a 200 behind — Search Console's definition
+   * of a soft 404. /products/[handle] has no loading file above it, never streams, and is exactly
+   * why that route answers a real 404 while this one did not.
+   *
+   * generateMetadata is awaited before any of that, because Next needs it to build <head>. Calling
+   * notFound() at this point sets the status while it can still be set.
+   *
+   * ── Why this is worth the care ─────────────────────────────────────────────────────────────────
+   * When a design is hidden in OPS — a duplicate, or one whose prompt named a child — a 404 is what
+   * takes it out of the index promptly. A 200 that merely says "Design not found" keeps it there.
+   */
+  if (!data) notFound()
 
-  const { design } = data
+  const { design } = data!
   const title = asTitle(design.prompt)
   const canonical = `/ai-cake-studio/gallery/${designSlug(design)}`
 
