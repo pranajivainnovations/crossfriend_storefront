@@ -7,6 +7,17 @@ import CountrySelect from "../country-select"
 import { Container } from "@medusajs/ui"
 import { usePincodeAutofill } from "../../hooks/use-pincode-autofill"
 
+/**
+ * An address the customer actually gave us, or nothing.
+ *
+ * The synthetic form is `<10 digits>@crossfriend.in` — see the note at the prefill below. The old
+ * `@pranajiva.in` domain is matched too, because accounts created before the rename still carry it.
+ */
+function realEmail(email: string | null | undefined): string | null {
+  if (!email) return null
+  return /^d{10}@(crossfriend.in|pranajiva.in)$/i.test(email) ? null : email
+}
+
 const ShippingAddress = ({
   customer,
   cart,
@@ -92,7 +103,15 @@ const ShippingAddress = ({
       "shipping_address.country_code":
         defaultAddress?.country_code || countryCode || "",
       "shipping_address.province": defaultAddress?.province || "",
-      email: cart?.email || customer?.email || "",
+      /**
+       * Never prefilled with the synthetic address.
+       *
+       * Signing in by mobile gives the customer an internal identifier — 9876543210@crossfriend.in —
+       * because Medusa requires a unique email and a phone number is what we actually have. Prefilled
+       * here it looks like a real address, so it is left alone, and every receipt goes to a mailbox
+       * nobody reads. Blank asks the question; a plausible wrong answer stops it being asked.
+       */
+      email: cart?.email || realEmail(customer?.email) || "",
       "shipping_address.phone": defaultAddress?.phone || customer?.phone || "",
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -299,7 +318,9 @@ const ShippingAddress = ({
       </div>
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Input
-          label="Email"
+          /* Says what it is for. Checkout is the one moment an email is obviously the customer's
+             interest rather than ours, and the label should say so. */
+          label="Email (for your receipt)"
           name="email"
           type="email"
           title="Enter a valid email address."

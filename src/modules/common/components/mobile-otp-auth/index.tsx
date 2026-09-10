@@ -6,11 +6,36 @@ import { useRouter } from "next/navigation"
 
 type Step = "mobile" | "otp" | "success"
 
+/**
+ * Signing in with a mobile number and a one-time code — the only way to sign in.
+ *
+ * ── Why this lives in common/ rather than the cake studio ──────────────────────────────────────
+ * It was written for the studio, where signing in unlocked free designs, and the copy said so. It is
+ * now the site's single sign-in surface, so the words that were true only there are props. The flow
+ * itself never was studio-specific: enter a number, enter a code, get a session.
+ *
+ * ── Why there is no password anywhere in it ────────────────────────────────────────────────────
+ * The backend issues the session in the same request that verifies the code. Nothing here computes,
+ * stores or sends a credential. See AUTH_PLAN.md for what this replaced and why.
+ */
 interface Props {
+  /** Studio-only: the free-design allowance shown as a badge. Omitted elsewhere. */
   attemptsLimit?: number
+  title?: string
+  subtitle?: string
+  /** Shown once signed in. Defaults to something true anywhere on the site. */
+  successText?: string
+  /** Where to go after signing in. Omitted means stay put and re-render with the new session. */
+  redirectTo?: string
 }
 
-export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
+export default function MobileOtpAuth({
+  attemptsLimit,
+  title = "Sign in",
+  subtitle = "Just your mobile number — no password, no email",
+  successText,
+  redirectTo,
+}: Props) {
   const router = useRouter()
   const [step, setStep] = useState<Step>("mobile")
   const [mobile, setMobile] = useState("")
@@ -85,8 +110,12 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
       }
       setIsNewUser(data.isNewUser)
       setStep("success")
-      // Refresh server components so the customer session is picked up
-      setTimeout(() => router.refresh(), 1000)
+      /* A beat on the success state before moving, so the confirmation is actually seen — then a
+         refresh (or a navigation) so server components pick up the new session. */
+      setTimeout(() => {
+        if (redirectTo) router.push(redirectTo)
+        else router.refresh()
+      }, 1000)
     } finally {
       setLoading(false)
     }
@@ -104,12 +133,15 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
     <div className="rounded-[14px] bg-gradient-to-b from-white to-cf-purple-50/70 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-base font-bold leading-snug text-slate-900">Sign in to generate your cake</p>
-          <p className="mt-0.5 text-xs text-slate-500">Just your mobile number — no password, no email</p>
+          <p className="text-base font-bold leading-snug text-slate-900">{title}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
         </div>
-        <span className="shrink-0 rounded-full bg-gradient-to-r from-cf-purple-600 to-fuchsia-600 px-2.5 py-1 text-[10px] font-bold text-white">
-          🎁 {attemptsLimit} free
-        </span>
+        {/* Only where there is actually an allowance to advertise. */}
+        {attemptsLimit !== undefined && (
+          <span className="shrink-0 rounded-full bg-gradient-to-r from-cf-purple-600 to-fuchsia-600 px-2.5 py-1 text-[10px] font-bold text-white">
+            🎁 {attemptsLimit} free
+          </span>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
@@ -232,9 +264,12 @@ export default function MobileOtpAuth({ attemptsLimit = 3 }: Props) {
                 {isNewUser ? "Welcome to CrossFriend! 🎉" : "Welcome back! 👋"}
               </p>
               <p className="text-xs text-green-600">
-                {isNewUser
-                  ? `Account created · Loading your ${attemptsLimit} free designs...`
-                  : "You're signed in · Loading your session..."}
+                {successText ??
+                  (isNewUser
+                    ? attemptsLimit !== undefined
+                      ? `Account created · Loading your ${attemptsLimit} free designs...`
+                      : "Account created · Taking you through..."
+                    : "You're signed in · Loading your session...")}
               </p>
             </div>
           </motion.div>

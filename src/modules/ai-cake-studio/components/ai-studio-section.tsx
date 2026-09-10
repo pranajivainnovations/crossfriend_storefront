@@ -14,7 +14,7 @@ import {
   TIER_DEFAULT_WEIGHT,
 } from "../data/mock-data"
 import PriceEstimator from "./price-estimator"
-import MobileOtpAuth from "./mobile-otp-auth"
+import MobileOtpAuth from "@modules/common/components/mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
 import StudioProgressRail, { type StudioStep } from "./studio-progress-rail"
@@ -1775,7 +1775,12 @@ export default function AiStudioSection({ customer }: Props) {
 
           {/* CTA area */}
           <div className="mt-4">
-            {!isLoggedIn && <MobileOtpAuth attemptsLimit={FREE_ATTEMPTS_LIMIT} />}
+            {!isLoggedIn && (
+              <MobileOtpAuth
+                attemptsLimit={FREE_ATTEMPTS_LIMIT}
+                title="Sign in to generate your cake"
+              />
+            )}
 
             {isLoggedIn && !hasAttempts && (
               <div className="flex flex-wrap items-center gap-3">

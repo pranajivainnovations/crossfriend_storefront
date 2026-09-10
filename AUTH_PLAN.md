@@ -1,6 +1,6 @@
 # Streamlining sign-in: mobile OTP as the only identity
 
-**Status:** Phases 0 and 1 done (2026-09-10, not yet deployed) · **Written:** 2026-09-10
+**Status:** Phases 0–2b done (2026-09-10, not yet deployed) · **Written:** 2026-09-10
 **Decision:** mobile + OTP becomes the only way to sign in. Email/password is retired.
 
 ---
@@ -185,17 +185,19 @@ one. Another reason the derived scheme had to be removed rather than improved.
 
 *The derived-password attack is gone the moment this deploys.*
 
-### Phase 2 — one sign-in everywhere
+### Phase 2 — one sign-in everywhere — **DONE, not deployed**
 
 6. `/account` sign-in and registration use the existing OTP component. The email/password form is
    removed, not hidden.
-7. Migrate the one email/password customer: attach their phone, so their orders follow them.
+7. ~~Migrate the one email/password customer.~~ **Skipped by decision** — the account is a team
+   member's, and it has no password hash at all, so it could not sign in either way. Signing in by
+   mobile creates a fresh account; the old one's orders do not follow. Accepted.
 8. ~~**Extend the session from 7 days to 90.**~~ **Done in Phase 1** — the cookie now lasts 30 days,
    matched to the token's own lifetime rather than exceeding it. A cookie outliving its token is
    worse than a short one: a browser that believes it is signed in and is silently rejected by every
    request. Raising both together is a one-line change whenever wanted.
 
-### Phase 2b — the profile, and asking for the rest
+### Phase 2b — the profile, and asking for the rest — **DONE, not deployed**
 
 Signing in with a phone number means we start with nothing else: no name, no email. That is the
 right trade at the door — one field to get in — but it leaves an account that cannot be emailed a
@@ -220,6 +222,16 @@ Three rules this must not break:
 - **An email for receipts is not consent to marketing.** Separate purposes under DPDP, so a separate
   opt-in, asked separately. Quietly adding a receipt address to a mailing list is the kind of thing
   that is cheap to do and expensive to have done.
+
+Also done in Phase 2, beyond the original list:
+
+- The OTP component moved from `ai-cake-studio/` to `common/` and its studio-specific copy became
+  props. It was never studio-specific in behaviour, only in wording.
+- **Checkout no longer prefills the synthetic email.** Signing in by mobile produces an internal
+  identifier like `9876543210@crossfriend.in`; prefilled at checkout it looks real, so it is left
+  alone and every receipt goes to a mailbox nobody reads. The field is now blank and labelled
+  "Email (for your receipt)" — the one moment an email is obviously the customer's interest.
+- `login`, `register` and `profile-password` components deleted, not hidden.
 
 ### Phase 3 — cleanup
 
