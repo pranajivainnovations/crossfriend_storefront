@@ -1,57 +1,30 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { medusaClient } from "@lib/config"
 
-const DOMAIN = "pranajiva.in"
 const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
 const FLOW = "ai_studio_login"
 
 /**
- * The salt that turns a mobile number into a Medusa password.
- *
- * ── Why this throws instead of defaulting ──────────────────────────────────────────────────────
- * It used to read `process.env.OTP_PASSWORD_SALT || "cf_change_this_salt_in_production"`, and the
- * variable was set in no environment file — so production ran on the literal. Every customer's
- * password was therefore `CF_<mobile>_cf_chang`, computable by anyone who could read this file, and
- * usable directly against the Medusa API without ever touching the sign-in form. A fallback that
- * silently ships is worse than no fallback, because nothing ever fails to draw attention to it.
- *
- * Failing closed here means a missing salt breaks sign-in loudly at deploy time rather than
- * quietly leaving the door open.
- */
-function derivePassword(mobile: string): string {
-  const salt = process.env.OTP_PASSWORD_SALT
-  if (!salt || salt.length < 32) {
-    throw new Error("OTP_PASSWORD_SALT must be set to at least 32 characters")
-  }
-  return `CF_${mobile}_${salt.slice(0, 16)}`
-}
-
-/**
- * The password shape produced by the old hardcoded fallback.
- *
- * Kept only so existing customers are not locked out the moment a real salt is set: their stored
- * password was derived from the literal below, and nothing has re-hashed it. When a login with the
- * current salt fails and this one succeeds, the account is silently upgraded — see below.
- *
- * Delete this once the accounts created before the salt was set have all signed in at least once,
- * or once they have been force-rotated. It is a known-value password by definition and every day it
- * remains valid is a day that credential still works.
- */
-function legacyPassword(mobile: string): string {
-  return `CF_${mobile}_cf_chang`
-}
-
-/**
  * POST /api/auth/otp/verify
  *
- * Verifies the code with the backend, then creates or logs in the Medusa customer.
+ * Verifies the code with the backend and puts the returned session in a cookie.
  *
- * The verification and the session are split deliberately. The backend owns the code — it is the
- * only place that knows what was issued and the only place that can consume it — but the session
- * cookie has to be set on this origin, so the login half stays here. A caller who verifies against
- * the backend directly consumes the code and gets no cookie, which makes that a way to break your
- * own login rather than a way around it.
+ * ── What used to be here, and why it is gone ───────────────────────────────────────────────────
+ * This file used to derive a Medusa password from the mobile number and a shared salt, then log in
+ * with it — plus a fallback to a hardcoded constant for accounts created before a real salt existed.
+ *
+ * Both were the same mistake in different sizes: a password anybody could compute. The salt was a
+ * master key to every customer, and the constant needed no key at all. Neither could be revoked for
+ * one account, and neither was protected by anything on the OTP path — an attacker went straight to
+ * `POST /store/auth` with a computed password and never requested a code at all.
+ *
+ * The backend now issues the session itself, in the same request that verifies the code. Customers
+ * have random passwords that nothing recomputes and nobody knows. There is no secret in this file.
+ *
+ * ── Why the cookie is still set here ───────────────────────────────────────────────────────────
+ * The token has to become an httpOnly cookie on this origin, and only this origin can set it. That
+ * is the whole remaining job. A future mobile app would call the backend directly and keep the token
+ * itself, which the old cookie-only design could not support.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
@@ -65,25 +38,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid mobile number" }, { status: 400 })
   }
 
-  // ── The actual verification ───────────────────────────────────────────────────────────────
-  // Everything below this block runs only if the backend confirmed the code. There is no branch
-  // that reaches the login on a bad code, and no shape check standing in for a comparison.
+  let data: { verified?: boolean; token?: string; isNewUser?: boolean; error?: string }
+  let status: number
+
   try {
-    const verifyRes = await fetch(`${MEDUSA_BACKEND_URL}/store/crossfriend/otp/verify`, {
+    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/crossfriend/otp/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mobile, otp, flow: FLOW }),
       cache: "no-store",
     })
-
-    const verifyData = await verifyRes.json().catch(() => ({}))
-
-    if (!verifyRes.ok || verifyData.verified !== true) {
-      return NextResponse.json(
-        { error: verifyData.error ?? "Incorrect code. Please try again." },
-        { status: verifyRes.status === 500 ? 502 : verifyRes.status || 400 }
-      )
-    }
+    status = res.status
+    data = await res.json().catch(() => ({}))
   } catch (error) {
     console.error("[otp/verify] backend unreachable", error)
     return NextResponse.json(
@@ -91,101 +57,31 @@ export async function POST(req: NextRequest) {
       { status: 502 }
     )
   }
-  // ──────────────────────────────────────────────────────────────────────────────────────────
 
-  const email = `${mobile}@${DOMAIN}`
-
-  let password: string
-  try {
-    password = derivePassword(mobile)
-  } catch (error) {
-    console.error("[otp/verify] misconfigured:", error)
+  /* Both conditions, not either. A response missing the token is not a sign-in however cheerful its
+     body is — and setting a cookie from an absent value would produce a session that looks real and
+     authenticates as nobody. */
+  if (!data.verified || !data.token) {
     return NextResponse.json(
-      { error: "Sign-in is temporarily unavailable. Please try again later." },
-      { status: 503 }
+      { error: data.error ?? "Incorrect code. Please try again." },
+      { status: status === 500 ? 502 : status || 400 }
     )
-  }
-
-  const setJwt = (token: string) => {
-    cookies().set("_medusa_jwt", token, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    })
-  }
-
-  const login = async (pw: string): Promise<string | null> => {
-    try {
-      const { access_token } = await medusaClient.auth.getToken(
-        { email, password: pw },
-        { next: { tags: ["auth"] } } as Record<string, unknown>
-      )
-      return access_token ?? null
-    } catch {
-      return null
-    }
-  }
-
-  // 1. Existing customer, current salt.
-  const token = await login(password)
-  if (token) {
-    setJwt(token)
-    return NextResponse.json({ success: true, isNewUser: false })
   }
 
   /**
-   * 2. Existing customer created before a real salt was set.
+   * Thirty days, matching the token's own lifetime.
    *
-   * Their stored hash came from the known fallback, so a login with the current salt just failed.
-   * Rotate them onto the real password now — they have proved possession of the mobile number by
-   * passing the OTP a moment ago, which is a stronger check than the password being replaced.
-   *
-   * A failed rotation is logged but not surfaced: the customer is legitimately signed in either
-   * way, and the next sign-in will simply try again.
+   * It was seven, which meant a customer who visits monthly did an OTP every single time — friction
+   * for them and a per-message cost to us, on an identity they had already proved. A cookie outliving
+   * its token would be worse than either: a browser that believes it is signed in and is silently
+   * rejected by every request.
    */
-  const legacyToken = await login(legacyPassword(mobile))
-  if (legacyToken) {
-    try {
-      await medusaClient.customers.update(
-        { password },
-        { Authorization: `Bearer ${legacyToken}` }
-      )
-      const rotated = await login(password)
-      setJwt(rotated ?? legacyToken)
-    } catch (err) {
-      console.error("[otp/verify] password rotation failed for an existing customer", err)
-      setJwt(legacyToken)
-    }
-    return NextResponse.json({ success: true, isNewUser: false })
-  }
+  cookies().set("_medusa_jwt", data.token, {
+    maxAge: 60 * 60 * 24 * 30,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  })
 
-  // 3. New customer.
-  try {
-    await medusaClient.customers.create({
-      email,
-      password,
-      first_name: mobile,
-      last_name: "",
-      phone: `+91${mobile}`,
-    })
-
-    const newToken = await login(password)
-    if (!newToken) {
-      console.error("[otp/verify] created customer but could not log them in")
-      return NextResponse.json(
-        { error: "Authentication failed. Please try again." },
-        { status: 500 }
-      )
-    }
-
-    setJwt(newToken)
-    return NextResponse.json({ success: true, isNewUser: true })
-  } catch (err) {
-    console.error("[otp/verify] Medusa customer creation failed:", err)
-    return NextResponse.json(
-      { error: "Authentication failed. Please try again." },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json({ success: true, isNewUser: data.isNewUser === true })
 }
