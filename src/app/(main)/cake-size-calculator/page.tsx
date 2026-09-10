@@ -21,9 +21,12 @@ import CakeSizeCalculator from "@modules/tools/components/cake-size-calculator"
  * JavaScript.
  */
 
-const TITLE = "Cake Size Calculator — How Much Cake Per Person"
+/* Both were over length and truncating in results. The title is measured WITH the root layout's
+   " | CrossFriend" suffix, which is where the extra 14 characters that pushed it to 61 came from —
+   shortening the base is the only lever, since the template is site-wide. */
+const TITLE = "Cake Size Calculator — How Much Per Person"
 const DESCRIPTION =
-  "Work out what weight of cake you need for your guest count. Accounts for how the cake is served, round versus square, and tiers — plus how long cream holds up in Delhi heat."
+  "Work out what weight of cake you need for your guest count — how it is served, round versus square, tiers, and how long cream holds up in Delhi heat."
 
 export const metadata: Metadata = {
   alternates: { canonical: "/cake-size-calculator" },

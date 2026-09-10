@@ -121,7 +121,7 @@ export default function SocialProofSection() {
             <div className="rounded-xl bg-cf-purple-50/60 px-3 py-3">
               <span className="text-lg">📍</span>
               <p className="mt-1 text-xs font-bold text-slate-700">Local Delivery</p>
-              <p className="text-[10px] text-slate-500">Bakers near you</p>
+              <p className="text-[10px] text-slate-500">In the areas we serve</p>
             </div>
           </div>
         </div>

@@ -1939,6 +1939,20 @@ export default function AiStudioSection({ customer }: Props) {
                   {generating && <CakeBuildingAnimation compact />}
                 </div>
 
+                {/* What the picture is, said where the picture is.
+                    This lived in the FAQ at the bottom of the page, which is the one place a person
+                    looking at their new cake will not scroll to. The expectation it sets — a brief,
+                    not a photograph — is only useful before somebody orders against the image, so it
+                    belongs against the image. Framed as what makes it real rather than as a
+                    liability disclaimer: handmade and one of a kind is the product, not the excuse. */}
+                {!generating && designs.length > 0 && (
+                  <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                    This is a design brief, not a photograph. A real person bakes it by hand, and
+                    sugar has limits that pixels don&rsquo;t &mdash; so expect something close to
+                    this, made properly, and one of a kind.
+                  </p>
+                )}
+
                 {/* The one moment worth asking at: they described a cake and watched it appear.
                     Never on load — see the component for why one badly-timed prompt is permanent. */}
                 {!generating && (
@@ -2026,6 +2040,17 @@ export default function AiStudioSection({ customer }: Props) {
             savedProduct={savedProduct}
             onBakerChosen={() => setReachedOrder(true)}
             pincode={confirmedPincode}
+            /* So the out-of-coverage state can hand over the design itself. Reuses the same
+               proxied-download path as the buttons on the design cards, rather than a second
+               mechanism that could drift from it. */
+            onDownloadDesign={
+              selectedDesignId
+                ? () => {
+                    const d = designs.find((x) => x.id === selectedDesignId)
+                    if (d) handleDownloadImage(d)
+                  }
+                : undefined
+            }
           />
         </div>
       </div>

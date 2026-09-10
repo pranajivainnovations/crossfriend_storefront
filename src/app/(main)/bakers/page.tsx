@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/bakers" },
   title: "Local Bakers",
   description:
-    "Discover local bakers on CrossFriend. Browse verified bakeries near you and order cakes, pastries and desserts made fresh.",
+    "Discover local bakers on CrossFriend. Browse verified bakeries and order cakes, pastries and desserts made fresh.",
   keywords: ["local bakers", "bakery near me", "cake shops", "order from local bakery"],
   openGraph: {
     title: "Local Bakers",

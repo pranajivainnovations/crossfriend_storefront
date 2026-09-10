@@ -58,7 +58,6 @@ services:
       #
       # Once set, do not change it: every existing customer's password is
       # derived from this value.
-      OTP_PASSWORD_SALT: ${OTP_PASSWORD_SALT}
 
       # ── Browser notifications ───────────────────────────────────────────────
       # The PUBLIC half of the VAPID pair only. The private key lives in OPS,

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/ready-to-order" },
   title: "Ready to Order",
   description:
-    "Cakes, pastries, desserts and gifts from local bakers — already made and ready to deliver. Order from verified bakeries near you.",
+    "Cakes, pastries, desserts and gifts from local bakers — already made and ready to deliver. Order from verified bakeries in the areas we serve.",
   keywords: [
     "order cake online",
     "cakes near me",

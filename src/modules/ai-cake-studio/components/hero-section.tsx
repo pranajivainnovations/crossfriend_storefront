@@ -137,7 +137,7 @@ export default function HeroSection() {
             custom={0.2}
             className="text-base leading-7 text-slate-600 sm:text-lg"
           >
-            Describe it, and a verified baker near you makes it.
+            Describe your cake in your own words — designed in 60 seconds, free, anywhere in India.
           </motion.p>
 
           <motion.div

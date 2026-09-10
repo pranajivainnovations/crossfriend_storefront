@@ -44,7 +44,7 @@ export const STUDIO_FAQ: FaqEntry[] = [
   {
     question: "Can a real baker actually make the design?",
     answer:
-      "The design is a reference for the baker, not a photograph of a finished cake. AI images sometimes include detail that is difficult or impossible to reproduce in sugar, so treat the image as a clear brief for what you want rather than an exact promise of what will arrive.",
+      "This is a design brief, not a photograph. A real person bakes it by hand, and sugar has limits that pixels don't — so expect something close to your design, made properly, and one of a kind. You will see the same note under every design in the Studio.",
   },
   {
     question: "Which areas do you deliver to?",

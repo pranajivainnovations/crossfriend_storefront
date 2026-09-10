@@ -68,8 +68,8 @@ export default async function Hero() {
             </h1>
 
             <p className="mt-5 max-w-md text-lg leading-relaxed text-white/60">
-              See it designed in seconds. Then have a local baker near you make it — for real, for
-              your celebration.
+              See it designed in seconds — free, anywhere in India. Where we deliver, a local
+              baker makes it for real.
             </p>
 
             <div className="mt-8">

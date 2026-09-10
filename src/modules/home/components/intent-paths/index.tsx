@@ -75,8 +75,8 @@ export default function IntentPaths() {
         Or{" "}
         <Link href="/bakers" className="text-cf-purple underline hover:text-cf-purple-700">
           discover local bakers
-        </Link>{" "}
-        near you.
+        </Link>
+        .
       </p>
     </section>
   )

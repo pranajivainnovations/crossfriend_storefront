@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import type { BakerProfile } from "../types"
 import { orderAiCake, type SavedAiCakeProduct } from "../actions"
+import PincodeWaitlistForm from "@modules/common/components/pincode-waitlist-form"
 
 type OrderKey = "automatch" | string
 
@@ -116,11 +117,21 @@ interface Props {
   /** Fires when the customer commits to a baker, so the progress rail can advance from Baker to Order
    * instead of parking on Baker while the cart page loads. */
   onBakerChosen?: () => void
+  /** Downloads the design the customer is looking at. Supplied so the out-of-coverage state can hand
+   * them the thing they came for — a brief they can walk into any bakery with — rather than ending
+   * on an apology. Absent when no design is selected, and the offer simply isn't made. */
+  onDownloadDesign?: () => void
 }
 
 type ServiceStatus = "enabled" | "coming_soon" | "unknown"
 
-export default function BakerFinder({ generated, savedProduct, pincode, onBakerChosen }: Props) {
+export default function BakerFinder({
+  generated,
+  savedProduct,
+  pincode,
+  onBakerChosen,
+  onDownloadDesign,
+}: Props) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [bakers, setBakers] = useState<BakerProfile[] | null>(null)
@@ -229,15 +240,13 @@ export default function BakerFinder({ generated, savedProduct, pincode, onBakerC
               {!savedProduct
                 ? "Unlocks once your price is confirmed above"
                 : loading
-                  ? "Finding bakers near you…"
+                  ? "Finding bakers…"
                   : bakers != null
-                    ? serviceStatus === "coming_soon"
-                      ? "Not in this area yet — coming soon"
-                      : serviceStatus === "unknown"
-                        ? "Pincode not recognized"
-                        : bakers.length > 0
-                          ? `${bakers.length} baker${bakers.length !== 1 ? "s" : ""} found`
-                          : "No bakers in this area yet"
+                    ? serviceStatus === "unknown"
+                      ? "Pincode not recognised"
+                      : bakers.length > 0
+                        ? `${bakers.length} baker${bakers.length !== 1 ? "s" : ""} found`
+                        : "Not delivering here yet — the design is still yours"
                     : "Preparing your options…"}
             </p>
           </div>
@@ -286,21 +295,45 @@ export default function BakerFinder({ generated, savedProduct, pincode, onBakerC
 
               {savedProduct && !loading && bakers != null && (
                 serviceStatus === "unknown" ? (
-                  <div className="rounded-2xl border border-dashed border-cf-purple-200 py-8 text-center">
+                  <div className="rounded-2xl border border-dashed border-cf-purple-200 px-4 py-6 text-center">
                     <p className="text-2xl">🤔</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-700">Pincode not recognized</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">
+                      We don&apos;t recognise {pincode}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Worth checking the digits — the price above was worked out for it.
+                    </p>
                   </div>
-                ) : serviceStatus === "coming_soon" ? (
-                  <div className="rounded-2xl border border-dashed border-cf-purple-200 py-8 text-center">
-                    <p className="text-2xl">🚧</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-700">Not in this area yet</p>
-                    <p className="mt-1 text-xs text-slate-500">We&apos;re expanding fast — check back soon!</p>
-                  </div>
-                ) : bakers.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-cf-purple-200 py-8 text-center">
-                    <p className="text-2xl">🌱</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-700">No bakers found in this area</p>
-                    <p className="mt-1 text-xs text-slate-500">We&apos;re growing fast — check back soon!</p>
+                ) : serviceStatus === "coming_soon" || bakers.length === 0 ? (
+                  /* The design is already made and already theirs, so this is a handover, not a
+                     rejection. Never "sorry, we don't service your area": that ends the visit, and
+                     the two things still on offer — the file, and being told when we arrive — are
+                     worth more to both sides than an apology. */
+                  <div className="rounded-2xl border border-cf-purple-200 bg-cf-purple-50/50 px-4 py-5">
+                    <p className="text-sm font-bold text-slate-900">
+                      We don&apos;t deliver to {pincode} yet — but the design is yours.
+                    </p>
+                    <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                      Download it and take it to any local baker. Everything they need is on it.
+                    </p>
+
+                    {onDownloadDesign && (
+                      <button
+                        type="button"
+                        onClick={onDownloadDesign}
+                        className="mt-3 rounded-xl bg-gradient-to-r from-cf-purple-600 to-fuchsia-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-cf-purple-300/40 transition hover:from-cf-purple-700 hover:to-purple-700"
+                      >
+                        Download the design
+                      </button>
+                    )}
+
+                    <p className="mt-4 text-xs leading-relaxed text-slate-600">
+                      We&apos;re adding new areas every day. Leave your number and we&apos;ll tell you
+                      the day we reach you.
+                    </p>
+                    <div className="mt-2">
+                      <PincodeWaitlistForm pincode={pincode ?? ""} source="studio" />
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">

@@ -117,7 +117,7 @@ export default function RecommendedBakers({ bakers }: RecommendedBakersProps) {
             Recommended local bakers
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            Verified bakers near you who can make this design
+            Verified bakers who can make this design
           </p>
         </div>
         <button

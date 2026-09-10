@@ -42,6 +42,11 @@ export default function ProductActions({
   const [options, setOptions] = useState<Record<string, string>>({})
   const [isAdding, setIsAdding] = useState(false)
 
+  const bakerSlug =
+    typeof (product.metadata as Record<string, unknown> | undefined)?.baker_slug === "string"
+      ? ((product.metadata as Record<string, unknown>).baker_slug as string)
+      : undefined
+
   // Cake customization state
   const isCakeProduct = isCake(product)
   const [cakeMessage, setCakeMessage] = useState("")
@@ -220,8 +225,11 @@ export default function ProductActions({
           />
         )}
 
-        {/* Delivery availability check */}
-        <PincodeChecker variant="full" className="my-2" />
+        {/* Delivery availability check.
+            Scoped to this product's baker: a ready-to-order cake is bound to a pincode through the
+            bakery that makes it, so "do you deliver here" is really "can they reach you". The slug
+            is already denormalised onto product metadata, so this costs no extra query. */}
+        <PincodeChecker variant="full" className="my-2" bakerSlug={bakerSlug} />
 
         <Button
           onClick={handleAddToCart}

@@ -151,6 +151,47 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
       },
     },
     {
+      /**
+       * The physical, findable business — distinct from the Organization above, which is the legal
+       * entity and brand.
+       *
+       * Why both: an Organization with a PostalAddress asserts "this company has a registered
+       * address"; it does not make the business eligible for the local results and map placements
+       * that "cake delivery in ghaziabad" actually returns. For a business whose whole fulfilment
+       * story is a short list of pincodes, those results are the ones worth appearing in.
+       *
+       * areaServed lists the districts OPS has actually launched, not an aspiration. It is stated
+       * as three named places rather than "India" for the same reason every delivery claim on this
+       * site was rewritten: the studio is free nationwide, delivery is not, and structured data is
+       * exactly where an unbacked claim gets read literally and repeated by machines. This is a
+       * hardcoded mirror of baker_network.pincode_service_status — when a new district launches,
+       * this list needs updating with it.
+       */
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "@id": `${BASE_URL}/#localbusiness`,
+      name: "CrossFriend",
+      parentOrganization: { "@id": ORGANIZATION_ID },
+      url: BASE_URL,
+      description:
+        "Custom and ready-to-order cakes from local bakers, plus a free AI cake design studio.",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Ghaziabad",
+        addressRegion: "Uttar Pradesh",
+        postalCode: "201016",
+        addressCountry: "IN",
+      },
+      areaServed: [
+        { "@type": "City", name: "Ghaziabad" },
+        { "@type": "City", name: "Noida" },
+        { "@type": "City", name: "Lucknow" },
+      ],
+      email: settings.supportEmail,
+      telephone: settings.supportPhone,
+      priceRange: "₹₹",
+    },
+    {
       "@context": "https://schema.org",
       "@type": "WebSite",
       "@id": WEBSITE_ID,

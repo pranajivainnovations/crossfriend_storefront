@@ -18,9 +18,14 @@ export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   alternates: { canonical: "/ai-cake-studio" },
-  title: "AI Cake Studio",
+  /* Renders as "Design Your Own Cake Free — AI Cake Studio | CrossFriend" once the root layout's
+     "%s | CrossFriend" template is applied — the title carries the query this page should win, and
+     the template supplies the brand. The two claims stay in separate sentences on purpose: the
+     studio is free everywhere, delivery is not, and a description that runs them together would be
+     the same misleading blur this page's copy was rewritten to remove. */
+  title: "Design Your Own Cake Free — AI Cake Studio",
   description:
-    "Design your dream cake in 60 seconds with AI and order from local verified bakers.",
+    "Describe any cake in your own words, designed in 60 seconds — free, anywhere in India. Delivery in Ghaziabad, Noida and Lucknow, expanding daily.",
   authors: [{ name: "CrossFriend" }],
   keywords: [
     "AI cake studio",
@@ -86,7 +91,7 @@ const HOW_IT_WORKS = [
   {
     title: "Order it from a local baker",
     detail:
-      "Send the design to a verified bakery near you. A real baker makes the cake and delivers it — the design is the brief they work from.",
+      "Where we deliver, we send the design to a verified local bakery and a real baker makes it. Everywhere else the design is yours to take to any baker — it is the brief they work from.",
   },
 ]
 
