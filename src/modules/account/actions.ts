@@ -1,11 +1,20 @@
 "use server"
 
+/**
+ * Account server actions.
+ *
+ * signUp, logCustomerIn and updateCustomerPassword used to live here and are deliberately gone.
+ * Sign-in is a mobile number and a one-time code; there is no password to set, change or check.
+ *
+ * They were already unreachable — the forms that called them were deleted — but an unreferenced
+ * "use server" export is still an auth entry point sitting in the tree, one import away from being
+ * wired back up. Leaving them would have made "removed, not hidden" true of the UI only. See
+ * AUTH_PLAN.md.
+ */
+
 import {
   addShippingAddress,
-  authenticate,
-  createCustomer,
   deleteShippingAddress,
-  getToken,
   updateCustomer,
   updateShippingAddress,
 } from "@lib/data"
@@ -13,49 +22,10 @@ import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { cookies, headers } from "next/headers"
 import {
-  Customer,
   StorePostCustomersCustomerAddressesAddressReq,
   StorePostCustomersCustomerAddressesReq,
   StorePostCustomersCustomerReq,
-  StorePostCustomersReq,
 } from "@medusajs/medusa"
-
-export async function signUp(_currentState: unknown, formData: FormData) {
-  const customer = {
-    email: formData.get("email"),
-    password: formData.get("password"),
-    first_name: formData.get("first_name"),
-    last_name: formData.get("last_name"),
-    phone: formData.get("phone"),
-  } as StorePostCustomersReq
-
-  try {
-    await createCustomer(customer)
-    await getToken({ email: customer.email, password: customer.password }).then(
-      () => {
-        revalidateTag("customer")
-      }
-    )
-  } catch (error: any) {
-    return error.toString()
-  }
-}
-
-export async function logCustomerIn(
-  _currentState: unknown,
-  formData: FormData
-) {
-  const email = formData.get("email") as string
-  const password = formData.get("password") as string
-
-  try {
-    await getToken({ email, password }).then(() => {
-      revalidateTag("customer")
-    })
-  } catch (error: any) {
-    return error.toString()
-  }
-}
 
 export async function updateCustomerName(
   _currentState: Record<string, unknown>,
@@ -109,58 +79,6 @@ export async function updateCustomerPhone(
     return { success: true, error: null }
   } catch (error: any) {
     return { success: false, error: error.toString() }
-  }
-}
-
-export async function updateCustomerPassword(
-  currentState: {
-    customer: Omit<Customer, "password_hash">
-    success: boolean
-    error: string | null
-  },
-  formData: FormData
-) {
-  const email = currentState.customer.email as string
-  const new_password = formData.get("new_password") as string
-  const old_password = formData.get("old_password") as string
-  const confirm_password = formData.get("confirm_password") as string
-
-  const isValid = await authenticate({ email, password: old_password })
-    .then(() => true)
-    .catch(() => false)
-
-  if (!isValid) {
-    return {
-      customer: currentState.customer,
-      success: false,
-      error: "Old password is incorrect",
-    }
-  }
-
-  if (new_password !== confirm_password) {
-    return {
-      customer: currentState.customer,
-      success: false,
-      error: "Passwords do not match",
-    }
-  }
-
-  try {
-    await updateCustomer({ password: new_password }).then(() => {
-      revalidateTag("customer")
-    })
-
-    return {
-      customer: currentState.customer,
-      success: true,
-      error: null,
-    }
-  } catch (error: any) {
-    return {
-      customer: currentState.customer,
-      success: false,
-      error: error.toString(),
-    }
   }
 }
 
