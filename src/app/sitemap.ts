@@ -12,6 +12,7 @@ import {
   resolveProductTypeId,
 } from "@lib/data"
 import { BASE_URL } from "@lib/util/seo"
+import { getIndexableSlugs } from "@lib/sanity/queries"
 
 /**
  * The sitemap the site has never had. Built from live data rather than a hand-maintained list,
@@ -122,6 +123,7 @@ const STATIC_PATHS: Array<{
   // A tool page rather than a product page, but it is the entry point for a whole class of
   // informational queries, so it is ranked with the commercial pages rather than the legal ones.
   { path: "/cake-size-calculator", priority: 0.7, changeFrequency: "monthly" },
+  { path: "/knowledge", priority: 0.8, changeFrequency: "weekly" },
   // Original designs with original images — the one kind of page nobody else can publish.
   { path: "/ai-cake-studio/gallery", priority: 0.8, changeFrequency: "daily" },
   // Listing pages for the two browse hierarchies. Their individual pages are enumerated below.
@@ -397,6 +399,17 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
   // whether the dynamic sections are populated — the failure mode this sitemap has actually had.
   const designEntries = await collectDesignEntries()
 
+  /* Knowledge articles. getIndexableSlugs already excludes anything an editor marked "hide from
+     search engines" and anything scheduled for the future, so a noIndex article stays reachable by
+     link but is never advertised here — a sitemap listing a page that asks not to be indexed is a
+     contradiction crawlers report back as an error. */
+  const knowledgeEntries = (await getIndexableSlugs()).map((a) => ({
+    url: `${BASE_URL}/knowledge/${a.slug}`,
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
+    ...(a.updated ? { lastModified: new Date(a.updated) } : {}),
+  }))
+
   return validate([
     ...staticEntries,
     ...occasionEntries,
@@ -406,6 +419,7 @@ async function buildEntries(): Promise<MetadataRoute.Sitemap> {
     ...bakerEntries,
     ...productEntries,
     ...designEntries,
+    ...knowledgeEntries,
   ])
 }
 

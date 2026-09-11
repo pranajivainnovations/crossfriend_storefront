@@ -21,10 +21,21 @@ import LocalBakers from "@modules/home/components/local-bakers"
 import { ProductCollectionWithPreviews } from "types/global"
 import { cache, Suspense } from "react"
 
-/* Fresh within a minute rather than never cached. The homepage reads collections and products
-   that change when a baker publishes, not second by second, and the previous force-dynamic also
-   disabled the Data Cache for every call the layout and nav make above it. */
-export const revalidate = 60
+/**
+ * Dynamic, but not cache-hostile.
+ *
+ * force-dynamic is back because this page fetches catalogue data through the Medusa client and
+ * touches no cookies, so without it Next prerenders it during `next build`. That works locally,
+ * where MEDUSA_BACKEND_URL points at the live backend, and fails inside Docker, where it points at
+ * localhost:9001 and nothing is listening — which is exactly how it broke the image build.
+ *
+ * fetchCache is set explicitly because force-dynamic otherwise implies `force-no-store` for every
+ * fetch in the route, layouts included. That is what previously stopped getSiteSettings,
+ * getAnnouncement and getTaxonomy from ever caching despite each asking for `revalidate: 60`.
+ * "default-cache" keeps rendering per-request while letting those honour their own revalidate.
+ */
+export const dynamic = "force-dynamic"
+export const fetchCache = "default-cache"
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },

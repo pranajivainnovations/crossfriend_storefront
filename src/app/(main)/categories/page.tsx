@@ -7,7 +7,21 @@ import {
   StaggerItem,
 } from "@modules/common/components/motion"
 
-export const revalidate = 300
+/**
+ * Dynamic, but not cache-hostile.
+ *
+ * force-dynamic is back because this page fetches catalogue data through the Medusa client and
+ * touches no cookies, so without it Next prerenders it during `next build`. That works locally,
+ * where MEDUSA_BACKEND_URL points at the live backend, and fails inside Docker, where it points at
+ * localhost:9001 and nothing is listening — which is exactly how it broke the image build.
+ *
+ * fetchCache is set explicitly because force-dynamic otherwise implies `force-no-store` for every
+ * fetch in the route, layouts included. That is what previously stopped getSiteSettings,
+ * getAnnouncement and getTaxonomy from ever caching despite each asking for `revalidate: 60`.
+ * "default-cache" keeps rendering per-request while letting those honour their own revalidate.
+ */
+export const dynamic = "force-dynamic"
+export const fetchCache = "default-cache"
 
 export const metadata: Metadata = {
   alternates: { canonical: "/categories" },

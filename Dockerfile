@@ -65,11 +65,23 @@ ARG NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://api.pranajiva.in
 # the localhost canonical URL described above.
 ARG NEXT_PUBLIC_GA_MEASUREMENT_ID=G-PGF5L9QMCQ
 
+# Sanity, for the knowledge articles. Declared here rather than only in docker-compose for the same
+# reason as everything above: NEXT_PUBLIC_* is inlined by the bundler during the build below, so a
+# value supplied to the runner stage arrives far too late and the client reads undefined.
+#
+# Both have working defaults in src/lib/sanity/client.ts, so omitting them builds correctly against
+# the real project. A project id is not a secret — it is in every request the browser makes to
+# Sanity — and the dataset is public, so there is nothing here that needs hiding.
+ARG NEXT_PUBLIC_SANITY_PROJECT_ID=q9n8m46w
+ARG NEXT_PUBLIC_SANITY_DATASET=production
+
 # Set environment variables for build
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 ENV NEXT_PUBLIC_DEFAULT_REGION=$NEXT_PUBLIC_DEFAULT_REGION
 ENV NEXT_PUBLIC_MEDUSA_BACKEND_URL=$NEXT_PUBLIC_MEDUSA_BACKEND_URL
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
+ENV NEXT_PUBLIC_SANITY_PROJECT_ID=$NEXT_PUBLIC_SANITY_PROJECT_ID
+ENV NEXT_PUBLIC_SANITY_DATASET=$NEXT_PUBLIC_SANITY_DATASET
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
