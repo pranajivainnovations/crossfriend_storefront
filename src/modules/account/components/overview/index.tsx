@@ -4,13 +4,16 @@ import { formatAmount } from "@lib/util/prices"
 
 import ChevronDown from "@modules/common/icons/chevron-down"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import WalletCard from "@modules/account/components/wallet-card"
+import type { Wallet } from "@lib/data/wallet"
 
 type OverviewProps = {
   customer: Omit<Customer, "password_hash"> | null
   orders: Order[] | null
+  wallet?: Wallet | null
 }
 
-const Overview = ({ customer, orders }: OverviewProps) => {
+const Overview = ({ customer, orders, wallet }: OverviewProps) => {
   return (
     <div data-testid="overview-page-wrapper">
       <div className="hidden small:block">
@@ -21,6 +24,14 @@ const Overview = ({ customer, orders }: OverviewProps) => {
             <span className="font-semibold" data-testid="customer-email" data-value={customer?.email}>{customer?.email}</span>
           </span>
         </div>
+        {/* Above the profile and address counts on purpose: money the customer holds is the thing
+            they came to look at, and a completion percentage is not. */}
+        {wallet && (
+          <div className="mb-6">
+            <WalletCard wallet={wallet} />
+          </div>
+        )}
+
         <div className="flex flex-col py-8 border-t border-gray-200">
           <div className="flex flex-col gap-y-4 h-full col-span-1 row-span-2 flex-1">
             <div className="flex items-start gap-x-16 mb-6">
