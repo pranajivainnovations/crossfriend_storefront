@@ -16,6 +16,8 @@ export interface CartCredit {
   /** What could be put towards this order right now. */
   applicablePaise: number
   balancePaise: number
+  /** What they would pay with no credit — after any coupon, including delivery and tax. */
+  payablePaise: number
   /** What the platform will let credit cover: goods after any campaign, never delivery or tax. */
   redeemablePaise: number
   /** What is already on the order. */

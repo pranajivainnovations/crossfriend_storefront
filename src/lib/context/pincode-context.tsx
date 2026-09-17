@@ -1,6 +1,10 @@
 "use client"
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react"
 
+/* The prompt on arrival and the bar that follows it are two of four places a visitor can tell us
+   where they are. All four record it the same way — see @lib/pincode-capture. */
+import { capturePincode, writePincodeCookie } from "@lib/pincode-capture"
+
 /**
  * What we can do for someone at a pincode — not merely whether we deliver there.
  *
@@ -40,6 +44,7 @@ interface PincodeContextType {
 
 const PincodeContext = createContext<PincodeContextType | null>(null)
 
+
 export function PincodeProvider({ children }: { children: ReactNode }) {
   const [pincode, setPincodeState] = useState("")
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null)
@@ -52,6 +57,10 @@ export function PincodeProvider({ children }: { children: ReactNode }) {
     const savedInfo = localStorage.getItem("cf_delivery_info")
     if (saved) {
       setPincodeState(saved)
+      /* Anybody who chose a pincode before the cookie existed has one in localStorage and nothing
+         the server can read. Mirroring it on load means they are not asked again for something they
+         have already told us. */
+      writePincodeCookie(saved)
       if (savedInfo) {
         /* Anything cached by the previous version has no `tier` and an `available` that was decided
            by the hardcoded prefix table — including "yes" for cities we have never served. Dropping
@@ -94,6 +103,7 @@ export function PincodeProvider({ children }: { children: ReactNode }) {
         setDeliveryInfo(data.data)
         localStorage.setItem("cf_pincode", trimmed)
         localStorage.setItem("cf_delivery_info", JSON.stringify(data.data))
+        capturePincode(trimmed)
         setError(null)
       } else {
         setError(data.error || "Couldn't check that pincode. Please try again.")
@@ -112,6 +122,7 @@ export function PincodeProvider({ children }: { children: ReactNode }) {
     setError(null)
     localStorage.removeItem("cf_pincode")
     localStorage.removeItem("cf_delivery_info")
+    writePincodeCookie(null)
   }, [])
 
   return (

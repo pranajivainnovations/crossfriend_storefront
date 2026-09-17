@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useTransition } from "react"
+import { capturePincode } from "@lib/pincode-capture"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
 import type { Addon, GeneratedDesign } from "../types"
@@ -424,6 +425,10 @@ export default function PriceEstimator({
     if (!/^\d{6}$/.test(pincode)) return
     setPincodeConfirmed(true)
     onPincodeChange?.(pincode)
+    /* One of four places a customer tells us where they are, and until now the only one this panel
+       told nobody about. Recording it here is what lets a welcome bonus reach somebody who came in
+       through the studio rather than the home page. */
+    capturePincode(pincode)
   }
 
   const handleChangePincode = () => {

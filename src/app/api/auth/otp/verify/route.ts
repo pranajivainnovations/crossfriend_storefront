@@ -47,7 +47,24 @@ export async function POST(req: NextRequest) {
     const res = await fetch(`${MEDUSA_BACKEND_URL}/store/crossfriend/otp/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mobile, otp, flow: FLOW }),
+      /**
+       * The visitor's own pincode travels with the sign-in.
+       *
+       * It is the only moment we can attach an area to a customer before their first order — an
+       * address does not exist yet, and a customer with no area cannot be offered an area-specific
+       * welcome. Absent is fine and common: somebody who skipped the prompt simply gets whatever is
+       * running brand-wide.
+       *
+       * Declared rather than verified, and treated that way downstream: it decides what a new
+       * customer is offered on joining, and nothing else. Everything that pays out on delivery reads
+       * the real address from the order.
+       */
+      body: JSON.stringify({
+        mobile,
+        otp,
+        flow: FLOW,
+        pincode: cookies().get("cf_pincode")?.value ?? null,
+      }),
       cache: "no-store",
     })
     status = res.status

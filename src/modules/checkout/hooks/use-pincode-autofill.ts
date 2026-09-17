@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { capturePincode } from "@lib/pincode-capture"
 
 export interface ResolvedArea {
   city: string
@@ -50,6 +51,15 @@ export function usePincodeAutofill(
     }
     lastResolvedRef.current = pin
     setStatus("resolving")
+
+    /**
+     * The fourth and last place a customer tells us where they are.
+     *
+     * Recorded the moment the field holds a real pincode, before the area lookup comes back — the
+     * lookup answers a different question (which city is this) and a customer whose area we cannot
+     * name has still told us their pincode. Safe to call repeatedly; it grants at most once.
+     */
+    capturePincode(pin)
 
     const controller = new AbortController()
 

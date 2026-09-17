@@ -9,6 +9,7 @@ import { ReviewsProvider } from "@lib/context/reviews-context"
 import PlanningWizard from "@modules/planning/components/planning-wizard"
 import WhatsAppWidget from "@modules/common/components/whatsapp-widget"
 import BottomBar from "@modules/layout/components/bottom-bar"
+import PincodeGate from "@modules/common/components/pincode-gate"
 import { retrieveCart } from "@modules/cart/actions"
 import { getSiteSettings } from "@lib/data/site-settings"
 import { getAnnouncement } from "@lib/data/announcement"
@@ -81,6 +82,8 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
             <PlanningWizard />
             <WhatsAppWidget number={settings.whatsappNumber} />
             <BottomBar cartCount={cartCount} whatsappNumber={settings.whatsappNumber} />
+            {/* Renders nothing once a pincode is known, so a returning customer never meets it. */}
+            <PincodeGate />
             {/* Reserves the height the fixed bar occupies. Without it the bar sits on top of
                 whatever each page ends with — most visibly the footer's last row. */}
             <div className="h-14 small:hidden" aria-hidden="true" />

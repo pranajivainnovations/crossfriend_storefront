@@ -52,9 +52,11 @@ export default function WalletCredit({ credit }: { credit: CartCredit | null }) 
     if (credit.balancePaise <= credit.applicablePaise) return null
     switch (credit.limitedBy) {
       case "order":
-        return `This order can take ${rupees(credit.redeemablePaise)} of credit — the rest stays in your wallet.`
+        /* The platform ceiling: credit pays for the cakes, not the delivery. Said as what it can do
+           rather than what it cannot. */
+        return `Credit covers the items — ${rupees(credit.redeemablePaise)} on this order. The rest stays in your wallet.`
       case "cap":
-        return `Up to ${rupees(credit.applicablePaise)} can go towards this order. The rest stays in your wallet.`
+        return `Up to ${rupees(credit.applicablePaise)} of this ${rupees(credit.payablePaise)} order can be paid with credit. The rest stays in your wallet.`
       default:
         return null
     }

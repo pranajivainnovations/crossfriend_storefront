@@ -32,8 +32,17 @@ export interface WalletEntry {
   expiresAt: string | null
 }
 
+export interface WalletSource {
+  /** The ledger's own name for how it was earned; the card decides what to call it. */
+  type: string
+  /** What is LEFT of that kind, not what was ever given. */
+  amountPaise: number
+}
+
 export interface Wallet {
   balancePaise: number
+  /** The balance broken into what it is made of. Absent from an older backend. */
+  sources?: WalletSource[]
   expiring: { amountPaise: number; expiresAt: string }[]
   entries: WalletEntry[]
 }
