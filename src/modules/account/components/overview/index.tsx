@@ -5,17 +5,38 @@ import { formatAmount } from "@lib/util/prices"
 import ChevronDown from "@modules/common/icons/chevron-down"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import WalletCard from "@modules/account/components/wallet-card"
+import ReferralCard from "@modules/account/components/referral-card"
 import type { Wallet } from "@lib/data/wallet"
+import type { Referral } from "@lib/data/referral"
 
 type OverviewProps = {
   customer: Omit<Customer, "password_hash"> | null
   orders: Order[] | null
   wallet?: Wallet | null
+  referral?: Referral | null
 }
 
-const Overview = ({ customer, orders, wallet }: OverviewProps) => {
+const Overview = ({ customer, orders, wallet, referral }: OverviewProps) => {
   return (
     <div data-testid="overview-page-wrapper">
+      {/**
+       * Outside the desktop-only block below, deliberately.
+       *
+       * Everything else on this page is wrapped in `hidden small:block`, because on a phone the
+       * account route shows the navigation list and not a dashboard. Leaving these two inside it
+       * meant a customer's credit and their referral code existed only on a desktop — on a storefront
+       * whose customers are almost entirely on phones, which is to say they existed almost nowhere.
+       *
+       * Money the customer holds comes first, then the invitation: what they already have outranks
+       * what they could earn by doing something for us.
+       */}
+      {(wallet || referral) && (
+        <div className="mb-6 flex flex-col gap-6">
+          {wallet && <WalletCard wallet={wallet} />}
+          {referral && <ReferralCard referral={referral} />}
+        </div>
+      )}
+
       <div className="hidden small:block">
         <div className="text-xl-semi flex justify-between items-center mb-4">
           <span data-testid="welcome-message" data-value={customer?.first_name}>Hello {customer?.first_name}</span>
@@ -24,13 +45,6 @@ const Overview = ({ customer, orders, wallet }: OverviewProps) => {
             <span className="font-semibold" data-testid="customer-email" data-value={customer?.email}>{customer?.email}</span>
           </span>
         </div>
-        {/* Above the profile and address counts on purpose: money the customer holds is the thing
-            they came to look at, and a completion percentage is not. */}
-        {wallet && (
-          <div className="mb-6">
-            <WalletCard wallet={wallet} />
-          </div>
-        )}
 
         <div className="flex flex-col py-8 border-t border-gray-200">
           <div className="flex flex-col gap-y-4 h-full col-span-1 row-span-2 flex-1">

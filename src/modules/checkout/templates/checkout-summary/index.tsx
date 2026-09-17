@@ -2,10 +2,12 @@ import { Heading } from "@medusajs/ui"
 
 import ItemsPreviewTemplate from "@modules/cart/templates/preview"
 import DiscountCode from "@modules/checkout/components/discount-code"
+import WalletCredit from "@modules/checkout/components/wallet-credit"
 import CartTotals from "@modules/common/components/cart-totals"
 import Divider from "@modules/common/components/divider"
 import { cookies } from "next/headers"
 import { getCart } from "@lib/data"
+import { getCartCredit } from "@lib/data/cart-credit"
 
 const CheckoutSummary = async () => {
   const cartId = cookies().get("_medusa_cart_id")?.value
@@ -14,7 +16,12 @@ const CheckoutSummary = async () => {
     return null
   }
 
-  const cart = await getCart(cartId).then((cart) => cart)
+  /* Fetched together: the credit read does not depend on the cart body, and making it wait would add
+     a round trip to the page a customer is about to pay on. */
+  const [cart, credit] = await Promise.all([
+    getCart(cartId).then((cart) => cart),
+    getCartCredit(cartId),
+  ])
 
   if (!cart) {
     return null
@@ -33,6 +40,11 @@ const CheckoutSummary = async () => {
         <Divider className="my-6" />
         <CartTotals data={cart} />
         <ItemsPreviewTemplate region={cart?.region} items={cart?.items} />
+        {/* Above the discount box: credit is money the customer already holds, and a code is
+            something they have to go and find. */}
+        <div className="mt-6">
+          <WalletCredit credit={credit} />
+        </div>
         <div className="my-6">
           <DiscountCode cart={cart} />
         </div>

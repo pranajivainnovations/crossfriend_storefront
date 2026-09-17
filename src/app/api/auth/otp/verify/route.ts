@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
+import { REFERRAL_COOKIE } from "@lib/referral"
+
 const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
 const FLOW = "ai_studio_login"
 
@@ -83,5 +85,70 @@ export async function POST(req: NextRequest) {
     secure: process.env.NODE_ENV === "production",
   })
 
-  return NextResponse.json({ success: true, isNewUser: data.isNewUser === true })
+  const referral = await claimPendingReferral(data.token)
+
+  return NextResponse.json({
+    success: true,
+    isNewUser: data.isNewUser === true,
+    referral,
+  })
+}
+
+/**
+ * Spends the referral cookie, if this visitor arrived with one.
+ *
+ * ── Why it runs on every sign-in and not only on a new account ─────────────────────────────────
+ * `isNewUser` is right here and it would be the obvious gate. It is the wrong one: somebody who
+ * signed up months ago, never ordered, and has now been talked into it by a friend is exactly what a
+ * referral is, and gating on account creation refuses them. The backend's rule is "has never
+ * ordered", which is the event that actually says the customer was already ours — so the decision
+ * belongs there, and this sends every code it holds and lets the backend decline.
+ *
+ * ── Why a failure here cannot fail a sign-in ───────────────────────────────────────────────────
+ * The session is already set by the time this runs. A customer who cannot get into their account
+ * because a referral lookup timed out would be a catastrophic trade for a feature that credits
+ * somebody else a few rupees, so every outcome — declined, unreachable, malformed — returns quietly
+ * and the sign-in succeeds regardless.
+ *
+ * ── Why the cookie survives a network failure ──────────────────────────────────────────────────
+ * It is cleared when the backend gives an answer, including a refusal, because in every one of those
+ * cases the code has been considered and is finished with. It is deliberately kept when the backend
+ * could not be reached at all: that referral has not been declined, it has not been asked, and
+ * throwing it away would lose a real attribution to a momentary blip.
+ */
+async function claimPendingReferral(
+  token: string
+): Promise<{ attributed: boolean; message: string } | null> {
+  const code = cookies().get(REFERRAL_COOKIE)?.value
+  if (!code) return null
+
+  try {
+    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/referral/claim`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ code, brand: "crossfriend" }),
+      cache: "no-store",
+    })
+
+    /* A 5xx is the backend failing, not declining — treated like unreachable, cookie kept. */
+    if (res.status >= 500) return null
+
+    const result = (await res.json().catch(() => ({}))) as {
+      attributed?: boolean
+      message?: string
+    }
+
+    cookies().delete(REFERRAL_COOKIE)
+
+    return {
+      attributed: result.attributed === true,
+      message: result.message ?? "",
+    }
+  } catch (error) {
+    console.error("[otp/verify] referral claim failed", error)
+    return null
+  }
 }

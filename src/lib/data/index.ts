@@ -224,24 +224,21 @@ export async function setPaymentSession({
 export async function completeCart(cartId: string) {
   const headers = getMedusaHeaders(["cart"])
 
-  // Belt-and-suspenders against a real Medusa v1 behavior: cartService.update() re-derives every line
-  // item's price from its variant whenever region_id/customer_id is present in the update call — the
-  // standard checkout's address step does exactly that, which can silently corrupt an AI Cake Studio
-  // item's custom price earlier in the flow. There's an async cart.updated subscriber that repairs this
-  // too, but it depends on the event bus (Redis) actually delivering the event — this synchronous call
-  // guarantees correctness right at the moment that matters, regardless of that.
-  try {
-    const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
-    await fetch(`${backendUrl}/store/ai-studio/cart/repair`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cartId }),
-      cache: "no-store",
-    })
-  } catch (error) {
-    console.error("[completeCart] AI cake price repair check failed", error)
-  }
-
+  /**
+   * There used to be a call to /store/ai-studio/cart/repair here, guarding against Medusa
+   * re-deriving a custom cake's price during checkout. It is gone because it was guarding against
+   * something that can no longer happen, and because the route it called was never built — it
+   * returned 404 on every single order, inside a try/catch that only logged.
+   *
+   * The risk it described was real for an earlier design, where a custom cake's price was a
+   * line-item override. Medusa re-derives line prices whenever a cart update carries region_id or
+   * customer_id, and two of ours do, so an override would indeed have been overwritten. The studio
+   * now puts the custom price on the variant itself, which is exactly where re-derivation reads
+   * from, so it recomputes to the same number.
+   *
+   * If custom pricing ever moves off the variant, this guard becomes necessary again — and would
+   * then have to be written, not merely re-called.
+   */
   return medusaClient.carts
     .complete(cartId, headers)
     .then((res) => res)

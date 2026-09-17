@@ -1,5 +1,9 @@
 import { cookies } from "next/headers"
 
+/* Re-exported so every existing importer keeps working. The definitions live in @lib/money because
+   this module reads a cookie and is therefore server-only, while formatting a number is not. */
+export { rupees, daysUntil } from "@lib/money"
+
 const MEDUSA_BACKEND_URL =
   process.env.MEDUSA_BACKEND_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9001"
 
@@ -64,30 +68,6 @@ export async function getWallet(): Promise<Wallet | null> {
   }
 }
 
-/**
- * Rupees, Indian-grouped, with paise only when there are any — ₹100, ₹104.50, ₹40,000.
- *
- * Both decimal places or none. Formatting the amount and then parsing it back to a number, which is
- * how this first read, silently drops a trailing zero: ₹104.50 becomes ₹104.5, which looks like a
- * rounding mistake on a figure the customer is about to spend.
- */
-export function rupees(paise: number): string {
-  const abs = Math.abs(paise)
-  const hasPaise = abs % 100 !== 0
-  const value = (abs / 100).toLocaleString("en-IN", {
-    minimumFractionDigits: hasPaise ? 2 : 0,
-    maximumFractionDigits: 2,
-  })
-  return `${paise < 0 ? "−" : ""}₹${value}`
-}
-
-/**
- * How a movement reads to the person it happened to.
- *
- * The ledger names entries by what they are; a customer wants to know what happened. "Expired" is
- * the one that matters most: credit disappearing with no line explaining it is the single thing
- * most likely to be read as the company quietly taking money back.
- */
 export function describeEntry(entry: WalletEntry): string {
   switch (entry.type) {
     case "promo_grant":
@@ -107,9 +87,4 @@ export function describeEntry(entry: WalletEntry): string {
     default:
       return "Adjustment"
   }
-}
-
-/** Days until an expiry, floored — "expires today" rather than "expires in 0.4 days". */
-export function daysUntil(iso: string): number {
-  return Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 86400000))
 }
