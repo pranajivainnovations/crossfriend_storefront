@@ -110,10 +110,35 @@ export default function MobileOtpAuth({
       }
       setIsNewUser(data.isNewUser)
       setStep("success")
-      /* A beat on the success state before moving, so the confirmation is actually seen — then a
-         refresh (or a navigation) so server components pick up the new session. */
+
+      /**
+       * A beat on the success state so the confirmation is actually seen — then the part that
+       * actually signs them in on screen.
+       *
+       * ── Why the sign-in page leaves by a full page load ──────────────────────────────────────
+       * The session is an httpOnly cookie, so nothing on this page can see it. What decides whether
+       * the account area shows a dashboard or this form is `app/(main)/account/layout.tsx`, a server
+       * component that reads that cookie — and it only re-reads it if the browser genuinely asks the
+       * server for the route again.
+       *
+       * `router.push("/account")` from `/account` never does. It is a navigation to the URL already
+       * in the bar, answered out of the App Router's own cache with the payload rendered moments
+       * earlier — while the visitor was signed out. The result is the exact symptom this fixes: a
+       * correct code, a session cookie that was set properly, and a sign-in form sitting under a
+       * "Taking you to your account…" message that never resolves.
+       *
+       * `window.location.assign` is the one option with no cache between it and the server. The cost
+       * is a full page load, at a moment when there is nothing on screen worth preserving and when
+       * people expect one anyway.
+       *
+       * ── Why the studio still refreshes instead ───────────────────────────────────────────────
+       * Signing in there happens mid-design, with the visitor's cake held in client state that a
+       * document load would throw away. It has no `redirectTo` and stays where it is, and
+       * `router.refresh()` is correct for it: same route, re-rendered server components, client
+       * state intact. That path works today and is deliberately left alone.
+       */
       setTimeout(() => {
-        if (redirectTo) router.push(redirectTo)
+        if (redirectTo) window.location.assign(redirectTo)
         else router.refresh()
       }, 1000)
     } finally {

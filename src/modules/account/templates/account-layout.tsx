@@ -30,7 +30,9 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({
             </span>
           </div>
           <div>
-            <UnderlineLink href="/customer-service">
+            {/* Was /customer-service, a Medusa starter page this site never had — so every account
+                screen carried a dead link, and Next prefetched the 404 on each visit. */}
+            <UnderlineLink href="/contact">
               Customer Service
             </UnderlineLink>
           </div>
