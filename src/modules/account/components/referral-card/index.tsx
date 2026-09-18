@@ -68,19 +68,25 @@ export default function ReferralCard({ referral }: { referral: Referral | null }
 
   return (
     <div
-      className="rounded-xl border border-ui-border-base bg-ui-bg-subtle p-6"
+      className="overflow-hidden rounded-2xl bg-white p-6 shadow-[0_8px_30px_rgba(17,24,39,0.08)] ring-1 ring-grey-20"
       data-testid="referral-card"
     >
-      <p className="text-small-regular text-ui-fg-subtle">Invite a friend</p>
-
-      <p
-        className="text-3xl-semi mt-1 font-mono tracking-[0.2em] text-ui-fg-base"
-        data-testid="referral-code"
-      >
-        {referral.code}
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-grey-40">
+        Invite a friend
       </p>
 
-      <p className="text-small-regular mt-3 text-ui-fg-subtle">
+      {/* A torn-ticket dashed border, because that is what a code people read aloud looks like
+          everywhere else they have seen one. It also stops the code reading as a heading. */}
+      <div className="mt-2.5 rounded-xl border-2 border-dashed border-cf-purple-200 bg-cf-purple-50 px-4 py-3.5 text-center">
+        <p
+          className="font-mono text-2xl font-bold tracking-[0.2em] text-cf-purple-700"
+          data-testid="referral-code"
+        >
+          {referral.code}
+        </p>
+      </div>
+
+      <p className="mt-3.5 text-sm leading-relaxed text-grey-60">
         Share your link with someone who hasn&rsquo;t ordered from us yet. When they place their
         first order, we&rsquo;ll credit you.
       </p>
@@ -89,7 +95,7 @@ export default function ReferralCard({ referral }: { referral: Referral | null }
         <button
           type="button"
           onClick={share}
-          className="rounded-lg bg-ui-bg-interactive px-4 py-2 text-small-semi text-ui-fg-on-color"
+          className="rounded-xl bg-gradient-to-r from-cf-purple-600 to-fuchsia-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-cf-purple-300/50 transition hover:from-cf-purple-700 hover:to-purple-700"
         >
           Share link
         </button>
@@ -97,14 +103,14 @@ export default function ReferralCard({ referral }: { referral: Referral | null }
         <button
           type="button"
           onClick={copy}
-          className="rounded-lg border border-ui-border-base px-4 py-2 text-small-semi text-ui-fg-base"
+          className="rounded-xl border border-grey-20 px-5 py-2.5 text-sm font-bold text-grey-80 transition hover:bg-grey-5"
           data-testid="referral-copy"
         >
           {copied ? "Copied" : "Copy link"}
         </button>
       </div>
 
-      <p className="text-xsmall-regular mt-4 break-all text-ui-fg-muted">{link}</p>
+      <p className="mt-4 break-all text-[11px] text-grey-40">{link}</p>
 
       {referral.standing.joined > 0 && <Standing standing={referral.standing} />}
     </div>
@@ -121,7 +127,7 @@ function Standing({ standing }: { standing: Referral["standing"] }) {
   const { joined, ordered, earnedPaise, holdingOrders } = standing
 
   return (
-    <div className="mt-5 border-t border-ui-border-base pt-4">
+    <div className="mt-5 border-t border-grey-20 pt-4">
       <div className="flex flex-wrap gap-x-8 gap-y-2">
         <Figure label={joined === 1 ? "friend joined" : "friends joined"} value={String(joined)} />
         {ordered > 0 && (
@@ -134,11 +140,11 @@ function Standing({ standing }: { standing: Referral["standing"] }) {
         /* Said rather than counted into the total. An order inside its return window is money that
            might not arrive, and a customer who watches a figure go down will not believe the next
            one. */
-        <p className="text-xsmall-regular mt-3 text-ui-fg-muted">{holdingPhrase(holdingOrders)}</p>
+        <p className="mt-3 text-xs text-grey-50">{holdingPhrase(holdingOrders)}</p>
       )}
 
       {joined > 0 && ordered === 0 && (
-        <p className="text-xsmall-regular mt-3 text-ui-fg-muted">
+        <p className="mt-3 text-xs text-grey-50">
           Nothing to pay out yet — your credit arrives once a friend&rsquo;s first order has been
           delivered.
         </p>
@@ -157,8 +163,8 @@ function holdingPhrase(orders: number): string | null {
 function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-base-semi text-ui-fg-base">{value}</p>
-      <p className="text-xsmall-regular text-ui-fg-subtle">{label}</p>
+      <p className="text-lg font-bold tabular-nums text-cf-purple-700">{value}</p>
+      <p className="text-xs text-grey-50">{label}</p>
     </div>
   )
 }

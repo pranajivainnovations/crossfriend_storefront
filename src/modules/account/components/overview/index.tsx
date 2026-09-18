@@ -31,7 +31,7 @@ const Overview = ({ customer, orders, wallet, referral }: OverviewProps) => {
        * what they could earn by doing something for us.
        */}
       {(wallet || referral) && (
-        <div className="mb-6 flex flex-col gap-6">
+        <div className="mb-6 mt-6 flex flex-col gap-6">
           {wallet && <WalletCard wallet={wallet} />}
           {referral && <ReferralCard referral={referral} />}
         </div>
