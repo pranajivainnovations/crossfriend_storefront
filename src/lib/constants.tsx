@@ -26,6 +26,12 @@ export const paymentInfoMap: Record<
     title: "PayPal",
     icon: <PayPal />,
   },
+  /* Named for what the customer will actually see inside the window — Razorpay is our supplier, not
+     a payment method anybody chooses by name. Without this entry the radio simply read "razorpay". */
+  razorpay: {
+    title: "Card, UPI & Netbanking",
+    icon: <CreditCard />,
+  },
   manual: {
     title: "Cash on Delivery",
     icon: <CreditCard />,

@@ -114,10 +114,21 @@ const Payment = ({
     setError(null)
   }, [isOpen])
 
-  // Auto-select Cash on Delivery as the default payment method — it's the one CrossFriend actually
-  // ships with today (Razorpay is available but not the primary path yet), so pre-selecting it saves
-  // a click without taking the choice away: the radio group stays fully interactive, the customer can
-  // still switch to Razorpay themselves.
+  /**
+   * Pre-select Razorpay, falling back to Cash on Delivery.
+   *
+   * This used to pre-select COD, on the reasoning that Razorpay was "available but not the primary
+   * path yet" — true while no provider was installed to serve it, and a session that could never be
+   * paid was worse than no session. Razorpay is now registered and verified server-side, so paying
+   * up front is the path this shop wants pressed.
+   *
+   * The fallback matters more than the preference: if Razorpay is ever unregistered — keys missing
+   * from the server, say — its session simply is not offered, and this quietly selects COD rather
+   * than leaving the customer on a checkout with nothing chosen and no explanation.
+   *
+   * Nothing is taken away. The radio group stays interactive and a customer who wants COD can still
+   * pick it.
+   */
   useEffect(() => {
     if (
       !paidByGiftcard &&
@@ -125,8 +136,10 @@ const Payment = ({
       !cart?.payment_session &&
       !isLoading
     ) {
-      const codSession = cart.payment_sessions.find((s) => s.provider_id === "manual")
-      if (codSession) set(codSession.provider_id)
+      const preferred =
+        cart.payment_sessions.find((s) => s.provider_id === "razorpay") ??
+        cart.payment_sessions.find((s) => s.provider_id === "manual")
+      if (preferred) set(preferred.provider_id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart?.payment_sessions, cart?.payment_session, paidByGiftcard])

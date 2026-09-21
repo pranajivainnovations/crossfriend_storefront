@@ -20,6 +20,11 @@ const StripePaymentButton = dynamic(() => import("./stripe-payment-button"), {
 const PayPalPaymentButton = dynamic(() => import("./paypal-payment-button"), {
   ssr: false,
 })
+/* Razorpay's own script is fetched by the button when the customer presses pay, so this split only
+   keeps the checkout bundle smaller — nothing here runs until a Razorpay session exists. */
+const RazorpayPaymentButton = dynamic(() => import("./razorpay-payment-button"), {
+  ssr: false,
+})
 
 type PaymentButtonProps = {
   cart: Omit<Cart, "refundable_amount" | "refunded_total">
@@ -64,6 +69,14 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
     case "paypal":
       return (
         <PayPalPaymentButton
+          notReady={notReady}
+          cart={cart}
+          data-testid={dataTestId}
+        />
+      )
+    case "razorpay":
+      return (
+        <RazorpayPaymentButton
           notReady={notReady}
           cart={cart}
           data-testid={dataTestId}
