@@ -615,6 +615,37 @@ export default function AiStudioSection({ customer }: Props) {
     return options.some((option) => option.value === current) ? current : options[0].value
   }
 
+  /**
+   * What this customer actually has left, from the server.
+   *
+   * Replaces the build-time number above with the only figure that matters: the same one the
+   * generate route will enforce. Without it the badge counted down from whatever the JSON file said
+   * and the refusal arrived as a surprise — and a refresh reset it, because the count lived in this
+   * component.
+   *
+   * Silent on failure. The Studio works without a badge; it must not fail to load because a count
+   * could not be read, and a missing badge cannot hand anybody an attempt they do not have since
+   * the generate route checks again anyway.
+   */
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setAttemptsLeft(0)
+      return
+    }
+    let cancelled = false
+    fetch("/api/ai-studio/allowance", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { remaining?: number | null } | null) => {
+        if (cancelled || data?.remaining == null) return
+        setAttemptsLeft(Math.max(0, data.remaining))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [isLoggedIn])
+
+
   // Load selectors + AI model options from config
   useEffect(() => {
     fetch("/api/ai-cake-studio-config")
@@ -624,6 +655,14 @@ export default function AiStudioSection({ customer }: Props) {
         freeAttemptsLimit?: number
         aiImageModels?: { options?: AiModelOption[] }
       }) => {
+        /**
+         * A starting point only, and immediately corrected below.
+         *
+         * This number comes from a JSON file shipped with the build. It said 50 because somebody set
+         * it to 50 for testing, and it was never the customer's real allowance — that is the
+         * configured base plus whatever support has given them, minus what they have used, and only
+         * the server knows it.
+         */
         if (data.freeAttemptsLimit != null) {
           setAttemptsLeft(isLoggedIn ? data.freeAttemptsLimit : 0)
         }
@@ -906,6 +945,23 @@ export default function AiStudioSection({ customer }: Props) {
         reason: result.error || "unknown",
         model: selectedModel?.model,
       })
+      /**
+       * Out of generations is not a failure — it is the limit working.
+       *
+       * Worth its own branch because the wording decides what the customer does next. A generic
+       * "something went wrong" invites a refresh, which used to reset the counter and did nothing
+       * now that it is counted server-side; telling them to talk to us is the whole point of the
+       * allowance being toppable up by hand.
+       */
+      if (result.code === "NO_GENERATIONS_LEFT") {
+        setAttemptsLeft(0)
+        setGenerationError(
+          result.error ||
+            "You have used all your design generations. Talk to us and we can add more to your account."
+        )
+        return
+      }
+
       setGenerationError(result.error || "Something went wrong. Please try again.")
       return
     }
@@ -951,11 +1007,23 @@ export default function AiStudioSection({ customer }: Props) {
     ])
     setGenerated(true)
     setHoroscopeQuote(result.horoscopeQuote || null)
-    setAttemptsLeft((prev) =>
-      result.creditsRemaining != null && result.creditsRemaining >= 0
-        ? result.creditsRemaining
-        : Math.max(0, prev - 1)
-    )
+    /**
+     * The server's count wins over anything this page was holding.
+     *
+     * `generationsRemaining` is read back from the generations table after the design is written, so
+     * it already accounts for whether a failed attempt consumes an allowance — a decision an
+     * operator makes in OPS and this component must not second-guess. The two fallbacks behind it
+     * are for a backend that has not shipped this yet.
+     */
+    setAttemptsLeft((prev) => {
+      if (result.generationsRemaining != null && result.generationsRemaining >= 0) {
+        return result.generationsRemaining
+      }
+      if (result.creditsRemaining != null && result.creditsRemaining >= 0) {
+        return result.creditsRemaining
+      }
+      return Math.max(0, prev - 1)
+    })
   }
 
   const handleSelectDesign = (id: string) => {

@@ -61,6 +61,14 @@ export interface GenerateResponse {
   generationId?: string
   designs?: DesignOutput[]
   creditsRemaining?: number
+  /**
+   * What the server will actually allow next, counted from the generations table rather than held
+   * in this page. The older `creditsRemaining` is left alone for compatibility, but this is the
+   * number to trust: it is re-read after every generation from the same source that refuses the
+   * next request, so the badge cannot promise an attempt the backend will decline.
+   */
+  generationsRemaining?: number | null
+  generationsTotal?: number | null
   /** Positive, LLM-generated horoscope-style quote — present only when zodiac influence was sent */
   horoscopeQuote?: string
   error?: string

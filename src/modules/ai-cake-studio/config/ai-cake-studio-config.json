@@ -1,6 +1,6 @@
 {
   "_comment": "AI Cake Studio configuration. Edit here and call POST /api/revalidate to apply without redeployment.",
-  "freeAttemptsLimit": 50,
+  "freeAttemptsLimit": 10,
   "selectors": {
     "weights": [
       {
