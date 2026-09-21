@@ -1,91 +1,41 @@
 "use client"
 
-import { Cart } from "@medusajs/medusa"
 import { Button } from "@medusajs/ui"
 import { useRouter } from "next/navigation"
-import { useCallback, useState } from "react"
+import { useEffect, useState } from "react"
 
-import { placeOrder } from "@modules/checkout/actions"
+import { openRazorpay, preloadRazorpay } from "@lib/razorpay"
+import {
+  confirmRazorpayPayment,
+  startRazorpayPayment,
+} from "@modules/checkout/actions"
 import ErrorMessage from "../error-message"
 
 /**
- * Paying by card, UPI or netbanking — the only way real money reaches this shop.
+ * Paying by card, UPI or netbanking.
  *
- * ── What this component is trusted with, which is almost nothing ───────────────────────────────
- * It opens Razorpay's modal and, when the modal says it is done, asks the server to complete the
- * cart. It does not decide whether the order was paid, and deliberately cannot: the handler below
- * receives a signature it never checks, because checking it here would be security theatre — a
- * browser cannot be trusted to grade its own payment.
+ * ── How little happens here ────────────────────────────────────────────────────────────────────
+ * Press the button and three things happen, none of which this file decides: the server prepares
+ * the cart and says how to pay it, the shared payment window opens with exactly what it was given,
+ * and the server turns the result into an order. There is no key in this component, no amount, no
+ * payment session, and no judgement about whether money changed hands — all of that moved to
+ * /store/checkout/razorpay and to @lib/razorpay when the two storefronts stopped each keeping their
+ * own copy of it.
  *
- * The real check is on the backend. Medusa's cart completion calls the Razorpay provider's
- * `authorizePayment`, which fetches the order from Razorpay's own API and returns AUTHORIZED only
- * when Razorpay itself reports `status: "paid"`. So a forged callback from a modified page ends in a
- * refused completion rather than a free cake. That is why this file has no secret in it and no
- * verification logic: both belong where they cannot be edited by the person paying.
- *
- * ── Why the Razorpay order is not created here ─────────────────────────────────────────────────
- * It already exists. The payment session Medusa created holds the order Razorpay returned, so
- * `session.data.id` is the order id and `session.data.amount` the amount in paise, both settled
- * server-side. Creating a second order from the browser would let the page choose its own price.
+ * What is left is the part that genuinely belongs to a button: what the customer sees while it is
+ * working, and what they are told about each way it can end.
  */
 
-type RazorpaySession = {
-  id?: string
-  amount?: number
-  currency?: string
-}
-
-type RazorpayOptions = {
-  key: string
-  amount: number
-  currency: string
-  name: string
-  description: string
-  order_id: string
-  prefill: { name?: string; email?: string; contact?: string }
-  notes: Record<string, string>
-  theme: { color: string }
-  handler: (response: { razorpay_payment_id: string }) => void
-  modal: { ondismiss: () => void }
-}
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: RazorpayOptions) => { open: () => void }
-  }
-}
-
-const CHECKOUT_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js"
-
-/** Loads Razorpay's script once, and resolves immediately if it is already there. */
-function loadRazorpay(): Promise<boolean> {
-  if (typeof window === "undefined") return Promise.resolve(false)
-  if (window.Razorpay) return Promise.resolve(true)
-
-  return new Promise((resolve) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[src="${CHECKOUT_SCRIPT}"]`
-    )
-    if (existing) {
-      existing.addEventListener("load", () => resolve(!!window.Razorpay))
-      existing.addEventListener("error", () => resolve(false))
-      return
-    }
-    const script = document.createElement("script")
-    script.src = CHECKOUT_SCRIPT
-    script.async = true
-    script.onload = () => resolve(!!window.Razorpay)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
-  })
+const BRANDING = {
+  name: "CrossFriend",
+  description: "Your celebration order",
+  themeColor: "#7B2FF7",
 }
 
 export default function RazorpayPaymentButton({
-  cart,
   notReady,
   "data-testid": dataTestId,
 }: {
-  cart: Omit<Cart, "refundable_amount" | "refunded_total">
   notReady: boolean
   "data-testid"?: string
 }) {
@@ -93,78 +43,67 @@ export default function RazorpayPaymentButton({
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const session = (cart.payment_session?.data ?? {}) as RazorpaySession
-  const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
-
-  const complete = useCallback(async () => {
-    const result = await placeOrder().catch((e) => {
-      /* Completion refused — most often because Razorpay does not agree the order is paid. Said
-         plainly rather than as a generic failure, because the customer has just been debited and
-         needs to know whether to try again. */
-      setErrorMessage(
-        e instanceof Error
-          ? e.message
-          : "We could not confirm that payment. If money has left your account, please contact us before trying again."
-      )
-      setSubmitting(false)
-      return null
-    })
-
-    if (result && "redirectTo" in result && result.redirectTo) {
-      router.replace(result.redirectTo)
-    }
-  }, [router])
+  /**
+   * Fetch Razorpay's script while they are still reading the order summary.
+   *
+   * It used to load on the click, which put a third-party network round trip between deciding to
+   * buy and seeing anything happen. Starting it here costs nothing — it is idempotent and its
+   * result is cached — and the modal opens immediately when the button is pressed.
+   */
+  useEffect(() => {
+    if (!notReady) void preloadRazorpay()
+  }, [notReady])
 
   const pay = async () => {
     setErrorMessage(null)
-
-    if (!keyId) {
-      /* Missing at build time, not at runtime: NEXT_PUBLIC_* is inlined when the image is built, so
-         this is a deploy problem and no amount of retrying will fix it. */
-      setErrorMessage("Card payment is unavailable right now. Please contact us to complete your order.")
-      return
-    }
-    if (!session.id) {
-      setErrorMessage("That payment session has expired. Please pick your payment method again.")
-      return
-    }
-
     setSubmitting(true)
 
-    if (!(await loadRazorpay())) {
-      setErrorMessage("Could not reach the payment window. Check your connection and try again.")
+    const preparation = await startRazorpayPayment()
+
+    /* Already an order — they paid, lost the confirmation and came back. Send them to it rather
+       than offering to charge them again. */
+    if (preparation.state === "completed") {
+      router.replace(
+        preparation.orderId ? `/order/confirmed/${preparation.orderId}` : "/account/orders"
+      )
+      return
+    }
+
+    if (preparation.state === "refused") {
+      /* Written by the backend, which is the only thing that knows which precondition failed —
+         a missing phone number reads as a missing phone number, not as "payment unavailable". */
+      setErrorMessage(preparation.error)
       setSubmitting(false)
       return
     }
 
-    const address = cart.shipping_address
-    const rzp = new window.Razorpay!({
-      key: keyId,
-      /* From the session, never recomputed here — see the note at the top of this file. */
-      amount: session.amount ?? cart.total ?? 0,
-      currency: (session.currency ?? cart.region?.currency_code ?? "INR").toUpperCase(),
-      name: "CrossFriend",
-      description: "Your celebration order",
-      order_id: session.id,
-      prefill: {
-        name: [address?.first_name, address?.last_name].filter(Boolean).join(" ") || undefined,
-        email: cart.email ?? undefined,
-        contact: address?.phone ?? undefined,
-      },
-      notes: { cart_id: cart.id },
-      theme: { color: "#7B2FF7" },
-      handler: () => {
-        /* Razorpay says it is done. Whether it actually is gets decided on the server. */
-        void complete()
-      },
-      modal: {
-        /* Closing the window is an ordinary thing to do and not an error — the cart is untouched and
-           the same button works again. */
-        ondismiss: () => setSubmitting(false),
-      },
-    })
+    const outcome = await openRazorpay(preparation.context, BRANDING)
 
-    rzp.open()
+    if (outcome.status === "dismissed") {
+      /* Closing the window is not an error. The cart is untouched and the button works again. */
+      setSubmitting(false)
+      return
+    }
+
+    if (outcome.status === "failed" || outcome.status === "unavailable") {
+      setErrorMessage(outcome.reason)
+      setSubmitting(false)
+      return
+    }
+
+    /* Paid. Whether that is true is the server's to establish — see confirmRazorpayPayment. */
+    const confirmation = await confirmRazorpayPayment()
+
+    if (confirmation.state === "confirmed") {
+      router.replace(confirmation.redirectTo)
+      return
+    }
+
+    /**
+     * Money has left their account and there is no order. Deliberately left in the submitting
+     * state: the button stays disabled so the next thing they do cannot be a second payment.
+     */
+    setErrorMessage(confirmation.error)
   }
 
   return (

@@ -16,6 +16,8 @@ import {
   StorePostCustomersCustomerAddressesReq,
 } from "@medusajs/medusa"
 import { revalidateTag, revalidatePath } from "next/cache"
+import { preparePayment, findOrderForCart } from "@lib/data/razorpay"
+import type { PaymentPreparation, Confirmation } from "@lib/data/razorpay"
 
 const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"
 
@@ -274,4 +276,84 @@ export async function placeOrder() {
   }
 
   return cart
+}
+
+/**
+ * Start a card payment: prepare the cart and hand back how to pay it.
+ *
+ * A server action because the backend is not addressable from the browser — MEDUSA_BACKEND_URL has
+ * no NEXT_PUBLIC prefix, deliberately. It is also why the Razorpay key is no longer a build-time
+ * variable in this repo: it arrives in the response, so rotating it does not need a rebuild.
+ */
+export async function startRazorpayPayment(): Promise<PaymentPreparation> {
+  const cartId = cookies().get("_medusa_cart_id")?.value
+
+  if (!cartId) {
+    return {
+      state: "refused",
+      code: "no_cart",
+      error: "We could not find your order. Please start checkout again.",
+    }
+  }
+
+  return preparePayment(cartId)
+}
+
+/**
+ * Turn a payment that has just been made into an order.
+ *
+ * ── Why this is not simply placeOrder ──────────────────────────────────────────────────────────
+ * By the time it runs, the customer has been debited. A completion that fails here leaves them with
+ * money gone and nothing to show for it, and the previous behaviour — surface the error, stop — made
+ * a transient network blip indistinguishable from a refused payment.
+ *
+ * So a failure is not taken at face value. Medusa's completion is idempotent: completing a cart that
+ * is already an order returns that order rather than erroring, which is what makes a second attempt
+ * safe to make. Between attempts it asks the backend whether the cart quietly became an order
+ * anyway, which is the likeliest truth when the first call timed out rather than refused.
+ *
+ * Only after that does it give up — and then it says the money may be gone and to contact us, rather
+ * than inviting a retry that could take a second payment.
+ */
+export async function confirmRazorpayPayment(): Promise<Confirmation> {
+  const cartId = cookies().get("_medusa_cart_id")?.value
+
+  if (!cartId) {
+    return {
+      state: "unconfirmed",
+      error:
+        "We could not confirm that payment. If money has left your account, please contact us before trying again.",
+    }
+  }
+
+  const confirmed = (orderId: string): Confirmation => {
+    cookies().set("_medusa_cart_id", "", { maxAge: -1 })
+    revalidateTag("cart")
+    revalidatePath("/", "layout")
+    return { state: "confirmed", redirectTo: `/order/confirmed/${orderId}` }
+  }
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const cart = await completeCart(cartId)
+      if (cart?.type === "order" && cart.data?.id) {
+        return confirmed(cart.data.id)
+      }
+    } catch {
+      /* Swallowed on purpose: the two checks below decide what this meant. */
+    }
+
+    /* Did it go through regardless? A completion whose response was lost still created the order. */
+    const already = await findOrderForCart(cartId)
+    if (already?.orderId) return confirmed(already.orderId)
+
+    /* Breathing room before the second attempt — the usual cause is a slow backend, not a refusal. */
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 1500))
+  }
+
+  return {
+    state: "unconfirmed",
+    error:
+      "Your payment went through but we could not confirm your order. Please contact us with your payment reference — do not pay again.",
+  }
 }

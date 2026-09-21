@@ -20,8 +20,8 @@ const StripePaymentButton = dynamic(() => import("./stripe-payment-button"), {
 const PayPalPaymentButton = dynamic(() => import("./paypal-payment-button"), {
   ssr: false,
 })
-/* Razorpay's own script is fetched by the button when the customer presses pay, so this split only
-   keeps the checkout bundle smaller — nothing here runs until a Razorpay session exists. */
+/* Split out to keep the checkout bundle smaller. The button preloads Razorpay's own script as soon
+   as it mounts, so the modal opens without a network wait when pay is pressed. */
 const RazorpayPaymentButton = dynamic(() => import("./razorpay-payment-button"), {
   ssr: false,
 })
@@ -76,11 +76,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
       )
     case "razorpay":
       return (
-        <RazorpayPaymentButton
-          notReady={notReady}
-          cart={cart}
-          data-testid={dataTestId}
-        />
+        <RazorpayPaymentButton notReady={notReady} data-testid={dataTestId} />
       )
     default:
       return <Button disabled>Select a payment method</Button>
