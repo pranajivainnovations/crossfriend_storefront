@@ -18,6 +18,7 @@ import MobileOtpAuth from "@modules/common/components/mobile-otp-auth"
 import BakerFinder from "./baker-finder"
 import PromptReveal from "./prompt-reveal"
 import StudioProgressRail, { type StudioStep } from "./studio-progress-rail"
+import RefineRequest from "./refine-request"
 import ShareToCommunityToggle from "./share-to-community-toggle"
 import PushOptIn from "@modules/common/components/push-opt-in"
 import {
@@ -553,6 +554,9 @@ export default function AiStudioSection({ customer }: Props) {
   const [designs, setDesigns] = useState<GeneratedDesign[]>([])
   const [attemptsLeft, setAttemptsLeft] = useState(isLoggedIn ? FREE_ATTEMPTS_LIMIT : 0)
   const [generationError, setGenerationError] = useState<string | null>(null)
+  /* Set only by the NO_GENERATIONS_LEFT branch, so the message above can tell the two apart without
+     matching on the text of an error string. */
+  const [outOfGenerations, setOutOfGenerations] = useState(false)
   // Bumped whenever "Use This Design" is clicked — PriceEstimator watches
   // this to auto-expand itself instead of requiring a second manual click.
   const [priceEstimatorOpenSignal, setPriceEstimatorOpenSignal] = useState(0)
@@ -884,6 +888,7 @@ export default function AiStudioSection({ customer }: Props) {
 
     setGenerating(true)
     setGenerationError(null)
+    setOutOfGenerations(false)
     setSelectedDesignId(null)
     setShowUsePanel(false)
     setHoroscopeQuote(null)
@@ -955,6 +960,7 @@ export default function AiStudioSection({ customer }: Props) {
        */
       if (result.code === "NO_GENERATIONS_LEFT") {
         setAttemptsLeft(0)
+        setOutOfGenerations(true)
         setGenerationError(
           result.error ||
             "You have used all your design generations. Talk to us and we can add more to your account."
@@ -1889,7 +1895,25 @@ export default function AiStudioSection({ customer }: Props) {
               </div>
             )}
 
-            {generationError && (
+            {/**
+              * Running out is not a failure, so it does not get the failure treatment.
+              *
+              * The red "Generation failed" box is right for a provider error and wrong here: the
+              * customer did nothing wrong and nothing broke. What they need is the way forward,
+              * which is why the refine panel below IS the message rather than sitting under it.
+              */}
+            {generationError && outOfGenerations && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3"
+              >
+                <p className="mb-2 text-sm text-slate-600">{generationError}</p>
+                <RefineRequest isLoggedIn={isLoggedIn} prominent />
+              </motion.div>
+            )}
+
+            {generationError && !outOfGenerations && (
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -2026,6 +2050,20 @@ export default function AiStudioSection({ customer }: Props) {
                 {!generating && (
                   <div className="mt-4">
                     <PushOptIn context="studio_design_generated" />
+                  </div>
+                )}
+
+                {/**
+                  * The other dead end.
+                  *
+                  * Someone with designs on screen and none of them right — which the generator
+                  * cannot tell you about, because from its side a design was produced successfully.
+                  * Quiet on purpose: it sits under the cards rather than competing with them, and
+                  * only becomes the main offer when the allowance has actually run out.
+                  */}
+                {!outOfGenerations && (
+                  <div className="mt-6">
+                    <RefineRequest isLoggedIn={isLoggedIn} designId={selectedDesignId} />
                   </div>
                 )}
 

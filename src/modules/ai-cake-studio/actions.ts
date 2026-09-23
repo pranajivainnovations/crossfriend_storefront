@@ -1,6 +1,11 @@
 "use server"
 
 import { cookies } from "next/headers"
+import {
+  addOrderCartItem,
+  getOrCreateOrderCart,
+  CART_COOKIE,
+} from "@lib/data/orders-cart"
 import { revalidateTag, revalidatePath } from "next/cache"
 import { getOrSetCart } from "@modules/cart/actions"
 import { addItem } from "@lib/data"
@@ -26,12 +31,22 @@ export interface CakeSelections {
   designId?: string
 }
 
-export interface SavedAiCakeProduct {
-  productId: string
-  variantId: string
+/**
+ * A cake whose price the customer has committed to.
+ *
+ * It used to be a real Medusa product — hence the name and the two ids. Nothing is created in the
+ * catalogue any more: the design is ordered by its own id and priced by the server at add-to-cart,
+ * so what is "saved" here is the decision, not a row.
+ */
+export interface LockedCake {
+  designId: string
+  selections: CakeSelections
   total: number
   breakdown: { label: string; amount: number }[]
 }
+
+/** @deprecated The old name, while callers move across. */
+export type SavedAiCakeProduct = LockedCake
 
 export interface PriceEstimateInput {
   weight: string
@@ -142,47 +157,50 @@ export async function estimateAiCakePrice(
 }
 
 /**
- * Creates (or updates, if productId/variantId are already known) the real Medusa product + variant
- * for this design — called once the customer commits to searching for a baker, since every
- * price-determining selection is final by then. See the backend route's own comment for why this
- * point in the flow and not Generate or "Use this design" (both far too early — most generated/
- * selected designs are never priced out, let alone ordered).
+ * Lock in the price of this cake.
+ *
+ * ── What this used to do ───────────────────────────────────────────────────────────────────────
+ * It created a real Medusa product and variant, because a cake could not be added to a cart without
+ * a variantId. That meant writing to the catalogue every time somebody committed to a price — a
+ * draft product with a shipping profile, a sales channel and an inventory quantity of zero, none of
+ * which described anything true about a made-to-order cake.
+ *
+ * Now the design is ordered by its own id, so nothing needs to be created. This confirms the price
+ * against the server one last time and hands back the decision, which is all the rest of the flow
+ * ever wanted from it.
+ *
+ * The authoritative price is computed again at add-to-cart, from these same selections, and it is
+ * that evaluation which is recorded against the order. The number here is what the customer was
+ * shown; the number there is what they pay, and they come from the same engine on purpose.
  */
-export async function saveAiCakeProduct(
-  selections: CakeSelections,
-  existing?: { productId: string; variantId: string }
-): Promise<SavedAiCakeProduct | { error: string }> {
-  const token = cookies().get("_medusa_jwt")?.value
-  if (!token) {
-    return { error: "Please log in to continue." }
+export async function lockCakePrice(
+  selections: CakeSelections
+): Promise<LockedCake | { error: string }> {
+  if (!selections.designId) {
+    return { error: "Please choose a design first." }
   }
 
-  let backendRes: Response
-  try {
-    backendRes = await fetch(`${MEDUSA_BACKEND_URL}/store/ai-studio/product`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        productId: existing?.productId,
-        variantId: existing?.variantId,
-        ...selections,
-      }),
-      cache: "no-store",
-    })
-  } catch (error) {
-    console.error("[ai-cake-studio] Failed to reach Medusa backend", error)
-    return { error: "Network error. Please try again." }
-  }
+  const priced = await estimateAiCakePrice({
+    weight: selections.weight,
+    tiers: selections.tiers,
+    shape: selections.shape,
+    style: selections.style,
+    flavor: selections.flavor,
+    occasion: selections.occasion,
+    expressDelivery: selections.expressDelivery,
+    midnightDelivery: selections.midnightDelivery,
+    cakeMessage: selections.cakeMessage,
+    pincode: selections.pincode,
+  } as PriceEstimateInput)
 
-  const data = await backendRes.json().catch(() => ({}))
-  if (!backendRes.ok) {
-    return { error: data.error || "Something went wrong pricing this cake. Please try again." }
-  }
+  if ("error" in priced) return { error: priced.error }
 
-  return data
+  return {
+    designId: selections.designId,
+    selections,
+    total: priced.total,
+    breakdown: priced.breakdown,
+  }
 }
 
 /**
@@ -205,25 +223,51 @@ export async function saveAiCakeProduct(
  * exactly the "blank cart after ordering" bug this replaced. The caller does a hard navigation instead.
  */
 export async function orderAiCake(
-  variantId: string,
+  designId: string,
+  selections: CakeSelections,
   bakerId: string | null,
   pincode: string
 ): Promise<{ error: string; redirectTo?: undefined } | { error?: undefined; redirectTo: string }> {
-  const cart = await getOrSetCart()
+  /**
+   * The design goes in as itself.
+   *
+   * It used to take a `variantId`, which is why a draft Medusa product had to be created before
+   * this could run — the whole of /store/ai-studio/product existed to manufacture one. Here the
+   * design's own id is the reference and the pricing engine works out the money server-side from
+   * `selections`, so nothing is written to the catalogue and no price crosses the wire.
+   */
+  const cart = await getOrCreateOrderCart(pincode)
   if (!cart) {
     return { error: "Could not start your cart. Please try again." }
   }
 
-  const cartOrError = await addItem({
+  const { cart: updated, error } = await addOrderCartItem({
     cartId: cart.id,
-    variantId,
-    quantity: 1,
-    metadata: { bakerId, needsBakerAssignment: bakerId == null, pincode },
+    kind: "studio_design",
+    refId: designId,
+    qty: 1,
+    spec: {
+      ...selections,
+      /* Carried so the checkout address step can lock the postal code: the price the customer just
+         saw was calculated for this pincode, and letting them change it afterwards would quietly
+         invalidate it. */
+      pincode,
+      bakerId,
+      needsBakerAssignment: bakerId == null,
+    },
   })
 
-  if (!cartOrError) {
-    return { error: "Something went wrong adding this cake to your cart. Please try again." }
+  if (!updated) {
+    return { error: error ?? "Something went wrong adding this cake to your cart. Please try again." }
   }
+
+  /* The cart id may be new. Held in its own cookie rather than _medusa_cart_id, which still names
+     Medusa carts while both pipelines exist. */
+  cookies().set(CART_COOKIE, updated.id, {
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: "lax",
+    path: "/",
+  })
 
   revalidateTag("cart")
   revalidatePath("/", "layout")

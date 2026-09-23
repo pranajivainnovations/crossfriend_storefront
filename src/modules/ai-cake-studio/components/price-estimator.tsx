@@ -8,7 +8,7 @@ import type { Addon, GeneratedDesign } from "../types"
 import { TIER_DEFAULT_WEIGHT } from "../data/mock-data"
 import {
   estimateAiCakePrice,
-  saveAiCakeProduct,
+  lockCakePrice,
   type ConstraintState,
   type SavedAiCakeProduct,
 } from "../actions"
@@ -449,7 +449,7 @@ export default function PriceEstimator({
     setSaving(true)
     setSaveError(null)
 
-    const result = await saveAiCakeProduct(
+    const result = await lockCakePrice(
       {
         weight: sel.weight,
         tiers: sel.tiers,
@@ -464,8 +464,7 @@ export default function PriceEstimator({
         designImageUrl: selectedDesign?.imageUrl,
         compiledPrompt: selectedDesign?.compiledPrompt,
         designId: selectedDesign?.designId,
-      },
-      savedProduct ? { productId: savedProduct.productId, variantId: savedProduct.variantId } : undefined
+      }
     )
 
     setSaving(false)

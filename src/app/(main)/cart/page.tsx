@@ -1,52 +1,30 @@
-import { LineItem } from "@medusajs/medusa"
 import { Metadata } from "next"
-import { cookies } from "next/headers"
 
-import CartTemplate from "@modules/cart/templates"
-
-import { enrichLineItems } from "@modules/cart/actions"
-import { getCheckoutStep } from "@lib/util/get-checkout-step"
-import { CartWithCheckoutStep } from "types/global"
-import { getCart, getCustomer } from "@lib/data"
+import OrderCartTemplate from "@modules/cart/order-cart"
+import { getOrderCart } from "@lib/data/orders-cart"
+import { getCustomer } from "@lib/data"
 
 export const metadata: Metadata = {
   title: "Cart",
   description: "View your cart",
 }
 
-const fetchCart = async () => {
-  const cartId = cookies().get("_medusa_cart_id")?.value
-
-  if (!cartId) {
-    return null
-  }
-
-  const cart = await getCart(cartId).then(
-    (cart) => cart as CartWithCheckoutStep
-  )
-
-  if (!cart) {
-    return null
-  }
-
-  if (cart?.items?.length) {
-    // Only overwrite the real line items if enrichment actually produced some — assigning an empty
-    // result would blank out a cart that genuinely has items in it. See enrichLineItems.
-    const enrichedItems = await enrichLineItems(cart.items, cart.region_id)
-    if (enrichedItems?.length) {
-      cart.items = enrichedItems as LineItem[]
-    }
-  }
-
-  cart.checkout_step = cart && getCheckoutStep(cart)
-
-  return cart
-}
-
+/**
+ * The cart page, on our own pipeline.
+ *
+ * ── What went away ────────────────────────────────────────────────────────────────────────────
+ * Reading a Medusa cart, then enriching its line items against the product service to recover
+ * titles and thumbnails the cart did not carry, then deriving a checkout step from how much of the
+ * Medusa flow had been completed. All three existed because the cart was a catalogue construct and
+ * the line items were pointers into it.
+ *
+ * Our cart arrives whole — titles, specs, totals and any credit already applied — in one response.
+ * There is nothing to enrich and no step to infer.
+ *
+ * The customer lookup is still independent of the cart, so the two round trips still overlap.
+ */
 export default async function Cart() {
-  // Independent — the customer lookup doesn't depend on the cart, so there's no reason for these two
-  // remote-DB round trips to happen one after another.
-  const [cart, customer] = await Promise.all([fetchCart(), getCustomer()])
+  const [cart, customer] = await Promise.all([getOrderCart(), getCustomer()])
 
-  return <CartTemplate cart={cart} customer={customer} />
+  return <OrderCartTemplate cart={cart} signedIn={!!customer} />
 }

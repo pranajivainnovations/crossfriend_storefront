@@ -1,39 +1,34 @@
 import { Metadata } from "next"
-
-import { retrieveOrder } from "@lib/data"
-import { LineItem, Order } from "@medusajs/medusa"
-import { enrichLineItems } from "@modules/cart/actions"
-import OrderCompletedTemplate from "@modules/order/templates/order-completed-template"
 import { notFound } from "next/navigation"
 
-type Props = {
-  params: { id: string }
-}
-
-async function getOrder(id: string) {
-  const order = await retrieveOrder(id)
-
-  if (!order) {
-    return notFound()
-  }
-
-  const enrichedItems = await enrichLineItems(order.items, order.region_id)
-
-  return {
-    order: {
-      ...order,
-      items: enrichedItems as LineItem[],
-    } as Order,
-  }
-}
+import { getPlacedOrder } from "@lib/data/orders-cart"
+import OrderConfirmed from "@modules/order/order-confirmed"
 
 export const metadata: Metadata = {
-  title: "Order Confirmed",
-  description: "You purchase was successful",
+  title: "Order confirmed",
+  description: "Your order is placed",
 }
 
-export default async function OrderConfirmedPage({ params }: Props) {
-  const { order } = await getOrder(params.id)
+/**
+ * The confirmation screen.
+ *
+ * ── Why there is no enrichment step ────────────────────────────────────────────────────────────
+ * The order carries its own items, with the titles and specs frozen onto them at placement. The
+ * version this replaces read a Medusa order and then looked its line items up against the product
+ * service to recover what they were — necessary there because the items pointed at catalogue rows,
+ * and because for a custom cake those rows were draft products invented for the purpose.
+ *
+ * Freezing is not only faster. A product edited or deleted afterwards cannot change what somebody
+ * was told they bought.
+ *
+ * ── Not found covers not yours ─────────────────────────────────────────────────────────────────
+ * The backend scopes the read to the signed-in customer, so somebody else's order simply is not
+ * found. A 403 would confirm the id exists.
+ */
+export default async function OrderConfirmedPage({ params }: { params: { id: string } }) {
+  const order = await getPlacedOrder(params.id)
 
-  return <OrderCompletedTemplate order={order} />
+  if (!order) return notFound()
+
+  return <OrderConfirmed order={order} />
 }

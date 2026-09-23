@@ -187,7 +187,12 @@ export default function BakerFinder({
     setOrderingKey(bakerId ?? "automatch")
     onBakerChosen?.()
 
-    const result = await orderAiCake(savedProduct.variantId, bakerId, pincode)
+    const result = await orderAiCake(
+      savedProduct.designId,
+      savedProduct.selections,
+      bakerId,
+      pincode
+    )
     if ("error" in result && result.error) {
       setOrderError(result.error)
       setOrderingKey(null)
