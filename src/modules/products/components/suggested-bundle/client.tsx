@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { addToCart } from "@modules/cart/actions"
+import { addCatalogueToCart as addToCart } from "@modules/cart/order-actions"
 
 export type BundleItem = {
   type: string

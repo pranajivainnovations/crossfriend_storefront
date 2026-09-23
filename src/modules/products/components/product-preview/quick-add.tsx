@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { addToCart } from "@modules/cart/actions"
+import { addCatalogueToCart as addToCart } from "@modules/cart/order-actions"
 
 export default function QuickAddButton({
   variantId,

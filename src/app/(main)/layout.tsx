@@ -10,7 +10,7 @@ import PlanningWizard from "@modules/planning/components/planning-wizard"
 import WhatsAppWidget from "@modules/common/components/whatsapp-widget"
 import BottomBar from "@modules/layout/components/bottom-bar"
 import PincodeGate from "@modules/common/components/pincode-gate"
-import { retrieveCart } from "@modules/cart/actions"
+import { getOrderCart } from "@lib/data/orders-cart"
 import { getSiteSettings } from "@lib/data/site-settings"
 import { getAnnouncement } from "@lib/data/announcement"
 import AnnouncementBanner from "@modules/layout/components/announcement-banner"
@@ -31,7 +31,7 @@ import { BASE_URL } from "@lib/util/seo"
  * Eight of them, uncached, on every single page view, is most of a three-second first byte.
  *
  * ── Why removing it does not reintroduce build-time Medusa calls ───────────────────────────────
- * These pages are still rendered per request: retrieveCart below reads an httpOnly cookie, and so
+ * These pages are still rendered per request: getOrderCart below reads an httpOnly cookie, and so
  * does CartButton inside Nav, which opts the whole route into dynamic rendering on its own. What
  * changes is only that the fetch Data Cache is allowed to work again — dynamic rendering and the
  * Data Cache are independent, and it was the implicit force-no-store, not the rendering mode, that
@@ -60,12 +60,15 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
    * Cart count for the mobile bar's badge.
    *
    * Read here rather than inside the bar because the bar is a client component and the cart lives
-   * behind an httpOnly cookie. Every page under this layout is force-dynamic and the nav already
-   * retrieves the cart in the same request, so Next's fetch deduplication makes this free rather
-   * than a second round trip.
+   * behind an httpOnly cookie. The nav's CartButton reads the same cart in the same request, so
+   * Next's fetch deduplication makes this free rather than a second round trip.
+   *
+   * It must be the SAME cart the nav and /cart read. It was not: this called Medusa's retrieveCart
+   * while everything else had moved to ours, so adding a catalogue item moved this badge and
+   * nothing else — the cart page, reading ours, showed empty.
    */
-  const cart = await retrieveCart().catch(() => null)
-  const cartCount = cart?.items?.reduce((n, item) => n + (item.quantity ?? 0), 0) ?? 0
+  const cart = await getOrderCart().catch(() => null)
+  const cartCount = cart?.items.reduce((n, item) => n + item.qty, 0) ?? 0
 
   return (
     <PincodeProvider>

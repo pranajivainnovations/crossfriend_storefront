@@ -3,7 +3,7 @@
 import { getProducts } from "@lib/data"
 import { OCCASION_KITS } from "@lib/constants"
 import type { OccasionCollection } from "@lib/types/product-contract"
-import { addToCart } from "@modules/cart/actions"
+import { addCatalogueToCart as addToCart } from "@modules/cart/order-actions"
 
 /**
  * Server action: add a pre-defined celebration kit to cart.
