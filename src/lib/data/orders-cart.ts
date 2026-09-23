@@ -40,6 +40,24 @@ export interface OrderCartItem {
   spec: Record<string, unknown>
 }
 
+/**
+ * What the wallet allows here, and why.
+ *
+ * The cart used to carry only `creditAppliedPaise` — how much was already on. That is enough to
+ * draw a discount line and nothing else: the page could not say what the balance was, how much of
+ * it was usable, or why the usable part was smaller. `limitedBy` is what lets the copy explain
+ * itself instead of presenting a number the customer has to take on trust.
+ *
+ * Null for a guest, and null if the wallet could not be read.
+ */
+export interface CreditQuote {
+  balancePaise: number
+  applicablePaise: number
+  appliedPaise: number
+  limitedBy: "balance" | "cap" | "order" | "nothing_to_apply"
+  capPercent: number
+}
+
 export interface OrderCart {
   id: string
   customerId: string | null
@@ -51,6 +69,7 @@ export interface OrderCart {
   deliveryPaise: number
   creditAppliedPaise: number
   payablePaise: number
+  credit?: CreditQuote | null
 }
 
 function authHeaders(): Record<string, string> {

@@ -1,11 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useTransition } from "react"
-
 import { rupees } from "@lib/money"
 import type { OrderCart } from "@lib/data/orders-cart"
-import { applyCredit, removeCredit } from "../order-actions"
+import CreditPanel from "./credit-panel"
 
 /**
  * What this order comes to.
@@ -15,10 +13,11 @@ import { applyCredit, removeCredit } from "../order-actions"
  * leaves the customer wondering what will be added at the next step. A line that says ₹0 answers
  * the question before it is asked.
  *
- * ── Why credit is a button and not a checkbox ──────────────────────────────────────────────────
- * Applying it writes a redemption to the ledger, which is a real movement of money rather than a
- * display preference. It can be taken off again — that writes a reversal — but neither is the kind
- * of thing that should happen because a control drifted under somebody's thumb.
+ * ── Why credit lives in its own panel ──────────────────────────────────────────────────────────
+ * Applying it writes a redemption to the ledger — a real movement of money, not a display
+ * preference — and it takes three numbers to explain: the balance, what this order can take, and
+ * why those differ. That does not fit in a totals list, and the checkout page needs exactly the
+ * same block, so it is a component rather than a button here and a copy of the button there.
  */
 export default function CartSummary({
   cart,
@@ -27,17 +26,7 @@ export default function CartSummary({
   cart: OrderCart
   canUseCredit: boolean
 }) {
-  const [pending, start] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-
   const applied = cart.creditAppliedPaise > 0
-
-  const toggle = () =>
-    start(async () => {
-      setError(null)
-      const { error } = applied ? await removeCredit() : await applyCredit()
-      if (error) setError(error)
-    })
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -71,28 +60,7 @@ export default function CartSummary({
         </span>
       </div>
 
-      {canUseCredit && (
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={pending}
-          className={
-            applied
-              ? "mt-4 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 disabled:opacity-50"
-              : "mt-4 w-full rounded-xl border border-cf-purple-200 bg-cf-purple-50 py-2.5 text-sm font-semibold text-cf-purple-800 disabled:opacity-50"
-          }
-        >
-          {pending
-            ? applied
-              ? "Removing…"
-              : "Applying…"
-            : applied
-            ? "Remove credit"
-            : "Use my celebration credit"}
-        </button>
-      )}
-
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {canUseCredit && <CreditPanel cart={cart} />}
 
       <Link
         href="/checkout"

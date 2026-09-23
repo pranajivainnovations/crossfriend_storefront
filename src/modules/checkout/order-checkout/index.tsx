@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { rupees } from "@lib/money"
 import type { OrderCart } from "@lib/data/orders-cart"
 import { openRazorpay, preloadRazorpay } from "@lib/razorpay"
+import CreditPanel from "@modules/cart/order-cart/credit-panel"
 import MobileOtpAuth from "@modules/common/components/mobile-otp-auth"
 import { usePincodeAutofill } from "../hooks/use-pincode-autofill"
 import { confirmPayment, placeAndPay } from "../order-actions"
@@ -270,6 +271,10 @@ export default function OrderCheckout({
               </div>
             )}
           </dl>
+
+          {/* Above "To pay", so the number it changes is the next thing read. Renders nothing for a
+              guest or an empty wallet — it self-gates on cart.credit. */}
+          <CreditPanel cart={cart} />
 
           <div className="mt-4 flex items-baseline justify-between border-t border-slate-200 pt-4">
             <span className="text-sm font-semibold text-slate-900">To pay</span>
