@@ -28,10 +28,28 @@ export default function CreditPanel({ cart }: { cart: OrderCart }) {
   const credit = cart.credit
   const applied = cart.creditAppliedPaise > 0
 
-  /* Nothing to offer and nothing applied: no panel at all. An empty wallet does not need a control
-     explaining that it is empty. */
+  /* Only a guest, or a wallet we could not read, gets nothing. Everyone signed in sees this block. */
   if (!credit) return null
-  if (!applied && credit.applicablePaise <= 0) return null
+
+  /**
+   * Zero balance is a state to explain, not a reason to disappear.
+   *
+   * This used to return null whenever there was nothing to apply, on the reasoning that an empty
+   * wallet does not need a control saying it is empty. That was wrong, and it was caught the first
+   * time somebody looked: a customer whose credit had been spent — or eaten by an order they never
+   * paid for — found no trace of the feature anywhere and concluded it was broken. A quiet line
+   * saying there is no balance answers that; a missing panel cannot.
+   */
+  if (!applied && credit.balancePaise <= 0) {
+    return (
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <span className="flex items-center gap-2 text-sm text-slate-500">
+          <span aria-hidden>🎁</span> Celebration credit
+        </span>
+        <span className="text-sm tabular-nums text-slate-400">No balance</span>
+      </div>
+    )
+  }
 
   const toggle = () =>
     start(async () => {
@@ -95,7 +113,15 @@ export default function CreditPanel({ cart }: { cart: OrderCart }) {
         <p className="mt-2 text-xs leading-relaxed text-slate-600">{limitNote}</p>
       )}
 
-      <button
+      {/* A balance that exists but rounds to nothing here — the cap on a very small order. Saying
+          so beats a button offering ₹0.00. */}
+      {!applied && credit.applicablePaise <= 0 ? (
+        <p className="mt-2 text-xs leading-relaxed text-slate-600">
+          This order is too small to use any of it — {credit.capPercent}% of the total rounds to
+          nothing. It stays in your wallet.
+        </p>
+      ) : (
+        <button
         type="button"
         onClick={toggle}
         disabled={pending}
@@ -113,7 +139,8 @@ export default function CreditPanel({ cart }: { cart: OrderCart }) {
           ? "Remove credit"
           : /* The amount is on the button, so pressing it holds no surprise. */
             `Use ${rupees(credit.applicablePaise)} on this order`}
-      </button>
+        </button>
+      )}
 
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
