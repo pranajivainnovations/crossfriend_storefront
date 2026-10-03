@@ -310,3 +310,38 @@ export async function getPlacedOrder(orderId: string): Promise<PlacedOrderView |
     return null
   }
 }
+
+/** One row of the account orders list. The full order comes from getPlacedOrder. */
+export interface OrderSummary {
+  id: string
+  displayId: number
+  brand: string
+  payablePaise: number
+  creditAppliedPaise: number
+  paymentStatus: "awaiting" | "paid" | "failed" | "refunded"
+  status: string
+  createdAt: string
+  titles: string[]
+  itemCount: number
+}
+
+/**
+ * Everything this customer has ordered.
+ *
+ * Empty array rather than null when signed out or on a failure: an account page that renders "no
+ * orders yet" is a page, and one that throws is a 500 on somebody's own account. The sign-in state
+ * is already known to the caller, which is the right place to say so.
+ */
+export async function listMyOrders(): Promise<OrderSummary[]> {
+  try {
+    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/orders`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    })
+    if (!res.ok) return []
+    const body = (await res.json()) as { orders?: OrderSummary[] }
+    return body.orders ?? []
+  } catch {
+    return []
+  }
+}

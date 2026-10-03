@@ -7,7 +7,6 @@ import {
   CART_COOKIE,
 } from "@lib/data/orders-cart"
 import { revalidateTag, revalidatePath } from "next/cache"
-import { getOrSetCart } from "@modules/cart/actions"
 import { addItem } from "@lib/data"
 
 const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9001"

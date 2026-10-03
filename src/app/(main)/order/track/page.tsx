@@ -1,55 +1,81 @@
 import { Metadata } from "next"
-import OrderTracker from "@modules/order/components/order-tracker"
+import Link from "next/link"
+
+import { getCustomer } from "@lib/data"
+import { listMyOrders } from "@lib/data/orders-cart"
 import { getSiteSettings, whatsappUrl } from "@lib/data/site-settings"
+import MyOrders from "@modules/account/components/my-orders"
 
 export const metadata: Metadata = {
   alternates: { canonical: "/order/track" },
-  title: "Track Your Order",
-  description: "Track the status of your CrossFriend order in real-time.",
+  title: "Track your order",
+  description: "See where your CrossFriend order has got to.",
 }
 
+/**
+ * Where is my order.
+ *
+ * ── What was here before ───────────────────────────────────────────────────────────────────────
+ * A mock. A hardcoded order id, a fixed "Today, 4:00 PM - 6:00 PM" delivery window, and a search
+ * box wired to nothing — its own comment said "in production, this would fetch from API". Anybody
+ * who typed their real order number watched the same invented order come back, which is worse than
+ * a page that admits it cannot help.
+ *
+ * ── Why there is no search box now ─────────────────────────────────────────────────────────────
+ * An order number alone must not open an order: they are sequential, so a box that accepts one is a
+ * box that reads other people's addresses and phone numbers by counting. The backend scopes every
+ * order read to the signed-in customer for that reason, and the honest front door is therefore the
+ * customer's own list rather than a field. Signing in is the one step, and it is the OTP they
+ * already used to order.
+ */
 export default async function OrderTrackPage() {
-  const settings = await getSiteSettings()
+  const [customer, settings] = await Promise.all([
+    getCustomer().catch(() => null),
+    getSiteSettings(),
+  ])
 
-  // In production, this would fetch from API based on order ID / session
-  // For now, show a demo tracker + search input
+  const orders = customer ? await listMyOrders() : []
+  const live = orders.filter((o) => o.status !== "delivered" && o.status !== "cancelled")
+
   return (
-    <div className="content-container py-12 max-w-2xl mx-auto">
-      <h1 className="cf-heading text-2xl small:text-3xl text-center mb-2">
-        Track Your <span className="gradient-cf-text">Order</span>
+    <div className="content-container mx-auto max-w-2xl py-12">
+      <h1 className="cf-heading mb-2 text-center text-2xl small:text-3xl">
+        Track your <span className="gradient-cf-text">order</span>
       </h1>
-      <p className="text-sm text-ui-fg-muted text-center mb-8">
-        Enter your order ID to see real-time delivery status
-      </p>
 
-      {/* Search */}
-      <div className="flex gap-2 mb-8">
-        <input
-          type="text"
-          placeholder="Enter Order ID (e.g. order_01H...)"
-          className="flex-1 px-4 py-3 rounded-xl border border-ui-border-base text-sm focus:outline-none focus:ring-2 focus:ring-cf-orange/40 focus:border-cf-orange"
-        />
-        <button className="px-6 py-3 bg-cf-orange text-white text-sm font-semibold rounded-xl hover:bg-cf-orange-dark transition-colors">
-          Track
-        </button>
-      </div>
+      {!customer ? (
+        <>
+          <p className="mb-8 text-center text-sm text-ui-fg-muted">
+            Sign in with the mobile number you ordered with and your orders will be here.
+          </p>
+          <div className="text-center">
+            <Link
+              href="/account"
+              className="inline-block rounded-xl bg-gradient-to-r from-cf-purple-700 via-cf-purple-600 to-fuchsia-600 px-6 py-3 text-sm font-semibold text-white"
+            >
+              Sign in
+            </Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mb-8 text-center text-sm text-ui-fg-muted">
+            {live.length > 0
+              ? "Tap an order to see every step and where it has got to."
+              : "Nothing on the way right now."}
+          </p>
+          <MyOrders orders={live.length > 0 ? live : orders} />
+        </>
+      )}
 
-      {/* Demo tracker */}
-      <OrderTracker
-        currentStatus="preparing"
-        orderId="order_01H8XKGFP4KJ9R"
-        estimatedDelivery="Today, 4:00 PM - 6:00 PM"
-      />
-
-      {/* Help text */}
-      <div className="mt-8 p-4 bg-cf-warm rounded-xl text-center">
+      <div className="mt-8 rounded-xl bg-cf-warm p-4 text-center">
         <p className="text-sm text-grey-60">
-          Can&apos;t find your order?{" "}
+          Something not right?{" "}
           <a
-            href={whatsappUrl(settings.whatsappNumber, "Hi! I can't find my CrossFriend order.")}
+            href={whatsappUrl(settings.whatsappNumber, "Hi! I have a question about my CrossFriend order.")}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-cf-orange font-medium hover:underline"
+            className="font-medium text-cf-orange hover:underline"
           >
             Chat with us on WhatsApp
           </a>

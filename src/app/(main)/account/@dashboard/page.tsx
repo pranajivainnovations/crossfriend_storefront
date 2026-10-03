@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 
-import { getCustomer, listCustomerOrders } from "@lib/data"
+import { getCustomer } from "@lib/data"
+import { listMyOrders } from "@lib/data/orders-cart"
 import { getWallet } from "@lib/data/wallet"
 import { getReferral } from "@lib/data/referral"
 import Overview from "@modules/account/components/overview"
@@ -16,7 +17,7 @@ export default async function OverviewTemplate() {
      round trips to the page a signed-in customer lands on most often. */
   const [customer, orders, wallet, referral] = await Promise.all([
     getCustomer().catch(() => null),
-    listCustomerOrders().catch(() => null),
+    listMyOrders().catch(() => null),
     getWallet().catch(() => null),
     getReferral().catch(() => null),
   ])

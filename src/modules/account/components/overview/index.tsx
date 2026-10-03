@@ -1,6 +1,4 @@
-import { Customer, Order } from "@medusajs/medusa"
-import { Container } from "@medusajs/ui"
-import { formatAmount } from "@lib/util/prices"
+import { Customer } from "@medusajs/medusa"
 
 import ChevronDown from "@modules/common/icons/chevron-down"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
@@ -8,10 +6,22 @@ import WalletCard from "@modules/account/components/wallet-card"
 import ReferralCard from "@modules/account/components/referral-card"
 import type { Wallet } from "@lib/data/wallet"
 import type { Referral } from "@lib/data/referral"
+import type { OrderSummary } from "@lib/data/orders-cart"
+import { rupees } from "@lib/money"
+
+/** The customer's words for each step, matching the account list and the order page. */
+const ORDER_STEP: Record<string, string> = {
+  placed: "Finding a baker",
+  accepted: "Baker assigned",
+  making: "Being made",
+  out_for_delivery: "On its way",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+}
 
 type OverviewProps = {
   customer: Omit<Customer, "password_hash"> | null
-  orders: Order[] | null
+  orders: OrderSummary[] | null
   wallet?: Wallet | null
   referral?: Referral | null
 }
@@ -78,46 +88,49 @@ const Overview = ({ customer, orders, wallet, referral }: OverviewProps) => {
               <div className="flex items-center gap-x-2">
                 <h3 className="text-large-semi">Recent orders</h3>
               </div>
-              <ul className="flex flex-col gap-y-4" data-testid="orders-wrapper">
+              <ul className="flex flex-col gap-y-3" data-testid="orders-wrapper">
                 {orders && orders.length > 0 ? (
-                  orders.slice(0, 5).map((order) => {
-                    return (
-                      <li key={order.id} data-testid="order-wrapper" data-value={order.id}>
-                        <LocalizedClientLink
-                          href={`/account/orders/details/${order.id}`}
-                        >
-                          <Container className="bg-gray-50 flex justify-between items-center p-4">
-                            <div className="grid grid-cols-3 grid-rows-2 text-small-regular gap-x-4 flex-1">
-                              <span className="font-semibold">Date placed</span>
-                              <span className="font-semibold">
-                                Order number
+                  orders.slice(0, 5).map((order) => (
+                    <li key={order.id} data-testid="order-wrapper" data-value={order.id}>
+                      <LocalizedClientLink href={`/account/orders/details/${order.id}`}>
+                        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className="font-mono text-sm font-semibold tabular-nums text-slate-900"
+                                data-testid="order-id"
+                                data-value={order.displayId}
+                              >
+                                #{order.displayId}
                               </span>
-                              <span className="font-semibold">
-                                Total amount
-                              </span>
-                              <span data-testid="order-created-date">
-                                {new Date(order.created_at).toDateString()}
-                              </span>
-                              <span data-testid="order-id" data-value={order.display_id}>#{order.display_id}</span>
-                              <span data-testid="order-amount">
-                                {formatAmount({
-                                  amount: order.total,
-                                  region: order.region,
-                                  includeTaxes: false,
-                                })}
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                                {ORDER_STEP[order.status] ?? order.status}
                               </span>
                             </div>
-                            <button className="flex items-center justify-between" data-testid="open-order-button">
-                              <span className="sr-only">
-                                Go to order #{order.display_id}
-                              </span>
-                              <ChevronDown className="-rotate-90" />
-                            </button>
-                          </Container>
-                        </LocalizedClientLink>
-                      </li>
-                    )
-                  })
+                            <p className="mt-1 truncate text-sm text-slate-600">
+                              {order.titles.join(", ")}
+                            </p>
+                            <p
+                              className="mt-0.5 text-xs text-slate-400"
+                              data-testid="order-created-date"
+                            >
+                              {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                          <span
+                            className="shrink-0 text-sm font-semibold tabular-nums text-slate-900"
+                            data-testid="order-amount"
+                          >
+                            {rupees(order.payablePaise)}
+                          </span>
+                        </div>
+                      </LocalizedClientLink>
+                    </li>
+                  ))
                 ) : (
                   <span data-testid="no-orders-message">No recent orders</span>
                 )}

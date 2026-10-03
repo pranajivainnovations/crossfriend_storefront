@@ -24,7 +24,20 @@ const STEPS: { key: string; label: string }[] = [
   { key: "delivered", label: "Delivered" },
 ]
 
-export default function OrderConfirmed({ order }: { order: PlacedOrderView }) {
+export default function OrderConfirmed({
+  order,
+  celebrate = true,
+}: {
+  order: PlacedOrderView
+  /**
+   * Off when this is somebody looking up an order from their account.
+   *
+   * The same screen answers two questions — "did that work?" straight after paying, and "where is
+   * my order?" a week later — and they want different first lines. Confetti over an order placed
+   * last Tuesday reads as a page that does not know what it is showing.
+   */
+  celebrate?: boolean
+}) {
   const paid = order.paymentStatus === "paid"
   const reached = new Set(order.events.map((e) => e.status))
   const currentIndex = STEPS.findIndex((s) => s.key === order.status)
@@ -37,20 +50,28 @@ export default function OrderConfirmed({ order }: { order: PlacedOrderView }) {
             paid ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
           }`}
         >
-          <div className="text-4xl">{paid ? "🎉" : "⏳"}</div>
+          <div className="text-4xl">{paid ? (celebrate ? "🎉" : "✓") : "⏳"}</div>
           <h1
             className={`mt-3 text-xl font-bold ${paid ? "text-emerald-900" : "text-amber-900"}`}
           >
-            {paid ? "Your order is confirmed" : "Payment is settling"}
+            {paid
+              ? celebrate
+                ? "Your order is confirmed"
+                : `Order #${order.displayId}`
+              : "Payment is settling"}
           </h1>
           <p className={`mt-2 text-sm ${paid ? "text-emerald-800" : "text-amber-900"}`}>
             {paid
-              ? "We have sent the details to your mobile."
+              ? celebrate
+                ? "We have sent the details to your mobile."
+                : "Paid in full."
               : "We have your order. Some payment methods take a minute to clear — there is no need to pay again."}
           </p>
-          <p className="mt-3 font-mono text-sm tabular-nums text-slate-700">
-            Order #{order.displayId}
-          </p>
+          {celebrate && (
+            <p className="mt-3 font-mono text-sm tabular-nums text-slate-700">
+              Order #{order.displayId}
+            </p>
+          )}
         </div>
 
         <section className="mt-8">
