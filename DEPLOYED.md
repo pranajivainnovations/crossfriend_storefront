@@ -361,3 +361,35 @@ Do not edit by hand, and do not delete — it is the only record of what is live
 - image:   crossfriend-storefront:latest
 - target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
 - by:      crossfriend2025
+---
+- when:    2026-10-03 21:07:13 UTC  /  2026-10-04 02:37 IST
+- outcome: SUCCESS
+- commit:  9d1f6d6 (main)
+- tree:    clean
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
+---
+- when:    2026-10-03 22:16:33 UTC  /  2026-10-04 03:46 IST
+- outcome: SUCCESS
+- commit:  9d1f6d6 (main)
+- tree:    dirty
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
+---
+- when:    2026-10-04 09:04:13 UTC  /  2026-10-04 14:34 IST
+- outcome: SUCCESS
+- commit:  9d1f6d6 (main)
+- tree:    dirty
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
+---
+- when:    2026-10-04 09:28:58 UTC  /  2026-10-04 14:58 IST
+- outcome: SUCCESS
+- commit:  9d1f6d6 (main)
+- tree:    dirty
+- image:   crossfriend-storefront:latest
+- target:  ubuntu@155.248.243.46:/home/ubuntu/crossfriend
+- by:      crossfriend2025
